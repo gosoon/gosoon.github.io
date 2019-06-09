@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kubelet,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="上篇文章（kubelet 架构浅析 ）已经介绍过 kubelet 在整个集群架构中的功能以及自身各模块的用途，本篇文章主要介绍 kubelet 的启动流程。  kubernetes 版本： v1.12   kubelet 启动流程kubelet 代码结构: 12345678910111213141516171819202122232425262728➜  kubernetes git:(relea">
+<meta name="keywords" content="kubelet">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubelet 启动流程分析">
+<meta property="og:url" content="http://yoursite.com/2018/12/23/kubelet_init/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="上篇文章（kubelet 架构浅析 ）已经介绍过 kubelet 在整个集群架构中的功能以及自身各模块的用途，本篇文章主要介绍 kubelet 的启动流程。  kubernetes 版本： v1.12   kubelet 启动流程kubelet 代码结构: 12345678910111213141516171819202122232425262728➜  kubernetes git:(relea">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-bdeb34a5cdda93d2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:updated_time" content="2019-06-01T14:26:16.309Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubelet 启动流程分析">
+<meta name="twitter:description" content="上篇文章（kubelet 架构浅析 ）已经介绍过 kubelet 在整个集群架构中的功能以及自身各模块的用途，本篇文章主要介绍 kubelet 的启动流程。  kubernetes 版本： v1.12   kubelet 启动流程kubelet 代码结构: 12345678910111213141516171819202122232425262728➜  kubernetes git:(relea">
+<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-bdeb34a5cdda93d2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2018/12/23/kubelet_init/">
+
+
+
+
+
+  <title>kubelet 启动流程分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/12/23/kubelet_init/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubelet 启动流程分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-12-23T21:22:30+08:00">
+                2018-12-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/12/23/kubelet_init/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2018/12/23/kubelet_init/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>上篇文章（<a href="https://blog.tianfeiyu.com/2018/12/16/kubelet-modules/" target="_blank" rel="noopener">kubelet 架构浅析</a> ）已经介绍过 kubelet 在整个集群架构中的功能以及自身各模块的用途，本篇文章主要介绍 kubelet 的启动流程。</p>
+<blockquote>
+<p>kubernetes 版本： v1.12 </p>
+</blockquote>
+<h2 id="kubelet-启动流程"><a href="#kubelet-启动流程" class="headerlink" title="kubelet 启动流程"></a>kubelet 启动流程</h2><p>kubelet 代码结构:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">➜  kubernetes git:(release-1.12) ✗ tree cmd/kubelet</span><br><span class="line">cmd/kubelet</span><br><span class="line">├── BUILD</span><br><span class="line">├── OWNERS</span><br><span class="line">├── app</span><br><span class="line">│   ├── BUILD</span><br><span class="line">│   ├── OWNERS</span><br><span class="line">│   ├── auth.go</span><br><span class="line">│   ├── init_others.go</span><br><span class="line">│   ├── init_windows.go</span><br><span class="line">│   ├── options</span><br><span class="line">│   │   ├── BUILD</span><br><span class="line">│   │   ├── container_runtime.go</span><br><span class="line">│   │   ├── globalflags.go</span><br><span class="line">│   │   ├── globalflags_linux.go</span><br><span class="line">│   │   ├── globalflags_other.go</span><br><span class="line">│   │   ├── options.go</span><br><span class="line">│   │   ├── options_test.go</span><br><span class="line">│   │   ├── osflags_others.go</span><br><span class="line">│   │   └── osflags_windows.go</span><br><span class="line">│   ├── plugins.go</span><br><span class="line">│   ├── server.go</span><br><span class="line">│   ├── server_linux.go</span><br><span class="line">│   ├── server_test.go</span><br><span class="line">│   └── server_unsupported.go</span><br><span class="line">└── kubelet.go</span><br><span class="line"></span><br><span class="line">2 directories, 22 files</span><br></pre></td></tr></table></figure>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-bdeb34a5cdda93d2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kubelet 启动流程时序图"></p>
+<h4 id="1、kubelet-入口函数-main（cmd-kubelet-kubelet-go）"><a href="#1、kubelet-入口函数-main（cmd-kubelet-kubelet-go）" class="headerlink" title="1、kubelet 入口函数 main（cmd/kubelet/kubelet.go）"></a>1、kubelet 入口函数 main（cmd/kubelet/kubelet.go）</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">func main() &#123;</span><br><span class="line">	rand.Seed(time.Now().UTC().UnixNano())</span><br><span class="line"></span><br><span class="line">	command := app.NewKubeletCommand(server.SetupSignalHandler())</span><br><span class="line">	logs.InitLogs()</span><br><span class="line">	defer logs.FlushLogs()</span><br><span class="line"></span><br><span class="line">	if err := command.Execute(); err != nil &#123;</span><br><span class="line">		fmt.Fprintf(os.Stderr, &quot;%v\n&quot;, err)</span><br><span class="line">		os.Exit(1)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="2、初始化-kubelet-配置（cmd-kubelet-app-server-go）"><a href="#2、初始化-kubelet-配置（cmd-kubelet-app-server-go）" class="headerlink" title="2、初始化 kubelet 配置（cmd/kubelet/app/server.go）"></a>2、初始化 kubelet 配置（cmd/kubelet/app/server.go）</h4><p>NewKubeletCommand() 函数主要负责获取配置文件中的参数，校验参数以及为参数设置默认值。  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">// NewKubeletCommand creates a *cobra.Command object with default parameters</span><br><span class="line">func NewKubeletCommand(stopCh &lt;-chan struct&#123;&#125;) *cobra.Command &#123;</span><br><span class="line">    cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)</span><br><span class="line">    cleanFlagSet.SetNormalizeFunc(flag.WordSepNormalizeFunc)</span><br><span class="line">    // Kubelet配置分两部分:</span><br><span class="line">    // KubeletFlag: 指那些不允许在 kubelet 运行时进行修改的配置集，或者不能在集群中各个 Nodes 之间共享的配置集。</span><br><span class="line">    // KubeletConfiguration: 指可以在集群中各个Nodes之间共享的配置集，可以进行动态配置。</span><br><span class="line">    kubeletFlags := options.NewKubeletFlags()</span><br><span class="line">	kubeletConfig, err := options.NewKubeletConfiguration()</span><br><span class="line">	...</span><br><span class="line">	cmd := &amp;cobra.Command&#123;</span><br><span class="line">		...</span><br><span class="line">		Run: func(cmd *cobra.Command, args []string) &#123;</span><br><span class="line">			// 读取 kubelet 配置文件</span><br><span class="line">			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) &gt; 0 &#123;</span><br><span class="line">				kubeletConfig, err = loadConfigFile(configFile)</span><br><span class="line">				if err != nil &#123;</span><br><span class="line">					glog.Fatal(err)</span><br><span class="line">				&#125;</span><br><span class="line">				...</span><br><span class="line">			&#125;</span><br><span class="line">			// 校验 kubelet 参数</span><br><span class="line">			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil &#123;</span><br><span class="line">				glog.Fatal(err)</span><br><span class="line">			&#125;</span><br><span class="line">			...</span><br><span class="line">			// 此处初始化了 kubeletDeps</span><br><span class="line">			kubeletDeps, err := UnsecuredDependencies(kubeletServer)</span><br><span class="line">			if err != nil &#123;</span><br><span class="line">				glog.Fatal(err)</span><br><span class="line">			&#125;</span><br><span class="line">			...</span><br><span class="line">			// 启动程序</span><br><span class="line">			if err := Run(kubeletServer, kubeletDeps, stopCh); err != nil &#123;</span><br><span class="line">				glog.Fatal(err)</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;,</span><br><span class="line">	&#125;</span><br><span class="line">    ...</span><br><span class="line">	return cmd</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>kubeletDeps 包含 kubelet 运行所必须的配置，是为了实现 dependency injection，其目的是为了把 kubelet 依赖的组件对象作为参数传进来，这样可以控制 kubelet 的行为。主要包括监控功能（cadvisor），cgroup 管理功能（containerManager）等。</p>
+<p>NewKubeletCommand() 会调用 Run() 函数，Run() 中主要调用 run() 函数进行一些准备事项。</p>
+<h4 id="3、创建和-apiserver-通信的对象（cmd-kubelet-app-server-go）"><a href="#3、创建和-apiserver-通信的对象（cmd-kubelet-app-server-go）" class="headerlink" title="3、创建和 apiserver 通信的对象（cmd/kubelet/app/server.go）"></a>3、创建和 apiserver 通信的对象（cmd/kubelet/app/server.go）</h4><p>run() 函数的主要功能：</p>
+<ul>
+<li>1、创建 kubeClient，evnetClient 用来和 apiserver 通信。创建 heartbeatClient 向 apiserver 上报心跳状态。</li>
+<li>2、为 kubeDeps 设定一些默认值。</li>
+<li>3、启动监听 Healthz 端口的 http server，默认端口是 10248。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line">func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh &lt;-chan struct&#123;&#125;) (err error) &#123;</span><br><span class="line">	...</span><br><span class="line">	// 判断 kubelet 的启动模式</span><br><span class="line">	if standaloneMode &#123;</span><br><span class="line">	...</span><br><span class="line">	&#125; else if kubeDeps.KubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil || kubeDeps.DynamicKubeClient == nil &#123;</span><br><span class="line">		...</span><br><span class="line">		// 创建对象 kubeClient</span><br><span class="line">		kubeClient, err = clientset.NewForConfig(clientConfig)</span><br><span class="line"></span><br><span class="line">		...</span><br><span class="line">        // 创建对象 evnetClient</span><br><span class="line">		eventClient, err = v1core.NewForConfig(&amp;eventClientConfig)</span><br><span class="line">		...</span><br><span class="line">		// heartbeatClient 上报状态</span><br><span class="line">		heartbeatClient, err = clientset.NewForConfig(&amp;heartbeatClientConfig)</span><br><span class="line">		...</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 为 kubeDeps 设定一些默认值</span><br><span class="line">	if kubeDeps.Auth == nil &#123;</span><br><span class="line">			auth, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)</span><br><span class="line">			if err != nil &#123;</span><br><span class="line">				return err</span><br><span class="line">			&#125;</span><br><span class="line">			kubeDeps.Auth = auth</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		if kubeDeps.CAdvisorInterface == nil &#123;</span><br><span class="line">			imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)</span><br><span class="line">			kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))</span><br><span class="line">			if err != nil &#123;</span><br><span class="line">				return err</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// </span><br><span class="line">	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil &#123;</span><br><span class="line">			return err</span><br><span class="line">	&#125;</span><br><span class="line">	...</span><br><span class="line">	// 启动监听 Healthz 端口的 http server  </span><br><span class="line">	if s.HealthzPort &gt; 0 &#123;</span><br><span class="line">		healthz.DefaultHealthz()</span><br><span class="line">		go wait.Until(func() &#123;</span><br><span class="line">			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)</span><br><span class="line">			if err != nil &#123;</span><br><span class="line">				glog.Errorf(&quot;Starting health server failed: %v&quot;, err)</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;, 5*time.Second, wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>kubelet 对 pod 资源的获取方式有三种：第一种是通过文件获得，文件一般放在 /etc/kubernetes/manifests 目录下面；第二种也是通过文件过得，只不过文件是通过 URL 获取的；第三种是通过 watch kube-apiserver 获取。其中前两种模式下，我们称 kubelet 运行在 standalone 模式下，运行在 standalone 模式下的 kubelet 一般用于调试某些功能。</p>
+<p>run() 中调用 RunKubelet() 函数进行后续操作。</p>
+<h4 id="4、初始化-kubelet-组件内部的模块（cmd-kubelet-app-server-go）"><a href="#4、初始化-kubelet-组件内部的模块（cmd-kubelet-app-server-go）" class="headerlink" title="4、初始化 kubelet 组件内部的模块（cmd/kubelet/app/server.go）"></a>4、初始化 kubelet 组件内部的模块（cmd/kubelet/app/server.go）</h4><p>RunKubelet()  主要功能：</p>
+<ul>
+<li>1、初始化 kubelet 组件中的各个模块，创建出 kubelet 对象。</li>
+<li>2、启动垃圾回收服务。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool) error &#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line"> 	// 初始化 kubelet 内部模块</span><br><span class="line">	k, err := CreateAndInitKubelet(&amp;kubeServer.KubeletConfiguration,</span><br><span class="line">		kubeDeps,</span><br><span class="line">		&amp;kubeServer.ContainerRuntimeOptions,</span><br><span class="line">		kubeServer.ContainerRuntime,</span><br><span class="line">		kubeServer.RuntimeCgroups,</span><br><span class="line">		kubeServer.HostnameOverride,</span><br><span class="line">		kubeServer.NodeIP,</span><br><span class="line">		kubeServer.ProviderID,</span><br><span class="line">		kubeServer.CloudProvider,</span><br><span class="line">		kubeServer.CertDirectory,</span><br><span class="line">		kubeServer.RootDirectory,</span><br><span class="line">		kubeServer.RegisterNode,</span><br><span class="line">		kubeServer.RegisterWithTaints,</span><br><span class="line">		kubeServer.AllowedUnsafeSysctls,</span><br><span class="line">		kubeServer.RemoteRuntimeEndpoint,</span><br><span class="line">		kubeServer.RemoteImageEndpoint,</span><br><span class="line">		kubeServer.ExperimentalMounterPath,</span><br><span class="line">		kubeServer.ExperimentalKernelMemcgNotification,</span><br><span class="line">		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,</span><br><span class="line">		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,</span><br><span class="line">		kubeServer.MinimumGCAge,</span><br><span class="line">		kubeServer.MaxPerPodContainerCount,</span><br><span class="line">		kubeServer.MaxContainerCount,</span><br><span class="line">		kubeServer.MasterServiceNamespace,</span><br><span class="line">		kubeServer.RegisterSchedulable,</span><br><span class="line">		kubeServer.NonMasqueradeCIDR,</span><br><span class="line">		kubeServer.KeepTerminatedPodVolumes,</span><br><span class="line">		kubeServer.NodeLabels,</span><br><span class="line">		kubeServer.SeccompProfileRoot,</span><br><span class="line">		kubeServer.BootstrapCheckpointPath,</span><br><span class="line">		kubeServer.NodeStatusMaxImages)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		return fmt.Errorf(&quot;failed to create kubelet: %v&quot;, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	...</span><br><span class="line">	if runOnce &#123;</span><br><span class="line">		if _, err := k.RunOnce(podCfg.Updates()); err != nil &#123;</span><br><span class="line">			return fmt.Errorf(&quot;runonce failed: %v&quot;, err)</span><br><span class="line">		&#125;</span><br><span class="line">		glog.Infof(&quot;Started kubelet as runonce&quot;)</span><br><span class="line">	&#125; else &#123;</span><br><span class="line">        // </span><br><span class="line">		startKubelet(k, podCfg, &amp;kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)</span><br><span class="line">		glog.Infof(&quot;Started kubelet&quot;)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">func CreateAndInitKubelet(...)&#123;</span><br><span class="line">	// NewMainKubelet 实例化一个 kubelet 对象，并对 kubelet 内部各个模块进行初始化</span><br><span class="line">	k, err = kubelet.NewMainKubelet(kubeCfg,</span><br><span class="line">		kubeDeps,</span><br><span class="line">		crOptions,</span><br><span class="line">		containerRuntime,</span><br><span class="line">		runtimeCgroups,</span><br><span class="line">		hostnameOverride,</span><br><span class="line">		nodeIP,</span><br><span class="line">		providerID,</span><br><span class="line">		cloudProvider,</span><br><span class="line">		certDirectory,</span><br><span class="line">		rootDirectory,</span><br><span class="line">		registerNode,</span><br><span class="line">		registerWithTaints,</span><br><span class="line">		allowedUnsafeSysctls,</span><br><span class="line">		remoteRuntimeEndpoint,</span><br><span class="line">		remoteImageEndpoint,</span><br><span class="line">		experimentalMounterPath,</span><br><span class="line">		experimentalKernelMemcgNotification,</span><br><span class="line">		experimentalCheckNodeCapabilitiesBeforeMount,</span><br><span class="line">		experimentalNodeAllocatableIgnoreEvictionThreshold,</span><br><span class="line">		minimumGCAge,</span><br><span class="line">		maxPerPodContainerCount,</span><br><span class="line">		maxContainerCount,</span><br><span class="line">		masterServiceNamespace,</span><br><span class="line">		registerSchedulable,</span><br><span class="line">		nonMasqueradeCIDR,</span><br><span class="line">		keepTerminatedPodVolumes,</span><br><span class="line">		nodeLabels,</span><br><span class="line">		seccompProfileRoot,</span><br><span class="line">		bootstrapCheckpointPath,</span><br><span class="line">		nodeStatusMaxImages)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		return nil, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 通知 apiserver kubelet 启动了</span><br><span class="line">	k.BirthCry()</span><br><span class="line">	// 启动垃圾回收服务</span><br><span class="line">	k.StartGarbageCollection()</span><br><span class="line"></span><br><span class="line">	return k, nil</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br></pre></td><td class="code"><pre><span class="line">func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,...)&#123;</span><br><span class="line">    ...</span><br><span class="line">	if kubeDeps.PodConfig == nil &#123;</span><br><span class="line">		var err error</span><br><span class="line">		// 初始化 makePodSourceConfig，监听 pod 元数据的来源(FILE, URL, api-server)，将不同 source 的 pod configuration 合并到一个结构中</span><br><span class="line">		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName, bootstrapCheckpointPath)</span><br><span class="line">		if err != nil &#123;</span><br><span class="line">			return nil, err</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">    </span><br><span class="line">    // kubelet 服务端口，默认 10250</span><br><span class="line">	daemonEndpoints := &amp;v1.NodeDaemonEndpoints&#123;</span><br><span class="line">		KubeletEndpoint: v1.DaemonEndpoint&#123;Port: kubeCfg.Port&#125;,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 使用 reflector 把 ListWatch 得到的服务信息实时同步到 serviceStore 对象中</span><br><span class="line">	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers&#123;cache.NamespaceIndex: cache.MetaNamespaceIndexFunc&#125;)</span><br><span class="line">	if kubeDeps.KubeClient != nil &#123;</span><br><span class="line">		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.CoreV1().RESTClient(), &quot;services&quot;, metav1.NamespaceAll, fields.Everything())</span><br><span class="line">		r := cache.NewReflector(serviceLW, &amp;v1.Service&#123;&#125;, serviceIndexer, 0)</span><br><span class="line">		go r.Run(wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line">	serviceLister := corelisters.NewServiceLister(serviceIndexer)</span><br><span class="line"></span><br><span class="line">	// 使用 reflector 把 ListWatch 得到的节点信息实时同步到  nodeStore 对象中</span><br><span class="line">	nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers&#123;&#125;)</span><br><span class="line">	if kubeDeps.KubeClient != nil &#123;</span><br><span class="line">		fieldSelector := fields.Set&#123;api.ObjectNameField: string(nodeName)&#125;.AsSelector()</span><br><span class="line">		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.CoreV1().RESTClient(), &quot;nodes&quot;, metav1.NamespaceAll, fieldSelector)</span><br><span class="line">		r := cache.NewReflector(nodeLW, &amp;v1.Node&#123;&#125;, nodeIndexer, 0)</span><br><span class="line">		go r.Run(wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line">	nodeInfo := &amp;predicates.CachedNodeInfo&#123;NodeLister: corelisters.NewNodeLister(nodeIndexer)&#125;</span><br><span class="line"></span><br><span class="line">	...</span><br><span class="line">	// node 资源不足时的驱逐策略的设定</span><br><span class="line">	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		return nil, err</span><br><span class="line">	&#125;</span><br><span class="line">	evictionConfig := eviction.Config&#123;</span><br><span class="line">		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,</span><br><span class="line">		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),</span><br><span class="line">		Thresholds:               thresholds,</span><br><span class="line">		KernelMemcgNotification:  experimentalKernelMemcgNotification,</span><br><span class="line">		PodCgroupRoot:            kubeDeps.ContainerManager.GetPodCgroupRoot(),</span><br><span class="line">	&#125;</span><br><span class="line">    ...</span><br><span class="line">    // 容器引用的管理</span><br><span class="line">	containerRefManager := kubecontainer.NewRefManager()</span><br><span class="line">    // oom 监控</span><br><span class="line">	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)</span><br><span class="line"></span><br><span class="line">	// 根据配置信息和各种对象创建 Kubelet 实例</span><br><span class="line">	klet := &amp;Kubelet&#123;</span><br><span class="line">		hostname:                       hostname,</span><br><span class="line">		hostnameOverridden:             len(hostnameOverride) &gt; 0,</span><br><span class="line">		nodeName:                       nodeName,</span><br><span class="line">		...</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	// 从 cAdvisor 获取当前机器的信息</span><br><span class="line">	machineInfo, err := klet.cadvisor.MachineInfo()</span><br><span class="line"></span><br><span class="line">	// 对 pod 的管理（如: 增删改等）</span><br><span class="line">	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager, checkpointManager)</span><br><span class="line"></span><br><span class="line">	// 容器运行时管理</span><br><span class="line">	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(...)</span><br><span class="line"></span><br><span class="line">	// pleg</span><br><span class="line">	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock&#123;&#125;)</span><br><span class="line"></span><br><span class="line">	// 创建 containerGC 对象，进行周期性的容器清理工作</span><br><span class="line">	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)</span><br><span class="line"></span><br><span class="line">	// 创建 imageManager 管理镜像</span><br><span class="line">	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)</span><br><span class="line">	</span><br><span class="line">	// statusManager 实时检测节点上 pod 的状态，并更新到 apiserver 对应的 pod</span><br><span class="line">	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)</span><br><span class="line"></span><br><span class="line">	// 探针管理</span><br><span class="line">	klet.probeManager = prober.NewManager(...)</span><br><span class="line"></span><br><span class="line">    // token 管理</span><br><span class="line">	tokenManager := token.NewManager(kubeDeps.KubeClient)</span><br><span class="line"></span><br><span class="line">	// 磁盘管理</span><br><span class="line">	klet.volumeManager = volumemanager.NewVolumeManager()</span><br><span class="line">	</span><br><span class="line">	// 将 syncPod() 注入到 podWorkers 中</span><br><span class="line">	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)</span><br><span class="line"></span><br><span class="line">	// 容器驱逐策略管理</span><br><span class="line">	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>RunKubelet 最后会调用 startKubelet() 进行后续的操作。</p>
+<h4 id="5、启动-kubelet-内部的模块及服务（cmd-kubelet-app-server-go）"><a href="#5、启动-kubelet-内部的模块及服务（cmd-kubelet-app-server-go）" class="headerlink" title="5、启动 kubelet 内部的模块及服务（cmd/kubelet/app/server.go）"></a>5、启动 kubelet 内部的模块及服务（cmd/kubelet/app/server.go）</h4><p>startKubelet()  的主要功能：</p>
+<ul>
+<li>1、以 goroutine 方式启动 kubelet 中的各个模块。</li>
+<li>2、启动 kubelet http server。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) &#123;</span><br><span class="line">	go wait.Until(func() &#123;</span><br><span class="line">		// 以 goroutine 方式启动 kubelet 中的各个模块</span><br><span class="line">		k.Run(podCfg.Updates())</span><br><span class="line">	&#125;, 0, wait.NeverStop)</span><br><span class="line"></span><br><span class="line">	// 启动 kubelet http server	</span><br><span class="line">	if enableServer &#123;</span><br><span class="line">		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line">	if kubeCfg.ReadOnlyPort &gt; 0 &#123;</span><br><span class="line">		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line">// Run starts the kubelet reacting to config updates</span><br><span class="line">func (kl *Kubelet) Run(updates &lt;-chan kubetypes.PodUpdate) &#123;</span><br><span class="line">	if kl.logServer == nil &#123;</span><br><span class="line">		kl.logServer = http.StripPrefix(&quot;/logs/&quot;, http.FileServer(http.Dir(&quot;/var/log/&quot;)))</span><br><span class="line">	&#125;</span><br><span class="line">	if kl.kubeClient == nil &#123;</span><br><span class="line">		glog.Warning(&quot;No api server defined - no node status update will be sent.&quot;)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// Start the cloud provider sync manager</span><br><span class="line">	if kl.cloudResourceSyncManager != nil &#123;</span><br><span class="line">		go kl.cloudResourceSyncManager.Run(wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	if err := kl.initializeModules(); err != nil &#123;</span><br><span class="line">		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())</span><br><span class="line">		glog.Fatal(err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// Start volume manager</span><br><span class="line">	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)</span><br><span class="line"></span><br><span class="line">	if kl.kubeClient != nil &#123;</span><br><span class="line">		// Start syncing node status immediately, this may set up things the runtime needs to run.</span><br><span class="line">		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)</span><br><span class="line">		go kl.fastStatusUpdateOnce()</span><br><span class="line"></span><br><span class="line">		// start syncing lease</span><br><span class="line">		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &#123;</span><br><span class="line">			go kl.nodeLeaseController.Run(wait.NeverStop)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)</span><br><span class="line"></span><br><span class="line">	// Start loop to sync iptables util rules</span><br><span class="line">	if kl.makeIPTablesUtilChains &#123;</span><br><span class="line">		go wait.Until(kl.syncNetworkUtil, 1*time.Minute, wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// Start a goroutine responsible for killing pods (that are not properly</span><br><span class="line">	// handled by pod workers).</span><br><span class="line">	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)</span><br><span class="line"></span><br><span class="line">	// Start component sync loops.</span><br><span class="line">	kl.statusManager.Start()</span><br><span class="line">	kl.probeManager.Start()</span><br><span class="line"></span><br><span class="line">	// Start syncing RuntimeClasses if enabled.</span><br><span class="line">	if kl.runtimeClassManager != nil &#123;</span><br><span class="line">		go kl.runtimeClassManager.Run(wait.NeverStop)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// Start the pod lifecycle event generator.</span><br><span class="line">	kl.pleg.Start()</span><br><span class="line"></span><br><span class="line">	kl.syncLoop(updates, kl)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>syncLoop 是 kubelet 的主循环方法，它从不同的管道(FILE,URL, API-SERVER)监听 pod 的变化，并把它们汇聚起来。当有新的变化发生时，它会调用对应的函数，保证 Pod 处于期望的状态。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) syncLoop(updates &lt;-chan kubetypes.PodUpdate, handler SyncHandler) &#123;</span><br><span class="line">	glog.Info(&quot;Starting kubelet main sync loop.&quot;)</span><br><span class="line"></span><br><span class="line">	// syncTicker 每秒检测一次是否有需要同步的 pod workers</span><br><span class="line">	syncTicker := time.NewTicker(time.Second)</span><br><span class="line">	defer syncTicker.Stop()</span><br><span class="line">	housekeepingTicker := time.NewTicker(housekeepingPeriod)</span><br><span class="line">	defer housekeepingTicker.Stop()</span><br><span class="line">	plegCh := kl.pleg.Watch()</span><br><span class="line">	const (</span><br><span class="line">		base   = 100 * time.Millisecond</span><br><span class="line">		max    = 5 * time.Second</span><br><span class="line">		factor = 2</span><br><span class="line">	)</span><br><span class="line">	duration := base</span><br><span class="line">	for &#123;</span><br><span class="line">		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 &#123;</span><br><span class="line">			glog.Infof(&quot;skipping pod synchronization - %v&quot;, rs)</span><br><span class="line">			// exponential backoff</span><br><span class="line">			time.Sleep(duration)</span><br><span class="line">			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))</span><br><span class="line">			continue</span><br><span class="line">		&#125;</span><br><span class="line">		// reset backoff if we have a success</span><br><span class="line">		duration = base</span><br><span class="line"></span><br><span class="line">		kl.syncLoopMonitor.Store(kl.clock.Now())</span><br><span class="line">		// </span><br><span class="line">		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) &#123;</span><br><span class="line">			break</span><br><span class="line">		&#125;</span><br><span class="line">		kl.syncLoopMonitor.Store(kl.clock.Now())</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>syncLoopIteration()  方法对多个管道进行遍历，如果 pod 发生变化，则会调用相应的 Handler，在 Handler 中通过调用 dispatchWork 分发任务。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本篇文章主要讲述了 kubelet 组件从加载配置到初始化内部的各个模块再到启动 kubelet 服务的整个流程，上面的时序图能清楚的看到函数之间的调用关系，但是其中每个组件具体的工作方式以及组件之间的交互方式还不得而知，后面会一探究竟。</p>
+<p>参考：<br><a href="http://www.sel.zju.edu.cn/?p=595" target="_blank" rel="noopener">kubernetes node components – kubelet</a><br><a href="https://segmentfault.com/a/1190000008267351" target="_blank" rel="noopener">Kubelet 源码分析(一):启动流程分析</a><br><a href="https://cizixs.com/2017/06/06/kubelet-source-code-analysis-part-1/" target="_blank" rel="noopener">kubelet 源码分析：启动流程</a><br><a href="https://www.lijiaocn.com/%E9%A1%B9%E7%9B%AE/2017/05/02/Kubernetes-kubelet.html" target="_blank" rel="noopener">kubernetes 的 kubelet 的工作过程</a><br><a href="https://fatsheep9146.github.io/2018/07/08/kubelet%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0%E8%A7%A3%E6%9E%90/" target="_blank" rel="noopener">kubelet 内部实现解析</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kubelet/" rel="tag"># kubelet</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/12/16/kubelet-modules/" rel="next" title="kubelet 架构浅析">
+                <i class="fa fa-chevron-left"></i> kubelet 架构浅析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/01/03/kubelet_create_pod/" rel="prev" title="kubelet 创建 pod 的流程">
+                kubelet 创建 pod 的流程 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#kubelet-启动流程"><span class="nav-number">1.</span> <span class="nav-text">kubelet 启动流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1、kubelet-入口函数-main（cmd-kubelet-kubelet-go）"><span class="nav-number">1.0.1.</span> <span class="nav-text">1、kubelet 入口函数 main（cmd/kubelet/kubelet.go）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2、初始化-kubelet-配置（cmd-kubelet-app-server-go）"><span class="nav-number">1.0.2.</span> <span class="nav-text">2、初始化 kubelet 配置（cmd/kubelet/app/server.go）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3、创建和-apiserver-通信的对象（cmd-kubelet-app-server-go）"><span class="nav-number">1.0.3.</span> <span class="nav-text">3、创建和 apiserver 通信的对象（cmd/kubelet/app/server.go）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4、初始化-kubelet-组件内部的模块（cmd-kubelet-app-server-go）"><span class="nav-number">1.0.4.</span> <span class="nav-text">4、初始化 kubelet 组件内部的模块（cmd/kubelet/app/server.go）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#5、启动-kubelet-内部的模块及服务（cmd-kubelet-app-server-go）"><span class="nav-number">1.0.5.</span> <span class="nav-text">5、启动 kubelet 内部的模块及服务（cmd/kubelet/app/server.go）</span></a></li></ol></li></ol><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">2.</span> <span class="nav-text">总结</span></a></li></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

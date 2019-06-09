@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="leader-election,component,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 kube-manager-controller 组件的多个副本只有一个是处于业务逻辑运行状态，其它副本">
+<meta name="keywords" content="leader-election,component">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernets 中组件高可用的实现方式">
+<meta property="og:url" content="http://yoursite.com/2019/03/13/k8s_leader_election/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 kube-manager-controller 组件的多个副本只有一个是处于业务逻辑运行状态，其它副本">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-402b3215eb022307.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-7ec427b37b6b6a10.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:updated_time" content="2019-06-01T14:26:16.308Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernets 中组件高可用的实现方式">
+<meta name="twitter:description" content="生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 kube-manager-controller 组件的多个副本只有一个是处于业务逻辑运行状态，其它副本">
+<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-402b3215eb022307.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/03/13/k8s_leader_election/">
+
+
+
+
+
+  <title>kubernets 中组件高可用的实现方式 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-component-HA" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/03/13/k8s_leader_election/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernets 中组件高可用的实现方式</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-13T07:49:30+08:00">
+                2019-03-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/03/13/k8s_leader_election/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/03/13/k8s_leader_election/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 kube-manager-controller 组件的多个副本只有一个是处于业务逻辑运行状态，其它副本则不断的尝试去获取锁，去竞争 leader，直到自己成为leader。如果正在运行的 leader 因某种原因导致当前进程退出，或者锁丢失，则由其它副本去竞争新的 leader，获取 leader 继而执行业务逻辑。</p>
+<blockquote>
+<p>kubernetes 版本： v1.12 </p>
+</blockquote>
+<h4 id="组件高可用的使用"><a href="#组件高可用的使用" class="headerlink" title="组件高可用的使用"></a>组件高可用的使用</h4><p>k8s 中已经为 kube-controller-manager、kube-scheduler 组件实现了高可用，只需在每个组件的配置文件中添加 <code>--leader-elect=true</code> 参数即可启用。在每个组件的日志中可以看到 HA 相关参数的默认值：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">I0306 19:17:14.109511  161798 flags.go:33] FLAG: --leader-elect=&quot;true&quot;</span><br><span class="line">I0306 19:17:14.109513  161798 flags.go:33] FLAG: --leader-elect-lease-duration=&quot;15s&quot;</span><br><span class="line">I0306 19:17:14.109516  161798 flags.go:33] FLAG: --leader-elect-renew-deadline=&quot;10s&quot;</span><br><span class="line">I0306 19:17:14.109518  161798 flags.go:33] FLAG: --leader-elect-resource-lock=&quot;endpoints&quot;</span><br><span class="line">I0306 19:17:14.109520  161798 flags.go:33] FLAG: --leader-elect-retry-period=&quot;2s&quot;</span><br></pre></td></tr></table></figure>
+<p>kubernetes 中查看组件 leader 的方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get endpoints kube-controller-manager --namespace=kube-system -o yaml &amp;&amp; </span><br><span class="line">  kubectl get endpoints kube-scheduler --namespace=kube-system -o yaml</span><br></pre></td></tr></table></figure>
+<p>当前组件 leader 的 hostname 会写在 annotation 的 control-plane.alpha.kubernetes.io/leader 字段里。</p>
+<h4 id="Leader-Election-的实现"><a href="#Leader-Election-的实现" class="headerlink" title="Leader Election 的实现"></a>Leader Election 的实现</h4><p>Leader Election 的过程本质上是一个竞争分布式锁的过程。在 Kubernetes 中，这个分布式锁是以创建 Endpoint 资源的形式进行，谁先创建了该资源，谁就先获得锁，之后会对该资源不断更新以保持锁的拥有权。</p>
+<p>下面开始讲述 kube-controller-manager 中 leader 的竞争过程，cm 在加载及配置完参数后就开始执行 run 方法了。代码在 <code>k8s.io/kubernetes/cmd/kube-controller-manager/app/controllermanager.go</code> 中：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line">// Run runs the KubeControllerManagerOptions.  This should never exit.</span><br><span class="line">func Run(c *config.CompletedConfig, stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">		...</span><br><span class="line">		// kube-controller-manager 的核心</span><br><span class="line">		run := func(ctx context.Context) &#123;</span><br><span class="line">		rootClientBuilder := controller.SimpleControllerClientBuilder&#123;</span><br><span class="line">			ClientConfig: c.Kubeconfig,</span><br><span class="line">		&#125;</span><br><span class="line">		var clientBuilder controller.ControllerClientBuilder</span><br><span class="line">		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials &#123;</span><br><span class="line">			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 &#123;</span><br><span class="line">				// It&apos;c possible another controller process is creating the tokens for us.</span><br><span class="line">				// If one isn&apos;t, we&apos;ll timeout and exit when our client builder is unable to create the tokens.</span><br><span class="line">				glog.Warningf(&quot;--use-service-account-credentials was specified without providing a --service-account-private-key-file&quot;)</span><br><span class="line">			&#125;</span><br><span class="line">			clientBuilder = controller.SAControllerClientBuilder&#123;</span><br><span class="line">				ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),</span><br><span class="line">				CoreClient:           c.Client.CoreV1(),</span><br><span class="line">				AuthenticationClient: c.Client.AuthenticationV1(),</span><br><span class="line">				Namespace:            &quot;kube-system&quot;,</span><br><span class="line">			&#125;</span><br><span class="line">		&#125; else &#123;</span><br><span class="line">			clientBuilder = rootClientBuilder</span><br><span class="line">		&#125;</span><br><span class="line">		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())</span><br><span class="line">		if err != nil &#123;</span><br><span class="line">			glog.Fatalf(&quot;error building controller context: %v&quot;, err)</span><br><span class="line">		&#125;</span><br><span class="line">		saTokenControllerInitFunc := serviceAccountTokenControllerStarter&#123;rootClientBuilder: rootClientBuilder&#125;.startServiceAccountTokenController</span><br><span class="line">		// 初始化及启动所有的 controller</span><br><span class="line">		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil &#123;</span><br><span class="line">			glog.Fatalf(&quot;error starting controllers: %v&quot;, err)</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		controllerContext.InformerFactory.Start(controllerContext.Stop)</span><br><span class="line">		close(controllerContext.InformersStarted)</span><br><span class="line"></span><br><span class="line">		select &#123;&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">    // 如果 LeaderElect 参数未配置,说明 controller-manager 是单点启动的，</span><br><span class="line">    // 则直接调用 run 方法来启动需要被启动的控制器即可。</span><br><span class="line">    if !c.ComponentConfig.Generic.LeaderElection.LeaderElect &#123;</span><br><span class="line">        run(context.TODO())</span><br><span class="line">        panic(&quot;unreachable&quot;)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">	// 如果 LeaderElect 参数配置为 true,说明 controller-manager 是以 HA 方式启动的，</span><br><span class="line">	// 则执行下面的代码进行 leader 选举，选举出的 leader 会回调 run 方法。</span><br><span class="line">    id, err := os.Hostname()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // add a uniquifier so that two processes on the same host don&apos;t accidentally both become active</span><br><span class="line">    id = id + &quot;_&quot; + string(uuid.NewUUID())</span><br><span class="line">    </span><br><span class="line">    // 初始化资源锁</span><br><span class="line">    rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,</span><br><span class="line">        &quot;kube-system&quot;,</span><br><span class="line">        &quot;kube-controller-manager&quot;,</span><br><span class="line">        c.LeaderElectionClient.CoreV1(),</span><br><span class="line">        resourcelock.ResourceLockConfig&#123;</span><br><span class="line">            Identity:      id,</span><br><span class="line">            EventRecorder: c.EventRecorder,</span><br><span class="line">        &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        glog.Fatalf(&quot;error creating lock: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 进入到选举的流程</span><br><span class="line">    leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig&#123;</span><br><span class="line">        Lock:          rl,</span><br><span class="line">        LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,</span><br><span class="line">        RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,</span><br><span class="line">        RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,</span><br><span class="line">        Callbacks: leaderelection.LeaderCallbacks&#123;</span><br><span class="line">            OnStartedLeading: run,</span><br><span class="line">            OnStoppedLeading: func() &#123;</span><br><span class="line">                glog.Fatalf(&quot;leaderelection lost&quot;)</span><br><span class="line">            &#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">        WatchDog: electionChecker,</span><br><span class="line">        Name:     &quot;kube-controller-manager&quot;,</span><br><span class="line">    &#125;)</span><br><span class="line">    panic(&quot;unreachable&quot;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>1、初始化资源锁，kubernetes 中默认的资源锁使用 <code>endpoints</code>，也就是 c.ComponentConfig.Generic.LeaderElection.ResourceLock 的值为 “endpoints”，在代码中我并没有找到对 ResourceLock 初始化的地方，只看到了对该参数的说明以及日志中配置的默认值：</li>
+</ul>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-402b3215eb022307.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+<p>​在初始化资源锁的时候还传入了 EventRecorder，其作用是当 leader 发生变化的时候会将对应的 events 发送到 apiserver。</p>
+<ul>
+<li><p>2、rl 资源锁被用于 controller-manager 进行 leader 的选举，RunOrDie 方法中就是 leader 的选举过程了。</p>
+</li>
+<li><p>3、Callbacks 中定义了在切换状态后需要执行的操作，当成为 leader 后会执行 OnStartedLeading 中的 run 方法，run 方法是 controller-manager 的核心，run 方法中会初始化并启动所包含资源的 controller，以下是 kube-controller-manager 中所有的 controller：</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc &#123;</span><br><span class="line">	controllers := map[string]InitFunc&#123;&#125;</span><br><span class="line">	controllers[&quot;endpoint&quot;] = startEndpointController</span><br><span class="line">	controllers[&quot;replicationcontroller&quot;] = startReplicationController</span><br><span class="line">	controllers[&quot;podgc&quot;] = startPodGCController</span><br><span class="line">	controllers[&quot;resourcequota&quot;] = startResourceQuotaController</span><br><span class="line">	controllers[&quot;namespace&quot;] = startNamespaceController</span><br><span class="line">	controllers[&quot;serviceaccount&quot;] = startServiceAccountController</span><br><span class="line">	controllers[&quot;garbagecollector&quot;] = startGarbageCollectorController</span><br><span class="line">	controllers[&quot;daemonset&quot;] = startDaemonSetController</span><br><span class="line">	controllers[&quot;job&quot;] = startJobController</span><br><span class="line">	controllers[&quot;deployment&quot;] = startDeploymentController</span><br><span class="line">	controllers[&quot;replicaset&quot;] = startReplicaSetController</span><br><span class="line">	controllers[&quot;horizontalpodautoscaling&quot;] = startHPAController</span><br><span class="line">	controllers[&quot;disruption&quot;] = startDisruptionController</span><br><span class="line">	controllers[&quot;statefulset&quot;] = startStatefulSetController</span><br><span class="line">	controllers[&quot;cronjob&quot;] = startCronJobController</span><br><span class="line">	controllers[&quot;csrsigning&quot;] = startCSRSigningController</span><br><span class="line">	controllers[&quot;csrapproving&quot;] = startCSRApprovingController</span><br><span class="line">	controllers[&quot;csrcleaner&quot;] = startCSRCleanerController</span><br><span class="line">	controllers[&quot;ttl&quot;] = startTTLController</span><br><span class="line">	controllers[&quot;bootstrapsigner&quot;] = startBootstrapSignerController</span><br><span class="line">	controllers[&quot;tokencleaner&quot;] = startTokenCleanerController</span><br><span class="line">	controllers[&quot;nodeipam&quot;] = startNodeIpamController</span><br><span class="line">	if loopMode == IncludeCloudLoops &#123;</span><br><span class="line">		controllers[&quot;service&quot;] = startServiceController</span><br><span class="line">		controllers[&quot;route&quot;] = startRouteController</span><br><span class="line">	&#125;</span><br><span class="line">	controllers[&quot;nodelifecycle&quot;] = startNodeLifecycleController</span><br><span class="line">	controllers[&quot;persistentvolume-binder&quot;] = startPersistentVolumeBinderController</span><br><span class="line">	controllers[&quot;attachdetach&quot;] = startAttachDetachController</span><br><span class="line">	controllers[&quot;persistentvolume-expander&quot;] = startVolumeExpandController</span><br><span class="line">	controllers[&quot;clusterrole-aggregation&quot;] = startClusterRoleAggregrationController</span><br><span class="line">	controllers[&quot;pvc-protection&quot;] = startPVCProtectionController</span><br><span class="line">	controllers[&quot;pv-protection&quot;] = startPVProtectionController</span><br><span class="line">	controllers[&quot;ttl-after-finished&quot;] = startTTLAfterFinishedController</span><br><span class="line"></span><br><span class="line">	return controllers</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>OnStoppedLeading 是从 leader 状态切换为 slave 要执行的操作，此方法仅打印了一条日志。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">func RunOrDie(ctx context.Context, lec LeaderElectionConfig) &#123;</span><br><span class="line">    le, err := NewLeaderElector(lec)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        panic(err)</span><br><span class="line">    &#125;</span><br><span class="line">    if lec.WatchDog != nil &#123;</span><br><span class="line">        lec.WatchDog.SetLeaderElection(le)</span><br><span class="line">    &#125;</span><br><span class="line">    le.Run(ctx)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 RunOrDie 中首先调用 NewLeaderElector 初始化了一个 LeaderElector 对象，然后执行 LeaderElector 的 run 方法进行选举。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func (le *LeaderElector) Run(ctx context.Context) &#123;</span><br><span class="line">	defer func() &#123;</span><br><span class="line">		runtime.HandleCrash()</span><br><span class="line">		le.config.Callbacks.OnStoppedLeading()</span><br><span class="line">	&#125;()</span><br><span class="line">	if !le.acquire(ctx) &#123;</span><br><span class="line">		return // ctx signalled done</span><br><span class="line">	&#125;</span><br><span class="line">	ctx, cancel := context.WithCancel(ctx)</span><br><span class="line">	defer cancel()</span><br><span class="line">	go le.config.Callbacks.OnStartedLeading(ctx)</span><br><span class="line">	le.renew(ctx)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Run 中首先会执行 acquire 尝试获取锁，获取到锁之后会回调 OnStartedLeading 启动所需要的 controller，然后会执行 renew 方法定期更新锁，保持 leader 的状态。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">func (le *LeaderElector) acquire(ctx context.Context) bool &#123;</span><br><span class="line">	ctx, cancel := context.WithCancel(ctx)</span><br><span class="line">	defer cancel()</span><br><span class="line">	succeeded := false</span><br><span class="line">	desc := le.config.Lock.Describe()</span><br><span class="line">	glog.Infof(&quot;attempting to acquire leader lease  %v...&quot;, desc)</span><br><span class="line">	wait.JitterUntil(func() &#123;</span><br><span class="line">		// 尝试创建或者续约资源锁</span><br><span class="line">		succeeded = le.tryAcquireOrRenew()</span><br><span class="line">		// leader 可能发生了改变，在 maybeReportTransition 方法中会</span><br><span class="line">		// 执行相应的 OnNewLeader() 回调函数,代码中对 OnNewLeader() 并没有初始化</span><br><span class="line">		le.maybeReportTransition()</span><br><span class="line">		if !succeeded &#123;</span><br><span class="line">			glog.V(4).Infof(&quot;failed to acquire lease %v&quot;, desc)</span><br><span class="line">			return</span><br><span class="line">		&#125;</span><br><span class="line">		le.config.Lock.RecordEvent(&quot;became leader&quot;)</span><br><span class="line">		glog.Infof(&quot;successfully acquired lease %v&quot;, desc)</span><br><span class="line">		cancel()</span><br><span class="line">	&#125;, le.config.RetryPeriod, JitterFactor, true, ctx.Done())</span><br><span class="line">	return succeeded</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 acquire 中首先初始化了一个 ctx，通过 wait.JitterUntil 周期性的去调用 le.tryAcquireOrRenew 方法来获取资源锁，直到获取为止。如果获取不到锁，则会以 RetryPeriod 为间隔不断尝试。如果获取到锁，就会关闭 ctx 通知 wait.JitterUntil 停止尝试，tryAcquireOrRenew 是最核心的方法。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line">func (le *LeaderElector) tryAcquireOrRenew() bool &#123;</span><br><span class="line">	now := metav1.Now()</span><br><span class="line">	leaderElectionRecord := rl.LeaderElectionRecord&#123;</span><br><span class="line">		HolderIdentity:       le.config.Lock.Identity(),</span><br><span class="line">		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),</span><br><span class="line">		RenewTime:            now,</span><br><span class="line">		AcquireTime:          now,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 1、获取当前的资源锁</span><br><span class="line">	oldLeaderElectionRecord, err := le.config.Lock.Get()</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		if !errors.IsNotFound(err) &#123;</span><br><span class="line">			glog.Errorf(&quot;error retrieving resource lock %v: %v&quot;, le.config.Lock.Describe(), err)</span><br><span class="line">			return false</span><br><span class="line">		&#125;</span><br><span class="line">		// 没有获取到资源锁，开始创建资源锁，若创建成功则成为 leader </span><br><span class="line">		if err = le.config.Lock.Create(leaderElectionRecord); err != nil &#123;</span><br><span class="line">			glog.Errorf(&quot;error initially creating leader election record: %v&quot;, err)</span><br><span class="line">			return false</span><br><span class="line">		&#125;</span><br><span class="line">		le.observedRecord = leaderElectionRecord</span><br><span class="line">		le.observedTime = le.clock.Now()</span><br><span class="line">		return true</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 2、获取资源锁后检查当前 id 是不是 leader</span><br><span class="line">	if !reflect.DeepEqual(le.observedRecord, *oldLeaderElectionRecord) &#123;</span><br><span class="line">		le.observedRecord = *oldLeaderElectionRecord</span><br><span class="line">		le.observedTime = le.clock.Now()</span><br><span class="line">	&#125;</span><br><span class="line">	// 如果资源锁没有过期且当前 id 不是 Leader，直接返回</span><br><span class="line">	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &amp;&amp;</span><br><span class="line">		!le.IsLeader() &#123;</span><br><span class="line">		glog.V(4).Infof(&quot;lock is held by %v and has not yet expired&quot;, oldLeaderElectionRecord.HolderIdentity)</span><br><span class="line">		return false</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 3、如果当前 id 是 Leader，将对应字段的时间改成当前时间，准备续租</span><br><span class="line">	// 如果是非 Leader 节点则抢夺资源锁</span><br><span class="line">	if le.IsLeader() &#123;</span><br><span class="line">		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime</span><br><span class="line">		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions</span><br><span class="line">	&#125; else &#123;</span><br><span class="line">		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 更新资源</span><br><span class="line">    // 对于 Leader 来说，这是一个续租的过程</span><br><span class="line">    // 对于非 Leader 节点（仅在上一个资源锁已经过期），这是一个更新锁所有权的过程</span><br><span class="line">	if err = le.config.Lock.Update(leaderElectionRecord); err != nil &#123;</span><br><span class="line">		glog.Errorf(&quot;Failed to update lock: %v&quot;, err)</span><br><span class="line">		return false</span><br><span class="line">	&#125;</span><br><span class="line">	le.observedRecord = leaderElectionRecord</span><br><span class="line">	le.observedTime = le.clock.Now()</span><br><span class="line">	return true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上面的这个函数的主要逻辑：</p>
+<ul>
+<li>1、获取 ElectionRecord 记录，如果没有则创建一条新的 ElectionRecord 记录，创建成功则表示获取到锁并成为 leader 了。</li>
+<li>2、当获取到资源锁后开始检查其中的信息，比较当前 id 是不是 leader 以及资源锁有没有过期，如果资源锁没有过期且当前 id 不是 Leader，则直接返回。</li>
+<li>3、如果当前 id 是 Leader，将对应字段的时间改成当前时间，更新资源锁进行续租。</li>
+<li>4、如果当前 id 不是 Leader 但是资源锁已经过期了，则抢夺资源锁，抢夺成功则成为 leader 否则返回。</li>
+</ul>
+<p>最后是 renew 方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">func (le *LeaderElector) renew(ctx context.Context) &#123;</span><br><span class="line">	ctx, cancel := context.WithCancel(ctx)</span><br><span class="line">	defer cancel()</span><br><span class="line">	wait.Until(func() &#123;</span><br><span class="line">		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)</span><br><span class="line">		defer timeoutCancel()</span><br><span class="line">		// 每间隔 RetryPeriod 就执行 tryAcquireOrRenew()</span><br><span class="line">        // 如果 tryAcquireOrRenew() 返回 false 说明续租失败</span><br><span class="line">		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) &#123;</span><br><span class="line">			done := make(chan bool, 1)</span><br><span class="line">			go func() &#123;</span><br><span class="line">				defer close(done)</span><br><span class="line">				done &lt;- le.tryAcquireOrRenew()</span><br><span class="line">			&#125;()</span><br><span class="line"></span><br><span class="line">			select &#123;</span><br><span class="line">			case &lt;-timeoutCtx.Done():</span><br><span class="line">				return false, fmt.Errorf(&quot;failed to tryAcquireOrRenew %s&quot;, timeoutCtx.Err())</span><br><span class="line">			case result := &lt;-done:</span><br><span class="line">				return result, nil</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;, timeoutCtx.Done())</span><br><span class="line"></span><br><span class="line">		le.maybeReportTransition()</span><br><span class="line">		desc := le.config.Lock.Describe()</span><br><span class="line">		if err == nil &#123;</span><br><span class="line">			glog.V(4).Infof(&quot;successfully renewed lease %v&quot;, desc)</span><br><span class="line">			return</span><br><span class="line">		&#125;</span><br><span class="line">		// 续租失败，说明已经不是 Leader，然后程序 panic</span><br><span class="line">		le.config.Lock.RecordEvent(&quot;stopped leading&quot;)</span><br><span class="line">		glog.Infof(&quot;failed to renew lease %v: %v&quot;, desc, err)</span><br><span class="line">		cancel()</span><br><span class="line">	&#125;, le.config.RetryPeriod, ctx.Done())</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>获取到锁之后定期进行更新，renew 只有在获取锁之后才会调用，它会通过持续更新资源锁的数据，来确保继续持有已获得的锁，保持自己的 leader 状态。</p>
+<h4 id="Leader-Election-功能的使用"><a href="#Leader-Election-功能的使用" class="headerlink" title="Leader Election 功能的使用"></a>Leader Election 功能的使用</h4><p>以下是一个 demo，使用 k8s 中 <code>k8s.io/client-go/tools/leaderelection</code> 进行一个演示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import (</span><br><span class="line">	&quot;context&quot;</span><br><span class="line">	&quot;flag&quot;</span><br><span class="line">	&quot;fmt&quot;</span><br><span class="line">	&quot;os&quot;</span><br><span class="line">	&quot;time&quot;</span><br><span class="line"></span><br><span class="line">	&quot;github.com/golang/glog&quot;</span><br><span class="line">	&quot;k8s.io/api/core/v1&quot;</span><br><span class="line">	&quot;k8s.io/client-go/kubernetes&quot;</span><br><span class="line">	&quot;k8s.io/client-go/kubernetes/scheme&quot;</span><br><span class="line">	v1core &quot;k8s.io/client-go/kubernetes/typed/core/v1&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/clientcmd&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/leaderelection&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/leaderelection/resourcelock&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/record&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">var (</span><br><span class="line">	masterURL  string</span><br><span class="line">	kubeconfig string</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">func init() &#123;</span><br><span class="line">	flag.StringVar(&amp;kubeconfig, &quot;kubeconfig&quot;, &quot;&quot;, &quot;Path to a kubeconfig. Only required if out-of-cluster.&quot;)</span><br><span class="line">	flag.StringVar(&amp;masterURL, &quot;master&quot;, &quot;&quot;, &quot;The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.&quot;)</span><br><span class="line"></span><br><span class="line">	flag.Set(&quot;logtostderr&quot;, &quot;true&quot;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	flag.Parse()</span><br><span class="line">	defer glog.Flush()</span><br><span class="line"></span><br><span class="line">	id, err := os.Hostname()</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		panic(err)</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	// 加载 kubeconfig 配置</span><br><span class="line">	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		glog.Fatalf(&quot;Error building kubeconfig: %s&quot;, err.Error())</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 创建 kubeclient</span><br><span class="line">	kubeClient, err := kubernetes.NewForConfig(cfg)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		glog.Fatalf(&quot;Error building kubernetes clientset: %s&quot;, err.Error())</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 初始化 eventRecorder</span><br><span class="line">	eventBroadcaster := record.NewBroadcaster()</span><br><span class="line">	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource&#123;Component: &quot;test-1&quot;&#125;)</span><br><span class="line">	eventBroadcaster.StartLogging(glog.Infof)</span><br><span class="line">	eventBroadcaster.StartRecordingToSink(&amp;v1core.EventSinkImpl&#123;Interface: kubeClient.CoreV1().Events(&quot;&quot;)&#125;)</span><br><span class="line"></span><br><span class="line">	run := func(ctx context.Context) &#123;</span><br><span class="line">		fmt.Println(&quot;run.........&quot;)</span><br><span class="line">		select &#123;&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	id = id + &quot;_&quot; + &quot;1&quot;</span><br><span class="line">	rl, err := resourcelock.New(&quot;endpoints&quot;,</span><br><span class="line">		&quot;kube-system&quot;,</span><br><span class="line">		&quot;test&quot;,</span><br><span class="line">		kubeClient.CoreV1(),</span><br><span class="line">		resourcelock.ResourceLockConfig&#123;</span><br><span class="line">			Identity:      id,</span><br><span class="line">			EventRecorder: eventRecorder,</span><br><span class="line">		&#125;)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		glog.Fatalf(&quot;error creating lock: %v&quot;, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig&#123;</span><br><span class="line">		Lock:          rl,</span><br><span class="line">		LeaseDuration: 15 * time.Second,</span><br><span class="line">		RenewDeadline: 10 * time.Second,</span><br><span class="line">		RetryPeriod:   2 * time.Second,</span><br><span class="line">		Callbacks: leaderelection.LeaderCallbacks&#123;</span><br><span class="line">			OnStartedLeading: run,</span><br><span class="line">			OnStoppedLeading: func() &#123;</span><br><span class="line">				glog.Info(&quot;leaderelection lost&quot;)</span><br><span class="line">			&#125;,</span><br><span class="line">		&#125;,</span><br><span class="line">		Name: &quot;test-1&quot;,</span><br><span class="line">	&#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>分别使用多个 hostname 同时运行后并测试 leader 切换，可以在 events 中看到 leader 切换的记录：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"># kubectl describe endpoints test  -n kube-system</span><br><span class="line">Name:         test</span><br><span class="line">Namespace:    kube-system</span><br><span class="line">Labels:       &lt;none&gt;</span><br><span class="line">Annotations:  control-plane.alpha.kubernetes.io/leader=&#123;&quot;holderIdentity&quot;:&quot;localhost_2&quot;,&quot;leaseDurationSeconds&quot;:15,&quot;acquireTime&quot;:&quot;2019-03-10T08:47:42Z&quot;,&quot;renewTime&quot;:&quot;2019-03-10T08:47:44Z&quot;,&quot;leaderTransitions&quot;:2&#125;</span><br><span class="line">Subsets:</span><br><span class="line">Events:</span><br><span class="line">  Type    Reason          Age   From    Message</span><br><span class="line">  ----    ------          ----  ----    -------</span><br><span class="line">  Normal  LeaderElection  50s   test-1  localhost_1 became leader</span><br><span class="line">  Normal  LeaderElection  5s    test-2  localhost_2 became leader</span><br></pre></td></tr></table></figure>
+<h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><p>本文讲述了 kube-controller-manager 使用 HA 的方式启动后 leader 选举过程的实现说明，k8s 中通过创建 endpoints 资源以及对该资源的持续更新来实现资源锁轮转的过程。但是相对于其他分布式锁的实现，普遍是直接基于现有的中间件实现，比如 redis、zookeeper、etcd 等，其所有对锁的操作都是原子性的，那 k8s 选举过程中的原子操作是如何实现的？k8s 中的原子操作最终也是通过 etcd 实现的，其在做 update 更新锁的操作时采用的是乐观锁，通过对比 resourceVersion 实现的，详细的实现下节再讲。</p>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-7ec427b37b6b6a10.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="api resource"></p>
+<p>参考文档：<br><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.10/" target="_blank" rel="noopener">API OVERVIEW</a><br><a href="https://kubernetes.io/blog/2016/01/simple-leader-election-with-kubernetes/" target="_blank" rel="noopener">Simple leader election with Kubernetes and Docker</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/leader-election/" rel="tag"># leader-election</a>
+          
+            <a href="/tags/component/" rel="tag"># component</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/03/05/k8s_v1.12/" rel="next" title="kubernetes 集群升级至 v1.12 需要注意的几个问题">
+                <i class="fa fa-chevron-left"></i> kubernetes 集群升级至 v1.12 需要注意的几个问题
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/04/14/k8s_metrics_server/" rel="prev" title="kubernetes 指标采集组件 metrics-server 的部署">
+                kubernetes 指标采集组件 metrics-server 的部署 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#组件高可用的使用"><span class="nav-number">1.</span> <span class="nav-text">组件高可用的使用</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Leader-Election-的实现"><span class="nav-number">2.</span> <span class="nav-text">Leader Election 的实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Leader-Election-功能的使用"><span class="nav-number">3.</span> <span class="nav-text">Leader Election 功能的使用</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

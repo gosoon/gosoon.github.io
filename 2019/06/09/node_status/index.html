@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kubelet,node status,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
+<meta name="keywords" content="kubelet,node status">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubelet 状态上报的方式">
+<meta property="og:url" content="http://yoursite.com/2019/06/09/node_status/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-05b37df015e527b7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:updated_time" content="2019-06-09T12:37:40.079Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubelet 状态上报的方式">
+<meta name="twitter:description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
+<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/06/09/node_status/">
+
+
+
+
+
+  <title>kubelet 状态上报的方式 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-node status" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/06/09/node_status/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubelet 状态上报的方式</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-09T20:37:30+08:00">
+                2019-06-09
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/06/09/node_status/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/06/09/node_status/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p> 分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 <code>--node-status-update-frequency</code> 指定上报频率，默认是 10s 上报一次，kubelet 不止上报心跳信息还会上报自身的一些数据信息。</p>
+<h3 id="一、kubelet-上报哪些状态"><a href="#一、kubelet-上报哪些状态" class="headerlink" title="一、kubelet 上报哪些状态"></a>一、kubelet 上报哪些状态</h3><p> 在 k8s 中，一个 node 的状态包含以下几个信息：</p>
+<ul>
+<li><a href="https://kubernetes.io/docs/concepts/architecture/nodes/#addresses" target="_blank" rel="noopener">Addresses</a></li>
+<li><a href="https://kubernetes.io/docs/concepts/architecture/nodes/#condition" target="_blank" rel="noopener">Condition</a></li>
+<li><a href="https://kubernetes.io/docs/concepts/architecture/nodes/#capacity" target="_blank" rel="noopener">Capacity</a></li>
+<li><a href="https://kubernetes.io/docs/concepts/architecture/nodes/#info" target="_blank" rel="noopener">Info</a></li>
+</ul>
+<h5 id="1、Addresses"><a href="#1、Addresses" class="headerlink" title="1、Addresses"></a>1、Addresses</h5><p>主要包含以下几个字段：</p>
+<ul>
+<li>HostName：Hostname 。可以通过 kubelet 的 <code>--hostname-override</code> 参数进行覆盖。</li>
+<li>ExternalIP：通常是可以外部路由的 node IP 地址（从集群外可访问）。</li>
+<li>InternalIP：通常是仅可在集群内部路由的 node IP 地址。</li>
+</ul>
+<h5 id="2、Condition"><a href="#2、Condition" class="headerlink" title="2、Condition"></a>2、Condition</h5><p><code>conditions</code> 字段描述了所有 <code>Running</code> nodes 的状态。</p>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="condition"></p>
+<h5 id="3、Capacity"><a href="#3、Capacity" class="headerlink" title="3、Capacity"></a>3、Capacity</h5><p>描述 node 上的可用资源：CPU、内存和可以调度到该 node 上的最大 pod 数量。</p>
+<h5 id="4、Info"><a href="#4、Info" class="headerlink" title="4、Info"></a>4、Info</h5><p>描述 node 的一些通用信息，例如内核版本、Kubernetes 版本（kubelet 和 kube-proxy 版本）、Docker 版本 （如果使用了）和系统版本，这些信息由 kubelet 从 node 上获取到。</p>
+<p>使用 <code>kubectl get node xxx -o yaml</code> 可以看到 node 所有的状态的信息，其中 status 中的信息都是 kubelet 需要上报的，所以 kubelet 不止上报心跳信息还上报节点信息、节点 OOD 信息、内存磁盘压力状态、节点监控状态、是否调度等。</p>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-05b37df015e527b7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="node 状态信息"></p>
+<h4 id="二、kubelet-状态异常时的影响"><a href="#二、kubelet-状态异常时的影响" class="headerlink" title="二、kubelet 状态异常时的影响"></a>二、kubelet 状态异常时的影响</h4><p>如果一个 node 处于非 Ready 状态超过 <code>pod-eviction-timeout</code>的值(默认为 5 分钟，在 kube-controller-manager 中定义)，在 v1.5 之前的版本中 kube-controller-manager 会 <code>force delete pod</code> 然后调度该宿主上的 pods 到其他宿主，在 v1.5 之后的版本中，kube-controller-manager 不会 <code>force delete pod</code>，pod 会一直处于<code>Terminating</code> 或<code>Unknown</code> 状态直到 node 被从 master 中删除或 kubelet 状态变为 Ready。在 node NotReady 期间，Daemonset 的 Pod 状态变为 Nodelost，Deployment、Statefulset 和 Static Pod 的状态先变为 NodeLost，然后马上变为 Unknown。Deployment 的 pod 会 recreate，Static Pod 和 Statefulset 的 Pod 会一直处于 Unknown 状态。</p>
+<p>当 kubelet 变为 Ready 状态时，Daemonset的pod不会recreate，旧pod状态直接变为Running，Deployment的则是将kubelet进程停止的Node删除，Statefulset的Pod会重新recreate，Staic Pod 会被删除。</p>
+<h3 id="三、kubelet-状态上报的实现"><a href="#三、kubelet-状态上报的实现" class="headerlink" title="三、kubelet 状态上报的实现"></a>三、kubelet 状态上报的实现</h3><p>kubelet 有两种上报状态的方式，第一种定期向 apiserver 发送心跳消息，简单理解就是启动一个 goroutine 然后定期向 APIServer 发送消息。</p>
+<p>第二中被称为 NodeLease，在 v1.13 之前的版本中，节点的心跳只有 NodeStatus，从 v1.13 开始，NodeLease feature 作为 alpha 特性引入。当启用 NodeLease feature 时，每个节点在“kube-node-lease”名称空间中都有一个关联的“Lease”对象，该对象由节点定期更新，NodeStatus 和 NodeLease 都被视为来自节点的心跳。NodeLease 会频繁更新，而只有在 NodeStatus 发生改变或者超过了一定时间(默认值为1分钟，node-monitor-grace-period 的默认值为 40s)，才会将 NodeStatus 上报给 master。由于 NodeLease 比 NodeStatus 更轻量级，该特性在集群规模扩展性和性能上有明显提升。本文主要分析第一种上报方式的实现。</p>
+<blockquote>
+<p>kubernetes 版本 ：v1.13</p>
+</blockquote>
+<p>kubelet 上报状态的代码大部分在 <code>kubernetes/pkg/kubelet/kubelet_node_status.go</code> 中实现。状态上报的功能是在 <code>kubernetes/pkg/kubelet/kubelet.go#Run</code> 方法以 goroutine 形式中启动的，kubelet 中多个重要的功能都是在该方法中启动的。</p>
+<p> <code>kubernetes/pkg/kubelet/kubelet.go#Run</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) Run(updates &lt;-chan kubetypes.PodUpdate) &#123;  </span><br><span class="line">  	// ...</span><br><span class="line">  	if kl.kubeClient != nil &#123;</span><br><span class="line">        // Start syncing node status immediately, this may set up things the runtime needs to run.</span><br><span class="line">        go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)</span><br><span class="line">        go kl.fastStatusUpdateOnce()</span><br><span class="line">				</span><br><span class="line">	    // 一种新的状态上报方式</span><br><span class="line">	    // start syncing lease</span><br><span class="line">        if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &#123;</span><br><span class="line">            go kl.nodeLeaseController.Run(wait.NeverStop)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">		// ...    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>kl.syncNodeStatus 便是上报状态的，此处 kl.nodeStatusUpdateFrequency 使用的是默认设置的 10s，也就是说节点间同步状态的函数 kl.syncNodeStatus 每 10s 执行一次。</p>
+<p>syncNodeStatus 是状态上报的入口函数，其后所调用的多个函数也都是在同一个文件中实现的。</p>
+<p><code>kubernetes/pkg/kubelet/kubelet_node_status.go#syncNodeStatus</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) syncNodeStatus() &#123;</span><br><span class="line">    kl.syncNodeStatusMux.Lock()</span><br><span class="line">    defer kl.syncNodeStatusMux.Unlock()</span><br><span class="line"></span><br><span class="line">    if kl.kubeClient == nil || kl.heartbeatClient == nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 是否为注册节点</span><br><span class="line">    if kl.registerNode &#123;</span><br><span class="line">        // This will exit immediately if it doesn&apos;t need to do anything.</span><br><span class="line">        kl.registerWithAPIServer()</span><br><span class="line">    &#125;</span><br><span class="line">    if err := kl.updateNodeStatus(); err != nil &#123;</span><br><span class="line">        klog.Errorf(&quot;Unable to update node status: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>syncNodeStatus 调用 updateNodeStatus， 然后又调用 tryUpdateNodeStatus 来进行上报操作，而最终调用的是 setNodeStatus。这里还进行了同步状态判断，如果是注册节点，则执行 registerWithAPIServer，否则，执行 updateNodeStatus。</p>
+<p>updateNodeStatus 主要是调用 tryUpdateNodeStatus 进行后续的操作，该函数中定义了状态上报重试的次数，nodeStatusUpdateRetry 默认定义为 5 次。</p>
+<p><code>kubernetes/pkg/kubelet/kubelet_node_status.go#updateNodeStatus</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) updateNodeStatus() error &#123;</span><br><span class="line">    klog.V(5).Infof(&quot;Updating node status&quot;)</span><br><span class="line">    for i := 0; i &lt; nodeStatusUpdateRetry; i++ &#123;</span><br><span class="line">        if err := kl.tryUpdateNodeStatus(i); err != nil &#123;</span><br><span class="line">            if i &gt; 0 &amp;&amp; kl.onRepeatedHeartbeatFailure != nil &#123;</span><br><span class="line">                kl.onRepeatedHeartbeatFailure()</span><br><span class="line">            &#125;</span><br><span class="line">            klog.Errorf(&quot;Error updating node status, will retry: %v&quot;, err)</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            return nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return fmt.Errorf(&quot;update node status exceeds retry count&quot;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>tryUpdateNodeStatus 是主要的上报逻辑，先给 node 设置状态，然后上报 node 的状态到 master。</p>
+<p><code>kubernetes/pkg/kubelet/kubelet_node_status.go#tryUpdateNodeStatus</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error &#123;</span><br><span class="line">	opts := metav1.GetOptions&#123;&#125;</span><br><span class="line">	if tryNumber == 0 &#123;</span><br><span class="line">		util.FromApiserverCache(&amp;opts)</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	// 获取 node 信息</span><br><span class="line">	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		return fmt.Errorf(&quot;error getting node %q: %v&quot;, kl.nodeName, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	originalNode := node.DeepCopy()</span><br><span class="line">	if originalNode == nil &#123;</span><br><span class="line">		return fmt.Errorf(&quot;nil %q node object&quot;, kl.nodeName)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	podCIDRChanged := false</span><br><span class="line">	if node.Spec.PodCIDR != &quot;&quot; &#123;</span><br><span class="line">		if podCIDRChanged, err = kl.updatePodCIDR(node.Spec.PodCIDR); err != nil &#123;</span><br><span class="line">			klog.Errorf(err.Error())</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 设置 node 状态</span><br><span class="line">	kl.setNodeStatus(node)</span><br><span class="line"></span><br><span class="line">	now := kl.clock.Now()</span><br><span class="line">	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &amp;&amp; now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) &#123;</span><br><span class="line">		if !podCIDRChanged &amp;&amp; !nodeStatusHasChanged(&amp;originalNode.Status, &amp;node.Status) &#123;</span><br><span class="line">			kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)</span><br><span class="line">			return nil</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">    // 更新 node 信息到 master</span><br><span class="line">	// Patch the current status on the API server</span><br><span class="line">	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		return err</span><br><span class="line">	&#125;</span><br><span class="line">	kl.lastStatusReportTime = now</span><br><span class="line">	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)</span><br><span class="line">	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate</span><br><span class="line">	// those volumes are already updated in the node&apos;s status</span><br><span class="line">	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)</span><br><span class="line">	return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>tryUpdateNodeStatus 中调用 setNodeStatus 设置 node 的状态。setNodeStatus 会获取一次 node 的所有状态，然后会将 kubelet 中保存的所有状态改为最新的值，也就是会重置 node status 中的所有字段。</p>
+<p><code>kubernetes/pkg/kubelet/kubelet_node_status.go#setNodeStatus</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) setNodeStatus(node *v1.Node) &#123;</span><br><span class="line">    for i, f := range kl.setNodeStatusFuncs &#123;</span><br><span class="line">        klog.V(5).Infof(&quot;Setting node status at position %v&quot;, i)</span><br><span class="line">        if err := f(node); err != nil &#123;</span><br><span class="line">            klog.Warningf(&quot;Failed to set some node status fields: %s&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>setNodeStatus 通过 setNodeStatusFuncs 方法覆盖 node 结构体中所有的字段，setNodeStatusFuncs 是在</p>
+<p>NewMainKubelet(pkg/kubelet/kubelet.go) 中初始化的。</p>
+<p><code>kubernetes/pkg/kubelet/kubelet.go#NewMainKubelet</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"> func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,</span><br><span class="line"> 		// ...</span><br><span class="line"> 		// Generating the status funcs should be the last thing we do,</span><br><span class="line">    klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()</span><br><span class="line"></span><br><span class="line">    return klet, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>defaultNodeStatusFuncs 是生成状态的函数，通过获取 node 的所有状态指标后使用工厂函数生成状态</p>
+<p><code>kubernetes/pkg/kubelet/kubelet_node_status.go#defaultNodeStatusFuncs</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error &#123;</span><br><span class="line">    // if cloud is not nil, we expect the cloud resource sync manager to exist</span><br><span class="line">    var nodeAddressesFunc func() ([]v1.NodeAddress, error)</span><br><span class="line">    if kl.cloud != nil &#123;</span><br><span class="line">        nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses</span><br><span class="line">    &#125;</span><br><span class="line">    var validateHostFunc func() error</span><br><span class="line">    if kl.appArmorValidator != nil &#123;</span><br><span class="line">        validateHostFunc = kl.appArmorValidator.ValidateHost</span><br><span class="line">    &#125;</span><br><span class="line">    var setters []func(n *v1.Node) error</span><br><span class="line">    setters = append(setters,</span><br><span class="line">        nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),</span><br><span class="line">        nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,</span><br><span class="line">            kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),</span><br><span class="line">        nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),</span><br><span class="line">        nodestatus.DaemonEndpoints(kl.daemonEndpoints),</span><br><span class="line">        nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),</span><br><span class="line">        nodestatus.GoRuntime(),</span><br><span class="line">    )</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) &#123;</span><br><span class="line">        setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))</span><br><span class="line">    &#125;</span><br><span class="line">    setters = append(setters,</span><br><span class="line">        nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),</span><br><span class="line">        nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),</span><br><span class="line">        nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),</span><br><span class="line">        nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.  Status, kl.recordNodeStatusEvent),</span><br><span class="line">        nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),</span><br><span class="line">        nodestatus.RemoveOutOfDiskCondition(),</span><br><span class="line">        // TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event</span><br><span class="line">        // and record state back to the Kubelet runtime object. In the future, I&apos;d like to isolate</span><br><span class="line">        // these side-effects by decoupling the decisions to send events and partial status recording</span><br><span class="line">        // from the Node setters.</span><br><span class="line">        kl.recordNodeSchedulableEvent,</span><br><span class="line">    )</span><br><span class="line">    return setters</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>defaultNodeStatusFuncs 可以看到 node 上报的所有信息，主要有 MemoryPressureCondition、DiskPressureCondition、PIDPressureCondition、ReadyCondition 等。每一种 nodestatus 都返回一个 setters，所有 setters 的定义在 pkg/kubelet/nodestatus/setters.go 文件中。</p>
+<p>对于二次开发而言，如果我们需要 APIServer 掌握更多的 Node 信息，可以在此处添加自定义函数，例如，上报磁盘信息等。</p>
+<p>tryUpdateNodeStatus 中最后调用 PatchNodeStatus 上报 node 的状态到 master。</p>
+<p><code>kubernetes/pkg/util/node/node.go#PatchNodeStatus</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">// PatchNodeStatus patches node status.</span><br><span class="line">func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, []byte, error) &#123;</span><br><span class="line">		// 计算 patch </span><br><span class="line">    patchBytes, err := preparePatchBytesforNodeStatus(nodeName, oldNode, newNode)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes,       &quot;status&quot;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, fmt.Errorf(&quot;failed to patch status %q for node %q: %v&quot;, patchBytes, nodeName, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return updatedNode, patchBytes, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 PatchNodeStatus 会调用已注册的那些方法将状态把状态发给 APIServer。</p>
+<h3 id="四、总结"><a href="#四、总结" class="headerlink" title="四、总结"></a>四、总结</h3><p>本文主要讲述了 kubelet 上报状态的方式及其实现，node 状态上报的方式目前有两种，本文仅分析了第一种状态上报的方式。在大规模集群中由于节点数量比较多，所有 node 都频繁报状态对 etcd 会有一定的压力，当 node 与 master 通信时由于网络导致心跳上报失败也会影响 node 的状态，为了避免类似问题的出现才有 NodeLease 方式，对于该功能的实现后文会继续进行分析。</p>
+<p>参考：<br><a href="https://www.qikqiak.com/post/kubelet-sync-node-status/" target="_blank" rel="noopener">https://www.qikqiak.com/post/kubelet-sync-node-status/</a><br><a href="https://www.jianshu.com/p/054450557818" target="_blank" rel="noopener">https://www.jianshu.com/p/054450557818</a><br><a href="https://blog.csdn.net/shida_csdn/article/details/84286058" target="_blank" rel="noopener">https://blog.csdn.net/shida_csdn/article/details/84286058</a><br><a href="https://kubernetes.io/docs/concepts/architecture/nodes/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/architecture/nodes/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kubelet/" rel="tag"># kubelet</a>
+          
+            <a href="/tags/node-status/" rel="tag"># node status</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/05/17/client-go_informer/" rel="next" title="kubernetes 中 informer 的使用">
+                <i class="fa fa-chevron-left"></i> kubernetes 中 informer 的使用
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、kubelet-上报哪些状态"><span class="nav-number">1.</span> <span class="nav-text">一、kubelet 上报哪些状态</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Addresses"><span class="nav-number">1.0.1.</span> <span class="nav-text">1、Addresses</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、Condition"><span class="nav-number">1.0.2.</span> <span class="nav-text">2、Condition</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3、Capacity"><span class="nav-number">1.0.3.</span> <span class="nav-text">3、Capacity</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#4、Info"><span class="nav-number">1.0.4.</span> <span class="nav-text">4、Info</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、kubelet-状态异常时的影响"><span class="nav-number">1.1.</span> <span class="nav-text">二、kubelet 状态异常时的影响</span></a></li></ol><li class="nav-item nav-level-3"><a class="nav-link" href="#三、kubelet-状态上报的实现"><span class="nav-number">2.</span> <span class="nav-text">三、kubelet 状态上报的实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#四、总结"><span class="nav-number">3.</span> <span class="nav-text">四、总结</span></a></li></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

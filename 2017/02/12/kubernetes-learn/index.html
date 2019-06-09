@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 kubernetes + docker 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 API 进行某些操作。 1，kubernetes 搭建kubernetes 是 google 的一个开源软件，其社区活跃量远超">
+<meta name="keywords" content="kubernetes tianfeiyu">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes 学习笔记">
+<meta property="og:url" content="http://yoursite.com/2017/02/12/kubernetes-learn/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 kubernetes + docker 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 API 进行某些操作。 1，kubernetes 搭建kubernetes 是 google 的一个开源软件，其社区活跃量远超">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:updated_time" content="2019-06-01T14:26:16.310Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernetes 学习笔记">
+<meta name="twitter:description" content="1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 kubernetes + docker 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 API 进行某些操作。 1，kubernetes 搭建kubernetes 是 google 的一个开源软件，其社区活跃量远超">
+<meta name="twitter:image" content="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2017/02/12/kubernetes-learn/">
+
+
+
+
+
+  <title>kubernetes 学习笔记 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubernetes" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2017/02/12/kubernetes-learn/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernetes 学习笔记</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-02-12T22:58:00+08:00">
+                2017-02-12
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/12/kubernetes-learn/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2017/02/12/kubernetes-learn/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 <strong>kubernetes + docker</strong> 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 <code>API</code> 进行某些操作。</p>
+<h2 id="1，kubernetes-搭建"><a href="#1，kubernetes-搭建" class="headerlink" title="1，kubernetes 搭建"></a>1，kubernetes 搭建</h2><p><a href="https://github.com/kubernetes/kubernetes" target="_blank" rel="noopener">kubernetes</a> 是 google 的一个开源软件，其社区活跃量远超 <strong>Mesos，Coreos</strong> 的，若想深入学习建议参考<strong>《kubernetes 权威指南》</strong>，我们团队的人都是从这本书学起的，作为一个新技术，会踩到的坑非常多，以下提及的是我学习过程中整理的部分资料。</p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kubernetes 架构图"></p>
+<p>kubernetes 是一个分布式系统，所以它有多个组件，并且需要安装在多个节点，一般来说有三个节点，etcd，master 和 minion，但是每个节点却又有多台机器，etcd 作为高性能存储服务，一般独立为一个节点，当然容错是必不可少的，官方建议集群使用奇数个节点，我们的线下集群使用 3 个节点。etcd 的学习可以参考 <strong>gitbook</strong> 上面某大神的一本书 一 <a href="https://skyao.gitbooks.io/leaning-etcd3/content/documentation/leaning/" target="_blank" rel="noopener">etcd3学习笔记</a>。master 端需要安装 kube-apiserver、kube-controller-manager和kube-scheduler 组件，minion 节点需要部署 kubelet、kube-proxy、docker 组件。</p>
+<blockquote>
+<p>注意：内核版本 &gt; 3.10 的系统才支持 kubernetes，所以一般安装在centos 7 上。 </p>
+</blockquote>
+<p>etcd 节点：</p>
+<pre><code># yum install -y etcd 
+# systemctl start etcd  
+</code></pre><p>master 节点：</p>
+<pre><code># yum install -y kubernetes-master
+# systemctl start kube-apiserver 
+# systemctl start kube-controller-manager 
+# systemctl start kube-scheduler 
+</code></pre><p>minion 节点：</p>
+<pre><code># yum install -y kubernetes  docker
+# systemctl start kubelet 
+# systemctl start kube-proxy 
+# systemctl start docker 
+</code></pre><h2 id="2，kubernetes-版本升级"><a href="#2，kubernetes-版本升级" class="headerlink" title="2，kubernetes 版本升级"></a>2，kubernetes 版本升级</h2><p>以前一直以为公司会追求稳定性，在软件和系统的选取方便会优先考虑稳定的版本。但是来了公司才发现，某些软件出了新版本后，若有期待的功能并且在掌控范围内都会及时更新，所以也协助过导师更新了线下集群的 minion 节点。</p>
+<p>下面是 minion 节点的升级操作，master 节点的操作类似。首先需要下载 <a href="https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#downloads-for-v160-alpha1" target="_blank" rel="noopener">kubernetes-server-linux-amd64.tar.gz</a>  这个包，下载你所要更新到的版本。</p>
+<p><strong>升级步骤</strong>：</p>
+<ul>
+<li>1，先关掉 docker 服务。docker 关闭后，当前节点的 pod 随之会被调度到其他节点上</li>
+<li>2，备份二进制程序（kubectl,kube-proxy）</li>
+<li>3，将解压后的二进制程序覆盖以前的版本</li>
+<li>4，最后重新启动服务</li>
+</ul>
+<pre><code># systemctl stop docker
+# which kubectl kube-proxy 
+/usr/bin/kubectl
+/usr/bin/kube-proxy
+
+# cp /usr/bin/{kubectl,kube-proxy} /tmp/
+# yes | cp bin/{kubectl,kube-proxy} /usr/bin/
+
+# systemctl status {kubectl,kube-proxy}
+
+# systemctl start docker 
+</code></pre><h2 id="3，kubeconfig-使用"><a href="#3，kubeconfig-使用" class="headerlink" title="3，kubeconfig 使用"></a>3，kubeconfig 使用</h2><p>若你使用的 kubelet 版本为 1.4，使用 <code>systemctl status kubelet</code>  会看到这样一句话：</p>
+<pre><code>--api-servers option is deprecated for kubelet, so I am now trying to deploy with simply using --kubeconfig=/etc/kubernetes/node-kubeconfig.yaml
+</code></pre><p>使用 kuconfig 是为了将所有的命令行启动选项放在一个文件中方便使用。由于我们已经升级到了 1.5，所以也得升级此功能，首先需要写一个 kubeconfig 的 yaml 文件，其 <a href="http://kubernetes.io/docs/user-guide/kubeconfig-file/" target="_blank" rel="noopener">官方文档</a> 有格式说明， 本人已将其翻译，翻译文档见下文。</p>
+<p><strong>kubeconfig</strong> 文件示例：</p>
+<pre><code>apiVersion: v1
+clusters:
+- cluster:
+    server: http://localhost:8080
+  name: local-server
+contexts:
+- context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+  name: default-context
+current-context: default-context
+kind: Config
+preferences: {}
+users:
+- name: myself
+  user:
+    password: secret
+    username: admin
+</code></pre><hr>
+<pre><code># kubelet --kubeconfig=/etc/kubernetes/config --require-kubeconfig=true
+</code></pre><p>kubeconfig 参数：设置 kubelet 配置文件路径，这个配置文件用来告诉 kubelet 组件 api-server 组件的位置，默认路径是。</p>
+<p>require-kubeconfig 参数：这是一个布尔类型参数，可以设置成true 或者 false，如果设置成 true，那么表示启用 kubeconfig 参数，从 kubeconfig 参数设置的配置文件中查找 api-server 组件，如果设置成 false，那么表示使用 kubelet 另外一个参数 “api-servers” 来查找 api-server 组件位置。</p>
+<p>关于 kubeconfig 的一个 <strong>issue</strong>，<a href="https://github.com/kubernetes/kubernetes/issues/36745" target="_blank" rel="noopener">Kubelet won’t read apiserver from kubeconfig</a>。</p>
+<p><strong>升级步骤</strong>，当然前提是你的 kubelet 版本已经到了 1.5：</p>
+<ul>
+<li>1，关闭 kubelet、kube-proxy 服务；</li>
+<li><p>2，注释掉 <code>/etc/kubernetes/kubelet</code> 文件中下面这一行:</p>
+<p>  <code>KUBELET_API_SERVER=&quot;--api-servers=http://127.0.0.1:8080&quot;</code></p>
+</li>
+</ul>
+<p>然后在 <strong>KUBELET_ARGS</strong> 中添加： </p>
+<pre><code>--kubeconfig=/etc/kubernetes/kubeconfig --require-kubeconfig=true
+</code></pre><p>这里的路径是你 yaml 文件放置的路径。 </p>
+<ul>
+<li>3，重新启动刚关掉的两个服务</li>
+</ul>
+<hr>
+<h2 id="4，以下为-kubeconfig-配置官方文档的翻译"><a href="#4，以下为-kubeconfig-配置官方文档的翻译" class="headerlink" title="4，以下为 kubeconfig 配置官方文档的翻译"></a>4，以下为 <a href="https://kubernetes.io/docs/user-guide/kubeconfig-file/" target="_blank" rel="noopener">kubeconfig 配置官方文档</a>的翻译</h2><h3 id="kubernetes-中的验证对于不同的群体可以使用不同的方法"><a href="#kubernetes-中的验证对于不同的群体可以使用不同的方法" class="headerlink" title="kubernetes 中的验证对于不同的群体可以使用不同的方法."></a>kubernetes 中的验证对于不同的群体可以使用不同的方法.</h3><ul>
+<li>运行 kubelet 可能有的一种认证方式（即证书）。</li>
+<li>用户可能有不同的认证方式（即 token）。</li>
+<li>管理员可以为每个用户提供一个证书列表。</li>
+<li>可能会有多个集群，但我们想在一个地方定义它们 - 使用户能够用自己的证书并重用相同的全局配置。 </li>
+</ul>
+<p>因此为了在多个集群之间轻松切换，对于多个用户，定义了一个 kubeconfig 文件。</p>
+<p>此文件包含一系列认证机制和与 nicknames 有关的群集连接信息。它还引入了认证信息元组（用户）和集群连接信息的概念，被称为上下文也与 nickname 相关联。</p>
+<p>如果明确指定，也可以允许使用多个 kubeconfig 文件。在运行时，它们被合并加载并覆盖从命令行指定的选项（参见下面的规则）。</p>
+<h3 id="相关讨论"><a href="#相关讨论" class="headerlink" title="相关讨论"></a>相关讨论</h3><pre><code>http://issue.k8s.io/1755
+</code></pre><h3 id="kubeconfig-文件的组件"><a href="#kubeconfig-文件的组件" class="headerlink" title="kubeconfig 文件的组件"></a>kubeconfig 文件的组件</h3><p>kubeconfig 文件示例：</p>
+<pre><code>current-context: federal-context
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: http://cow.org:8080
+  name: cow-cluster
+- cluster:
+    certificate-authority: path/to/my/cafile
+    server: https://horse.org:4443
+  name: horse-cluster
+- cluster:
+    insecure-skip-tls-verify: true
+    server: https://pig.org:443
+  name: pig-cluster
+contexts:
+- context:
+    cluster: horse-cluster
+    namespace: chisel-ns
+    user: green-user
+  name: federal-context
+- context:
+    cluster: pig-cluster
+    namespace: saw-ns
+    user: black-user
+  name: queen-anne-context
+kind: Config
+preferences:
+  colors: true
+users:
+- name: blue-user
+  user:
+    token: blue-token
+- name: green-user
+  user:
+    client-certificate: path/to/my/client/cert
+    client-key: path/to/my/client/key
+</code></pre><h3 id="组件的解释"><a href="#组件的解释" class="headerlink" title="组件的解释"></a>组件的解释</h3><h4 id="cluster"><a href="#cluster" class="headerlink" title="cluster"></a>cluster</h4><pre><code>clusters:
+- cluster:
+    certificate-authority: path/to/my/cafile
+    server: https://horse.org:4443
+  name: horse-cluster
+- cluster:
+    insecure-skip-tls-verify: true
+    server: https://pig.org:443
+  name: pig-cluster
+</code></pre><p>cluster 包含 kubernetes 集群的 endpoint 数据。它包括 kubernetes apiserver 完全限定的 URL，以及集群的证书颁发机构或 insecure-skip-tls-verify：true，如果集群的服务证书未由系统信任的证书颁发机构签名。集群有一个名称（nickname），该名称用作此 kubeconfig 文件中的字典键。你可以使用 kubectl config set-cluster 添加或修改集群条目。</p>
+<h4 id="user"><a href="#user" class="headerlink" title="user"></a>user</h4><pre><code>users:
+- name: blue-user
+  user:
+    token: blue-token
+- name: green-user
+  user:
+    client-certificate: path/to/my/client/cert
+    client-key: path/to/my/client/key
+</code></pre><p>用户定义用于向 Kubernetes 集群进行身份验证的客户端凭证。在 kubeconfig 被加载/合并之后，用户具有在用户条目列表中充当其键的名称（nickname）。可用的凭证是客户端证书，客户端密钥，令牌和用户名/密码。用户名/密码和令牌是互斥的，但客户端证书和密钥可以与它们组合。你可以使用 kubectl config set-credentials 添加或修改用户条目。</p>
+<h3 id="context"><a href="#context" class="headerlink" title="context"></a>context</h3><pre><code>contexts:
+- context:
+    cluster: horse-cluster
+    namespace: chisel-ns
+    user: green-user
+  name: federal-context
+</code></pre><p>context 定义 cluster,user,namespace 元组的名称，用来向指定的集群使用提供的认证信息和命名空间向指定的集群发送请求。<br>三个都是可选的，仅指定 cluster，user，namespace 中的一个也是可用的，或者指定为 none。未指定的值或命名值，在加载的 kubeconfig 中没有对应的条目（例如，如果context 在上面的 kubeconfig 文件指定为 pink-user ）将被替换为默认值。有关覆盖/合并行为，请参阅下面的加载/合并规则。你可以使用 kubectl config set-context 添加或修改上下文条目。</p>
+<h4 id="current-context"><a href="#current-context" class="headerlink" title="current-context"></a>current-context</h4><pre><code>current-context: federal-context
+</code></pre><p>current-context 是 cluster,user,namespace 中的 nickname 或者 ‘key’，kubectl 在从此文件加载配置时将使用默认值。通过给 kubelett 传递 –context=CONTEXT, –cluster=CLUSTER, –user=USER, and/or –namespace=NAMESPACE 可以从命令行覆盖任何值。你可以使用 kubectl config use-context 更改当前上下文。</p>
+<h4 id="杂项"><a href="#杂项" class="headerlink" title="杂项"></a>杂项</h4><pre><code>apiVersion: v1
+kind: Config
+preferences:
+  colors: true
+</code></pre><p>apiVersion 和 kind 标识客户端要解析的版本和模式，不应手动编辑。<br>preferences 指定选项(和当前未使用的) kubectl preferences.</p>
+<h3 id="查看-kubeconfig-文件"><a href="#查看-kubeconfig-文件" class="headerlink" title="查看 kubeconfig 文件"></a>查看 kubeconfig 文件</h3><p>kubectl config view 会显示当前的 kubeconfig 配置。默认情况下，它会显示所有加载的 kubeconfig 配置， 你可以通过 –minify 选项来过滤与 current-context 相关的设置。请参见 kubectl config view 的其他选项。</p>
+<h3 id="创建你的-kubeconfig-文件"><a href="#创建你的-kubeconfig-文件" class="headerlink" title="创建你的 kubeconfig 文件"></a>创建你的 kubeconfig 文件</h3><p>注意，如果你通过 kube-up.sh 部署 k8s，则不需要创建 kubeconfig 文件，脚本将为你创建。</p>
+<p>在任何情况下，可以轻松地使用此文件作为模板来创建自己的 kubeconfig 文件。</p>
+<p>因此，让我们快速浏览上述文件的基础知识，以便可以根据需要轻松修改…</p>
+<p>以上文件可能对应于使用–token-auth-file = tokens.csv 选项启动的 api 服务器，其中 tokens.csv文件看起来像这样：</p>
+<pre><code>blue-user,blue-user,1
+mister-red,mister-red,2
+</code></pre><p>此外，由于不同用户使用不同的验证机制，api-server 可能已经启动其他的身份验证选项（有许多这样的选项，在制作 kubeconfig 文件之前确保你理解所关心的，因为没有人需要实现所有可能的认证方案）。</p>
+<ul>
+<li>由于 current-context 的用户是 “green-user”，因此任何使用此 kubeconfig 文件的客户端自然都能够成功登录 api-server，因为我们提供了 “green-user” 的客户端凭据。</li>
+<li>类似地，我们也可以选择改变 current-context 的值为 “blue-user”。</li>
+<li>在上述情况下，“green-user” 将必须通过提供证书登录，而 “blue-user” 只需提供 token。所有的这些信息将由我们处理通过</li>
+</ul>
+<h3 id="加载和合并规则"><a href="#加载和合并规则" class="headerlink" title="加载和合并规则"></a>加载和合并规则</h3><p>加载和合并 kubeconfig 文件的规则很简单，但有很多。最终配置按照以下顺序构建：</p>
+<p>1，从磁盘获取 kubeconfig。通过以下层次结构和合并规则完成：<br>如果设置了 CommandLineLocation（kubeconfig 命令行选项的值），则仅使用此文件，不合并。只允许此标志的一个实例。</p>
+<p>否则，如果 EnvVarLocation（$KUBECONFIG 的值）可用，将其用作应合并的文件列表。根据以下规则将文件合并在一起。将忽略空文件名。文件内容不能反序列化则产生错误。设置特定值或映射密钥的第一个文件将被使用，并且值或映射密钥永远不会更改。这意味着设置CurrentContext 的第一个文件将保留其 context。也意味着如果两个文件指定 “red-user”,，则仅使用来自第一个文件的 “red-user” 的值。来自第二个 “red-user” 文件的非冲突条目也将被丢弃。</p>
+<p>对于其他的，使用 HomeDirectoryLocation（~/.kube/config）也不会被合并。</p>
+<p>2，此链中第一个被匹配的 context 将被使用：</p>
+<ul>
+<li>1，命令行参数 - 命令行选项中 context 的值</li>
+<li>2，合并文件中的 current-context</li>
+<li>3，此段允许为空</li>
+</ul>
+<p>3，确定要使用的集群信息和用户。在此处，也可能没有 context。这个链中第一次使用的会被构建。（运行两次，一次为用户，一次为集群）：</p>
+<ul>
+<li>1，命令行参数 - user 是用户名，cluster 是集群名</li>
+<li>2，如果存在 context 则使用</li>
+<li>3，允许为空</li>
+</ul>
+<p>4，确定要使用的实际集群信息。在此处，也可能没有集群信息。基于链构建每个集群信息（首次使用的）：</p>
+<ul>
+<li>1，命令行参数 - server，api-version，certificate-authority 和 insecure-skip-tls-verify</li>
+<li>2，如果存在集群信息并且该属性的值存在，则使用它。</li>
+<li>3，如果没有 server 位置则出错。</li>
+</ul>
+<p>5，确定要使用的实际用户信息。用户构建使用与集群信息相同的规则，但每个用户只能具有一种认证方法：</p>
+<ul>
+<li>1，加载优先级为 1）命令行参数，2） kubeconfig 的用户字段</li>
+<li>2，命令行参数：客户端证书，客户端密钥，用户名，密码和 token。</li>
+<li>3，如果两者有冲突则失败</li>
+</ul>
+<p>6，对于仍然缺失的信息，使用默认值并尽可能提示输入身份验证信息。</p>
+<p>7，kubeconfig 文件中的所有文件引用都是相对于 kubeconfig 文件本身的位置解析的。当文件引用显示在命令行上时，它们被视为相对于当前工作目录。当路径保存在 ~/.kube/config 中时，相对路径和绝对路径被分别存储。</p>
+<p>kubeconfig 文件中的任何路径都是相对于 kubeconfig 文件本身的位置解析的。</p>
+<h3 id="通过-kubectl-config-操作-kubeconfig"><a href="#通过-kubectl-config-操作-kubeconfig" class="headerlink" title="通过 kubectl config  操作 kubeconfig"></a>通过 kubectl config <subcommand> 操作 kubeconfig</subcommand></h3><p>为了更容易地操作 kubeconfig 文件，可以使用 kubectl config 的子命令。请参见 kubectl/kubectl_config.md 获取帮助。</p>
+<p>例如：</p>
+<pre><code>$ kubectl config set-credentials myself --username=admin --password=secret
+$ kubectl config set-cluster local-server --server=http://localhost:8080
+$ kubectl config set-context default-context --cluster=local-server --user=myself
+$ kubectl config use-context default-context
+$ kubectl config set contexts.default-context.namespace the-right-prefix
+$ kubectl config view
+</code></pre><p>输出：</p>
+<pre><code>apiVersion: v1
+clusters:
+- cluster:
+    server: http://localhost:8080
+  name: local-server
+contexts:
+- context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+  name: default-context
+current-context: default-context
+kind: Config
+preferences: {}
+users:
+- name: myself
+  user:
+    password: secret
+    username: admin
+</code></pre><p>一个 kubeconfig 文件类似这样：</p>
+<pre><code>apiVersion: v1
+clusters:
+- cluster:
+    server: http://localhost:8080
+  name: local-server
+contexts:
+- context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+  name: default-context
+current-context: default-context
+kind: Config
+preferences: {}
+users:
+- name: myself
+  user:
+    password: secret
+    username: admin
+</code></pre><p>示例文件的命令操作：</p>
+<pre><code>$ kubectl config set preferences.colors true
+$ kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1
+$ kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
+$ kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
+$ kubectl config set-credentials blue-user --token=blue-token
+$ kubectl config set-credentials green-user --client-certificate=path/to/my/client/cert --client-key=path/to/my/client/key
+$ kubectl config set-context queen-anne-context --cluster=pig-cluster --user=black-user --namespace=saw-ns
+$ kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
+$ kubectl config use-context federal-context
+</code></pre><p>最后的总结：</p>
+<p>所以，看完这些，你就可以快速开始创建自己的 kubeconfig 文件了：</p>
+<ul>
+<li>仔细查看并了解 api-server 如何启动：了解你的安全策略后，然后才能设计 kubeconfig 文件以便于身份验证</li>
+<li>将上面的代码段替换为你集群的 api-server endpoint 的信息。</li>
+<li>确保 api-server 已启动，以至少向其提供一个用户（例如：green-user）凭证。当然，你必须查看 api-server 文档，以确定以目前最好的技术提供详细的身份验证信息。</li>
+</ul>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/03/02/etcd-backup/" rel="prev" title="etcd 备份与恢复">
+                etcd 备份与恢复 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1，kubernetes-搭建"><span class="nav-number">1.</span> <span class="nav-text">1，kubernetes 搭建</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2，kubernetes-版本升级"><span class="nav-number">2.</span> <span class="nav-text">2，kubernetes 版本升级</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3，kubeconfig-使用"><span class="nav-number">3.</span> <span class="nav-text">3，kubeconfig 使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4，以下为-kubeconfig-配置官方文档的翻译"><span class="nav-number">4.</span> <span class="nav-text">4，以下为 kubeconfig 配置官方文档的翻译</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的验证对于不同的群体可以使用不同的方法"><span class="nav-number">4.1.</span> <span class="nav-text">kubernetes 中的验证对于不同的群体可以使用不同的方法.</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#相关讨论"><span class="nav-number">4.2.</span> <span class="nav-text">相关讨论</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubeconfig-文件的组件"><span class="nav-number">4.3.</span> <span class="nav-text">kubeconfig 文件的组件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#组件的解释"><span class="nav-number">4.4.</span> <span class="nav-text">组件的解释</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#cluster"><span class="nav-number">4.4.1.</span> <span class="nav-text">cluster</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#user"><span class="nav-number">4.4.2.</span> <span class="nav-text">user</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#context"><span class="nav-number">4.5.</span> <span class="nav-text">context</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#current-context"><span class="nav-number">4.5.1.</span> <span class="nav-text">current-context</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#杂项"><span class="nav-number">4.5.2.</span> <span class="nav-text">杂项</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查看-kubeconfig-文件"><span class="nav-number">4.6.</span> <span class="nav-text">查看 kubeconfig 文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#创建你的-kubeconfig-文件"><span class="nav-number">4.7.</span> <span class="nav-text">创建你的 kubeconfig 文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#加载和合并规则"><span class="nav-number">4.8.</span> <span class="nav-text">加载和合并规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#通过-kubectl-config-操作-kubeconfig"><span class="nav-number">4.9.</span> <span class="nav-text">通过 kubectl config  操作 kubeconfig</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

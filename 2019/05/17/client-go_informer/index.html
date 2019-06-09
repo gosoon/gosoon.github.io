@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="client-go,informer,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
+<meta name="keywords" content="client-go,informer">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes 中 informer 的使用">
+<meta property="og:url" content="http://yoursite.com/2019/05/17/client-go_informer/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-4f2f879989eef369.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta property="og:updated_time" content="2019-06-01T14:26:16.306Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernetes 中 informer 的使用">
+<meta name="twitter:description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
+<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/05/17/client-go_informer/">
+
+
+
+
+
+  <title>kubernetes 中 informer 的使用 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-client-go" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/05/17/client-go_informer/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernetes 中 informer 的使用</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-05-17T11:00:30+08:00">
+                2019-05-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/05/17/client-go_informer/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/05/17/client-go_informer/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h4 id="一、kubernetes-集群的几种访问方式"><a href="#一、kubernetes-集群的几种访问方式" class="headerlink" title="一、kubernetes 集群的几种访问方式"></a>一、kubernetes 集群的几种访问方式</h4><p>在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获取的，使用 <code>kubectl get pod -v=9</code> 可以直接看到调用 k8s 的接口，然后在程序中直接访问还是比较方便的。但是随着集群规模的增长或者从国内获取海外 k8s 集群的数据，直接调用 k8s 接口获取所有 pod 还是比较耗时，这个问题有多种解决方法，最初是直接使用 k8s 原生的 watch 接口来获取的，下面是一个伪代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">const (</span><br><span class="line">	ADDED    string = &quot;ADDED&quot;</span><br><span class="line">	MODIFIED string = &quot;MODIFIED&quot;</span><br><span class="line">	DELETED  string = &quot;DELETED&quot;</span><br><span class="line">	ERROR    string = &quot;ERROR&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">type Event struct &#123;</span><br><span class="line">	Type   string          `json:&quot;type&quot;`</span><br><span class="line">	Object json.RawMessage `json:&quot;object&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	resp, err := http.Get(&quot;http://apiserver:8080/api/v1/watch/pods?watch=yes&quot;)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		// ...</span><br><span class="line">	&#125;</span><br><span class="line">	decoder := json.NewDecoder(resp.Body)</span><br><span class="line">	for &#123;</span><br><span class="line">		var event Event</span><br><span class="line">		err = decoder.Decode(&amp;event)</span><br><span class="line">		if err != nil &#123;</span><br><span class="line">			// ...</span><br><span class="line">		&#125;</span><br><span class="line">		switch event.Type &#123;</span><br><span class="line">		case ADDED, MODIFIED:</span><br><span class="line">			// ...</span><br><span class="line">		case DELETED:</span><br><span class="line">			// ...</span><br><span class="line">		case ERROR:</span><br><span class="line">			// ...</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>调用 watch 接口后会先将所有的对象 list 一次，然后 apiserver 会将变化的数据推送到 client 端，可以看到每次对于 watch 到的事件都需要判断后进行处理，然后将处理后的结果写入到本地的缓存中，原生的 watch 操作还是非常麻烦的。后来了解到官方推出一个客户端工具 client-go ，client-go 中的 Informer 对 watch 操作做了封装，使用起来非常方便，下面会主要介绍一下 client-go 的使用。</p>
+<h4 id="二、Informer-的机制"><a href="#二、Informer-的机制" class="headerlink" title="二、Informer 的机制"></a>二、Informer 的机制</h4><p>cient-go 是从 k8s 代码中抽出来的一个客户端工具，Informer 是 client-go 中的核心工具包，已经被 kubernetes 中众多组件所使用。所谓 Informer，其实就是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client，本地缓存被称为 Store，索引被称为 Index。使用 informer 的目的是为了减轻 apiserver 数据交互的压力而抽象出来的一个 cache 层, 客户端对 apiserver 数据的 “读取” 和 “监听” 操作都通过本地 informer 进行。Informer 实例的<code>Lister()</code>方法可以直接查找缓存在本地内存中的数据。</p>
+<p>Informer 的主要功能：</p>
+<ul>
+<li>同步数据到本地缓存</li>
+<li>根据对应的事件类型，触发事先注册好的 ResourceEventHandler</li>
+</ul>
+<h5 id="1、Informer-中几个组件的作用"><a href="#1、Informer-中几个组件的作用" class="headerlink" title="1、Informer 中几个组件的作用"></a>1、Informer 中几个组件的作用</h5><p>Informer 中主要有 Reflector、Delta FIFO Queue、Local Store、WorkQueue 几个组件。以下是 Informer 的工作流程图。</p>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="Informer 组件"></p>
+<p>根据流程图来解释一下 Informer 中几个组件的作用：</p>
+<ul>
+<li><p>Reflector：称之为反射器，实现对 apiserver 指定类型对象的监控(ListAndWatch)，其中反射实现的就是把监控的结果实例化成具体的对象，最终也是调用 Kubernetes 的 List/Watch API；</p>
+</li>
+<li><p>DeltaIFIFO Queue：一个增量队列，将 Reflector 监控变化的对象形成一个 FIFO 队列，此处的 Delta 就是变化；</p>
+</li>
+<li><p>LocalStore：就是 informer 的 cache，这里面缓存的是 apiserver 中的对象(其中有一部分可能还在DeltaFIFO 中)，此时使用者再查询对象的时候就直接从 cache 中查找，减少了 apiserver 的压力，LocalStore 只会被 Lister 的 List/Get 方法访问。</p>
+</li>
+<li><p>WorkQueue：DeltaIFIFO 收到时间后会先将时间存储在自己的数据结构中，然后直接操作 Store 中存储的数据，更新完 store 后 DeltaIFIFO 会将该事件 pop 到 WorkQueue 中，Controller 收到 WorkQueue  中的事件会根据对应的类型触发对应的回调函数。</p>
+</li>
+</ul>
+<h5 id="2、Informer-的工作流程"><a href="#2、Informer-的工作流程" class="headerlink" title="2、Informer 的工作流程"></a>2、Informer 的工作流程</h5><ul>
+<li>Informer 首先会 list/watch apiserver，Informer 所使用的 Reflector 包负责与 apiserver 建立连接，Reflector 使用 ListAndWatch 的方法，会先从 apiserver 中 list 该资源的所有实例，list 会拿到该对象最新的 resourceVersion，然后使用 watch 方法监听该 resourceVersion 之后的所有变化，若中途出现异常，reflector 则会从断开的 resourceVersion 处重现尝试监听所有变化，一旦该对象的实例有创建、删除、更新动作，Reflector 都会收到”事件通知”，这时，该事件及它对应的 API 对象这个组合，被称为增量（Delta），它会被放进 DeltaFIFO 中。</li>
+<li>Informer 会不断地从这个 DeltaFIFO 中读取增量，每拿出一个对象，Informer 就会判断这个增量的时间类型，然后创建或更新本地的缓存，也就是 store。</li>
+<li>如果事件类型是 Added（添加对象），那么 Informer 会通过 Indexer 的库把这个增量里的 API 对象保存到本地的缓存中，并为它创建索引，若为删除操作，则在本地缓存中删除该对象。</li>
+<li>DeltaFIFO 再 pop 这个事件到 controller 中，controller 会调用事先注册的 ResourceEventHandler 回调函数进行处理。</li>
+<li>在 ResourceEventHandler 回调函数中，其实只是做了一些很简单的过滤，然后将关心变更的 Object 放到 workqueue 里面。</li>
+<li>Controller 从 workqueue 里面取出 Object，启动一个 worker 来执行自己的业务逻辑，业务逻辑通常是计算目前集群的状态和用户希望达到的状态有多大的区别，然后孜孜不倦地让 apiserver 将状态演化到用户希望达到的状态，比如为 deployment 创建新的 pods，或者是扩容/缩容 deployment。</li>
+<li>在worker中就可以使用 lister 来获取 resource，而不用频繁的访问 apiserver，因为 apiserver 中 resource 的变更都会反映到本地的 cache 中。</li>
+</ul>
+<p>Informer 在使用时需要先初始化一个 InformerFactory，目前主要推荐使用的是 SharedInformerFactory，Shared 指的是在多个 Informer 中共享一个本地 cache。</p>
+<p>Informer 中的 ResourceEventHandler  函数有三种：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or</span><br><span class="line">// as few of the notification functions as you want while still implementing</span><br><span class="line">// ResourceEventHandler.</span><br><span class="line">type ResourceEventHandlerFuncs struct &#123;</span><br><span class="line">    AddFunc    func(obj interface&#123;&#125;)</span><br><span class="line">    UpdateFunc func(oldObj, newObj interface&#123;&#125;)</span><br><span class="line">    DeleteFunc func(obj interface&#123;&#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这三种函数的处理逻辑是用户自定义的，在初始化 controller 时注册完 ResourceEventHandler 后，一旦该对象的实例有创建、删除、更新三中操作后就会触发对应的 ResourceEventHandler。</p>
+<h4 id="三、Informer-使用示例"><a href="#三、Informer-使用示例" class="headerlink" title="三、Informer 使用示例"></a>三、Informer 使用示例</h4><p>在实际的开发工作中，Informer 主要用在两处：</p>
+<ul>
+<li>在访问 k8s apiserver 的客户端作为一个 client 缓存对象使用；</li>
+<li>在一些自定义 controller 中使用，比如 operator 的开发；</li>
+</ul>
+<h4 id="1、下面是一个作为-client-的使用示例："><a href="#1、下面是一个作为-client-的使用示例：" class="headerlink" title="1、下面是一个作为 client 的使用示例："></a>1、下面是一个作为 client 的使用示例：</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import (</span><br><span class="line">	&quot;flag&quot;</span><br><span class="line">	&quot;fmt&quot;</span><br><span class="line">	&quot;log&quot;</span><br><span class="line">	&quot;path/filepath&quot;</span><br><span class="line"></span><br><span class="line">	corev1 &quot;k8s.io/api/core/v1&quot;</span><br><span class="line">	&quot;k8s.io/apimachinery/pkg/labels&quot;</span><br><span class="line">	&quot;k8s.io/apimachinery/pkg/util/runtime&quot;</span><br><span class="line"></span><br><span class="line">	&quot;k8s.io/client-go/informers&quot;</span><br><span class="line">	&quot;k8s.io/client-go/kubernetes&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/cache&quot;</span><br><span class="line">	&quot;k8s.io/client-go/tools/clientcmd&quot;</span><br><span class="line">	&quot;k8s.io/client-go/util/homedir&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	var kubeconfig *string</span><br><span class="line">	if home := homedir.HomeDir(); home != &quot;&quot; &#123;</span><br><span class="line">		kubeconfig = flag.String(&quot;kubeconfig&quot;, filepath.Join(home, &quot;.kube&quot;, &quot;config&quot;), &quot;(optional) absolute path to the kubeconfig file&quot;)</span><br><span class="line">	&#125; else &#123;</span><br><span class="line">		kubeconfig = flag.String(&quot;kubeconfig&quot;, &quot;&quot;, &quot;absolute path to the kubeconfig file&quot;)</span><br><span class="line">	&#125;</span><br><span class="line">	flag.Parse()</span><br><span class="line"></span><br><span class="line">	config, err := clientcmd.BuildConfigFromFlags(&quot;&quot;, *kubeconfig)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		panic(err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 初始化 client</span><br><span class="line">	clientset, err := kubernetes.NewForConfig(config)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		log.Panic(err.Error())</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	stopper := make(chan struct&#123;&#125;)</span><br><span class="line">	defer close(stopper)</span><br><span class="line">	</span><br><span class="line">	// 初始化 informer</span><br><span class="line">	factory := informers.NewSharedInformerFactory(clientset, 0)</span><br><span class="line">	nodeInformer := factory.Core().V1().Nodes()</span><br><span class="line">	informer := nodeInformer.Informer()</span><br><span class="line">	defer runtime.HandleCrash()</span><br><span class="line">	</span><br><span class="line">	// 启动 informer，list &amp; watch</span><br><span class="line">	go factory.Start(stopper)</span><br><span class="line">	</span><br><span class="line">	// 从 apiserver 同步资源，即 list </span><br><span class="line">	if !cache.WaitForCacheSync(stopper, informer.HasSynced) &#123;</span><br><span class="line">		runtime.HandleError(fmt.Errorf(&quot;Timed out waiting for caches to sync&quot;))</span><br><span class="line">		return</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 使用自定义 handler</span><br><span class="line">	informer.AddEventHandler(cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">		AddFunc:    onAdd,</span><br><span class="line">		UpdateFunc: func(interface&#123;&#125;, interface&#123;&#125;) &#123; fmt.Println(&quot;update not implemented&quot;) &#125;, // 此处省略 workqueue 的使用</span><br><span class="line">		DeleteFunc: func(interface&#123;&#125;) &#123; fmt.Println(&quot;delete not implemented&quot;) &#125;,</span><br><span class="line">	&#125;)</span><br><span class="line">	</span><br><span class="line">	// 创建 lister</span><br><span class="line">	nodeLister := nodeInformer.Lister()</span><br><span class="line">	// 从 lister 中获取所有 items</span><br><span class="line">	nodeList, err := nodeLister.List(labels.Everything())</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		fmt.Println(err)</span><br><span class="line">	&#125;</span><br><span class="line">	fmt.Println(&quot;nodelist:&quot;, nodeList)</span><br><span class="line">	&lt;-stopper</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func onAdd(obj interface&#123;&#125;) &#123;</span><br><span class="line">	node := obj.(*corev1.Node)</span><br><span class="line">	fmt.Println(&quot;add a node:&quot;, node.Name)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Shared指的是多个 lister 共享同一个cache，而且资源的变化会同时通知到cache和 listers。这个解释和上面图所展示的内容的是一致的，cache我们在Indexer的介绍中已经分析过了，lister 指的就是OnAdd、OnUpdate、OnDelete 这些回调函数背后的对象。</p>
+<h4 id="2、以下是作为-controller-使用的一个整体工作流程"><a href="#2、以下是作为-controller-使用的一个整体工作流程" class="headerlink" title="2、以下是作为 controller 使用的一个整体工作流程"></a>2、以下是作为 controller 使用的一个整体工作流程</h4><p>(1) 创建一个控制器</p>
+<ul>
+<li>为控制器创建 workqueue</li>
+<li>创建 informer, 为 informer 添加 callback 函数，创建 lister</li>
+</ul>
+<p>(2) 启动控制器</p>
+<ul>
+<li>启动 informer</li>
+<li>等待本地 cache sync 完成后， 启动 workers</li>
+</ul>
+<p>(3) 当收到变更事件后，执行 callback </p>
+<ul>
+<li>等待事件触发</li>
+<li>从事件中获取变更的 Object</li>
+<li>做一些必要的检查</li>
+<li>生成 object key，一般是 namespace/name 的形式</li>
+<li>将 key 放入 workqueue 中</li>
+</ul>
+<p>(4) worker loop</p>
+<ul>
+<li>等待从 workqueue 中获取到 item，一般为 object key</li>
+<li>用 object key 通过 lister 从本地 cache 中获取到真正的 object 对象</li>
+<li>做一些检查</li>
+<li>执行真正的业务逻辑</li>
+<li>处理下一个 item</li>
+</ul>
+<p>下面是自定义 controller 使用的一个参考：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br></pre></td><td class="code"><pre><span class="line">var (</span><br><span class="line">    masterURL  string</span><br><span class="line">    kubeconfig string</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">func init() &#123;</span><br><span class="line">    flag.StringVar(&amp;kubeconfig, &quot;kubeconfig&quot;, &quot;&quot;, &quot;Path to a kubeconfig. Only required if out-of-cluster.&quot;)</span><br><span class="line">    flag.StringVar(&amp;masterURL, &quot;master&quot;, &quot;&quot;, &quot;The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.&quot;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">    flag.Parse()</span><br><span class="line"></span><br><span class="line">    stopCh := signals.SetupSignalHandler()</span><br><span class="line"></span><br><span class="line">    cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        glog.Fatalf(&quot;Error building kubeconfig: %s&quot;, err.Error())</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    kubeClient, err := kubernetes.NewForConfig(cfg)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        glog.Fatalf(&quot;Error building kubernetes clientset: %s&quot;, err.Error())</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 所谓 Informer，其实就是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client</span><br><span class="line">    // informer watch apiserver,每隔 30 秒 resync 一次(list)</span><br><span class="line">    kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, time.Second*30)</span><br><span class="line"></span><br><span class="line">    controller := controller.NewController(kubeClient, kubeInformerFactory.Core().V1().Nodes())</span><br><span class="line"></span><br><span class="line">    //  启动 informer</span><br><span class="line">    go kubeInformerFactory.Start(stopCh)</span><br><span class="line"></span><br><span class="line">	 // start controller </span><br><span class="line">    if err = controller.Run(2, stopCh); err != nil &#123;</span><br><span class="line">        glog.Fatalf(&quot;Error running controller: %s&quot;, err.Error())</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">// NewController returns a new network controller</span><br><span class="line">func NewController(</span><br><span class="line">    kubeclientset kubernetes.Interface,</span><br><span class="line">    networkclientset clientset.Interface,</span><br><span class="line">    networkInformer informers.NetworkInformer) *Controller &#123;</span><br><span class="line"></span><br><span class="line">    // Create event broadcaster</span><br><span class="line">    // Add sample-controller types to the default Kubernetes Scheme so Events can be</span><br><span class="line">    // logged for sample-controller types.</span><br><span class="line">    utilruntime.Must(networkscheme.AddToScheme(scheme.Scheme))</span><br><span class="line">    glog.V(4).Info(&quot;Creating event broadcaster&quot;)</span><br><span class="line">    eventBroadcaster := record.NewBroadcaster()</span><br><span class="line">    eventBroadcaster.StartLogging(glog.Infof)</span><br><span class="line">    eventBroadcaster.StartRecordingToSink(&amp;typedcorev1.EventSinkImpl&#123;Interface: kubeclientset.CoreV1().Events(&quot;&quot;)&#125;)</span><br><span class="line">    recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource&#123;Component: controllerAgentName&#125;)</span><br><span class="line"></span><br><span class="line">    controller := &amp;Controller&#123;</span><br><span class="line">        kubeclientset:    kubeclientset,</span><br><span class="line">        networkclientset: networkclientset,</span><br><span class="line">        networksLister:   networkInformer.Lister(),</span><br><span class="line">        networksSynced:   networkInformer.Informer().HasSynced,</span><br><span class="line">        workqueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), &quot;Networks&quot;),</span><br><span class="line">        recorder:         recorder,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    glog.Info(&quot;Setting up event handlers&quot;)</span><br><span class="line">    // Set up an event handler for when Network resources change</span><br><span class="line">    networkInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">        AddFunc: controller.enqueueNetwork,</span><br><span class="line">        UpdateFunc: func(old, new interface&#123;&#125;) &#123;</span><br><span class="line">            oldNetwork := old.(*samplecrdv1.Network)</span><br><span class="line">            newNetwork := new.(*samplecrdv1.Network)</span><br><span class="line">            if oldNetwork.ResourceVersion == newNetwork.ResourceVersion &#123;</span><br><span class="line">                // Periodic resync will send update events for all known Networks.</span><br><span class="line">                // Two different versions of the same Network will always have different RVs.</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">            controller.enqueueNetwork(new)</span><br><span class="line">        &#125;,</span><br><span class="line">        DeleteFunc: controller.enqueueNetworkForDelete,</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    return controller</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>自定义 controller 的详细使用方法可以参考：<a href="https://github.com/resouer/k8s-controller-custom-resource" target="_blank" rel="noopener">k8s-controller-custom-resource</a></p>
+<h4 id="四、使用中的一些问题"><a href="#四、使用中的一些问题" class="headerlink" title="四、使用中的一些问题"></a>四、使用中的一些问题</h4><h5 id="1、Informer-二级缓存中的同步问题"><a href="#1、Informer-二级缓存中的同步问题" class="headerlink" title="1、Informer 二级缓存中的同步问题"></a>1、Informer 二级缓存中的同步问题</h5><p>虽然 Informer 和 Kubernetes 之间没有 resync 机制，但 Informer 内部的这两级缓存 DeltaIFIFO 和 LocalStore 之间会存在 resync 机制，k8s 中 kube-controller-manager 的 StatefulSetController 中使用了两级缓存的 resync 机制（如下图所示），我们在生产环境中发现 sts 创建后过了很久 pod 才会创建，主要是由于 StatefulSetController 的两级缓存之间 30s 会同步一次，由于  StatefulSetController watch 到变化后就会把对应的 sts 放入 DeltaIFIFO 中，且每隔30s会把 LocalStore 中全部的 sts 重新入一遍 DeltaIFIFO，入队时会做一些处理，过滤掉一些不需要重复入队列的 sts，若间隔的 30s 内没有处理完队列中所有的 sts，则待处理队列中始终存在未处理完的 sts，并且在同步过程中产生的 sts 会加的队列的尾部，新加入队尾的 sts 只能等到前面的 sts 处理完成（也就是 resync 完成）才会被处理，所以导致的现象就是 sts 创建后过了很久 pod 才会创建。</p>
+<p>优化的方法就是去掉二级缓存的同步策略（将 setInformer.Informer().AddEventHandlerWithResyncPeriod() 改为 informer.AddEventHandler()）或者调大同步周期，但是在研究 kube-controller-manager 其他 controller 时发现并不是所有的 controller 都有同步策略，社区也有相关的 issue 反馈了这一问题，<a href="https://github.com/kubernetes/kubernetes/pull/75622" target="_blank" rel="noopener">Remove resync period for sset controller</a>，社区也会在以后的版本中去掉两级缓存之间的 resync 策略。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set.go</code></p>
+<p><img src="https://upload-images.jianshu.io/upload_images/1262158-4f2f879989eef369.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kube-controller-manager sts controller"></p>
+<h5 id="2、使用-Informer-如何监听所有资源对象？"><a href="#2、使用-Informer-如何监听所有资源对象？" class="headerlink" title="2、使用 Informer 如何监听所有资源对象？"></a>2、使用 Informer 如何监听所有资源对象？</h5><p>一个 Informer 实例只能监听一种 resource，每个 resource 需要创建对应的 Informer 实例。</p>
+<h5 id="3、为什么不是使用-workqueue？"><a href="#3、为什么不是使用-workqueue？" class="headerlink" title="3、为什么不是使用 workqueue？"></a>3、为什么不是使用 workqueue？</h5><p>建议使用 RateLimitingQueue，它相比普通的 workqueue 多了以下的功能: </p>
+<ul>
+<li>限流：可以限制一个 item 被 reenqueued 的次数。</li>
+<li>防止 hot loop：它保证了一个 item 被 reenqueued 后，不会马上被处理。</li>
+</ul>
+<h4 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a>五、总结</h4><p>本文介绍了 client-go 包中核心组件 Informer 的原理以及使用方法，Informer 主要功能是缓存对象到本地以及根据对应的事件类型触发已注册好的 ResourceEventHandler，其主要用在访问 k8s apiserver 的客户端和 operator 中。</p>
+<p>参考：</p>
+<p><a href="https://mp.weixin.qq.com/s?__biz=MzU1OTAzNzc5MQ==&amp;mid=2247484052&amp;idx=1&amp;sn=cec9f4a1ee0d21c5b2c51bd147b8af59&amp;chksm=fc1c2ea4cb6ba7b283eef5ac4a45985437c648361831bc3e6dd5f38053be1968b3389386e415&amp;scene=21#wechat_redirect" target="_blank" rel="noopener">如何用 client-go 拓展 Kubernetes 的 API</a></p>
+<p><a href="https://www.kubernetes.org.cn/2693.html" target="_blank" rel="noopener">https://www.kubernetes.org.cn/2693.html</a></p>
+<p><a href="https://studygolang.com/articles/9270" target="_blank" rel="noopener">Kubernetes 大咖秀徐超《使用 client-go 控制原生及拓展的 Kubernetes API》</a></p>
+<p><a href="https://github.com/kubernetes/kubernetes/issues/71165" target="_blank" rel="noopener">Use prometheus conventions for workqueue metrics</a></p>
+<p><a href="https://blog.csdn.net/weixin_42663840/article/details/81482553#%E9%99%90%E9%80%9F%E9%98%9F%E5%88%97" target="_blank" rel="noopener">深入浅出kubernetes之client-go的workqueue</a></p>
+<p><a href="https://gianarb.it/blog/kubernetes-shared-informer" target="_blank" rel="noopener">https://gianarb.it/blog/kubernetes-shared-informer</a></p>
+<p><a href="https://zhuanlan.zhihu.com/p/59660536" target="_blank" rel="noopener">理解 K8S 的设计精髓之 List-Watch机制和Informer模块</a></p>
+<p><a href="https://ranler.org/notes/file/528" target="_blank" rel="noopener">https://ranler.org/notes/file/528</a></p>
+<p><a href="https://yq.aliyun.com/articles/688485" target="_blank" rel="noopener">Kubernetes Client-go Informer 源码分析</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/client-go/" rel="tag"># client-go</a>
+          
+            <a href="/tags/informer/" rel="tag"># informer</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/05/16/kubectl_plugin/" rel="next" title="使用插件扩展 kubectl">
+                <i class="fa fa-chevron-left"></i> 使用插件扩展 kubectl
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/06/09/node_status/" rel="prev" title="kubelet 状态上报的方式">
+                kubelet 状态上报的方式 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">20</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、kubernetes-集群的几种访问方式"><span class="nav-number">1.</span> <span class="nav-text">一、kubernetes 集群的几种访问方式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Informer-的机制"><span class="nav-number">2.</span> <span class="nav-text">二、Informer 的机制</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-中几个组件的作用"><span class="nav-number">2.1.</span> <span class="nav-text">1、Informer 中几个组件的作用</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、Informer-的工作流程"><span class="nav-number">2.2.</span> <span class="nav-text">2、Informer 的工作流程</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、Informer-使用示例"><span class="nav-number">3.</span> <span class="nav-text">三、Informer 使用示例</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1、下面是一个作为-client-的使用示例："><span class="nav-number">4.</span> <span class="nav-text">1、下面是一个作为 client 的使用示例：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2、以下是作为-controller-使用的一个整体工作流程"><span class="nav-number">5.</span> <span class="nav-text">2、以下是作为 controller 使用的一个整体工作流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、使用中的一些问题"><span class="nav-number">6.</span> <span class="nav-text">四、使用中的一些问题</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-二级缓存中的同步问题"><span class="nav-number">6.1.</span> <span class="nav-text">1、Informer 二级缓存中的同步问题</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、使用-Informer-如何监听所有资源对象？"><span class="nav-number">6.2.</span> <span class="nav-text">2、使用 Informer 如何监听所有资源对象？</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3、为什么不是使用-workqueue？"><span class="nav-number">6.3.</span> <span class="nav-text">3、为什么不是使用 workqueue？</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、总结"><span class="nav-number">7.</span> <span class="nav-text">五、总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+      <style>
+        a.gitment-editor-footer-tip { display: none; }
+        .gitment-container.gitment-footer-container { display: none; }
+      </style>
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
