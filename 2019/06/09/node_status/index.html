@@ -87,13 +87,13 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-05b37df015e527b7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-09T12:42:52.193Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/1262158-05b37df015e527b7.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/status.png">
+<meta property="og:updated_time" content="2019-06-09T12:49:18.948Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubelet 状态上报的方式">
 <meta name="twitter:description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/1262158-05b37df015e527b7.png">
 
 
 
@@ -390,11 +390,11 @@
 <li>InternalIP：通常是仅可在集群内部路由的 node IP 地址。</li>
 </ul>
 <h5 id="2、Condition"><a href="#2、Condition" class="headerlink" title="2、Condition"></a>2、Condition</h5><p><code>conditions</code> 字段描述了所有 <code>Running</code> nodes 的状态。</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-ffff6427936ba17c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="condition"></p>
+<p><img src="http://cdn.tianfeiyu.com/1262158-05b37df015e527b7.png" alt="condition"></p>
 <h5 id="3、Capacity"><a href="#3、Capacity" class="headerlink" title="3、Capacity"></a>3、Capacity</h5><p>描述 node 上的可用资源：CPU、内存和可以调度到该 node 上的最大 pod 数量。</p>
 <h5 id="4、Info"><a href="#4、Info" class="headerlink" title="4、Info"></a>4、Info</h5><p>描述 node 的一些通用信息，例如内核版本、Kubernetes 版本（kubelet 和 kube-proxy 版本）、Docker 版本 （如果使用了）和系统版本，这些信息由 kubelet 从 node 上获取到。</p>
 <p>使用 <code>kubectl get node xxx -o yaml</code> 可以看到 node 所有的状态的信息，其中 status 中的信息都是 kubelet 需要上报的，所以 kubelet 不止上报心跳信息还上报节点信息、节点 OOD 信息、内存磁盘压力状态、节点监控状态、是否调度等。</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-05b37df015e527b7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="node 状态信息"></p>
+<p><img src="http://cdn.tianfeiyu.com/status.png" alt="node 状态信息"></p>
 <h3 id="二、kubelet-状态异常时的影响"><a href="#二、kubelet-状态异常时的影响" class="headerlink" title="二、kubelet 状态异常时的影响"></a>二、kubelet 状态异常时的影响</h3><p>如果一个 node 处于非 Ready 状态超过 <code>pod-eviction-timeout</code>的值(默认为 5 分钟，在 kube-controller-manager 中定义)，在 v1.5 之前的版本中 kube-controller-manager 会 <code>force delete pod</code> 然后调度该宿主上的 pods 到其他宿主，在 v1.5 之后的版本中，kube-controller-manager 不会 <code>force delete pod</code>，pod 会一直处于<code>Terminating</code> 或<code>Unknown</code> 状态直到 node 被从 master 中删除或 kubelet 状态变为 Ready。在 node NotReady 期间，Daemonset 的 Pod 状态变为 Nodelost，Deployment、Statefulset 和 Static Pod 的状态先变为 NodeLost，然后马上变为 Unknown。Deployment 的 pod 会 recreate，Static Pod 和 Statefulset 的 Pod 会一直处于 Unknown 状态。</p>
 <p>当 kubelet 变为 Ready 状态时，Daemonset的pod不会recreate，旧pod状态直接变为Running，Deployment的则是将kubelet进程停止的Node删除，Statefulset的Pod会重新recreate，Staic Pod 会被删除。</p>
 <h3 id="三、kubelet-状态上报的实现"><a href="#三、kubelet-状态上报的实现" class="headerlink" title="三、kubelet 状态上报的实现"></a>三、kubelet 状态上报的实现</h3><p>kubelet 有两种上报状态的方式，第一种定期向 apiserver 发送心跳消息，简单理解就是启动一个 goroutine 然后定期向 APIServer 发送消息。</p>
