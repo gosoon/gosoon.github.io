@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="kubernetes v1.12,">
+  <meta name="keywords" content="go module,">
 
 
 
@@ -79,21 +79,18 @@
 
 
 
-<meta name="description" content="最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题： 1、注意 k">
-<meta name="keywords" content="kubernetes v1.12">
+<meta name="description" content="Go Modules 是 Go 语言的一种依赖管理方式，该  feature 是在 Go 1.11 版本中出现的，由于最近在做的项目中，团队都开始使用 go module 来替代以前的 Godep，Kubernetes 也从 v1.15 开始采用 go module 来进行包管理，所以有必要了解一下 go module。go module 相比于原来的 Godep，go module 在打包、编译">
+<meta name="keywords" content="go module">
 <meta property="og:type" content="article">
-<meta property="og:title" content="kubernetes 集群升级至 v1.12 需要注意的几个问题">
-<meta property="og:url" content="http://yoursite.com/2019/03/05/k8s_v1.12/index.html">
+<meta property="og:title" content="使用 Go Modules 管理依赖">
+<meta property="og:url" content="http://yoursite.com/2019/06/22/golang_modules/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题： 1、注意 k">
+<meta property="og:description" content="Go Modules 是 Go 语言的一种依赖管理方式，该  feature 是在 Go 1.11 版本中出现的，由于最近在做的项目中，团队都开始使用 go module 来替代以前的 Godep，Kubernetes 也从 v1.15 开始采用 go module 来进行包管理，所以有必要了解一下 go module。go module 相比于原来的 Godep，go module 在打包、编译">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-8af5facac815e980.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.308Z">
+<meta property="og:updated_time" content="2019-06-22T12:49:34.781Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="kubernetes 集群升级至 v1.12 需要注意的几个问题">
-<meta name="twitter:description" content="最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题： 1、注意 k">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:title" content="使用 Go Modules 管理依赖">
+<meta name="twitter:description" content="Go Modules 是 Go 语言的一种依赖管理方式，该  feature 是在 Go 1.11 版本中出现的，由于最近在做的项目中，团队都开始使用 go module 来替代以前的 Godep，Kubernetes 也从 v1.15 开始采用 go module 来进行包管理，所以有必要了解一下 go module。go module 相比于原来的 Godep，go module 在打包、编译">
 
 
 
@@ -123,13 +120,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/03/05/k8s_v1.12/">
+  <link rel="canonical" href="http://yoursite.com/2019/06/22/golang_modules/">
 
 
 
 
 
-  <title>kubernetes 集群升级至 v1.12 需要注意的几个问题 | 田飞雨</title>
+  <title>使用 Go Modules 管理依赖 | 田飞雨</title>
   
 
 
@@ -293,12 +290,12 @@
   
   
 
-  <article class="post post-type-v1.12" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-go module" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/03/05/k8s_v1.12/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/06/22/golang_modules/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -315,7 +312,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">kubernetes 集群升级至 v1.12 需要注意的几个问题</h1>
+          <h1 class="post-title" itemprop="name headline">使用 Go Modules 管理依赖</h1>
         
 
         <div class="post-meta">
@@ -327,8 +324,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-05T18:30:30+08:00">
-                2019-03-05
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-22T20:49:30+08:00">
+                2019-06-22
               </time>
             
 
@@ -346,8 +343,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/03/05/k8s_v1.12/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/03/05/k8s_v1.12/" itemprop="commentsCount"></span>
+                <a href="/2019/06/22/golang_modules/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/06/22/golang_modules/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -375,32 +372,37 @@
       
 
       
-        <p>最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题：</p>
-<h3 id="1、注意-k8s-中-resource-version-的变化"><a href="#1、注意-k8s-中-resource-version-的变化" class="headerlink" title="1、注意 k8s 中 resource version 的变化"></a>1、注意 k8s 中 resource version 的变化</h3><p>k8s 中许多 resouce 都是随着 k8s 的版本变化而变化的，例如，statefulset 在 v1.8 版本中 apiVersion 是 apps/v1beta1，在 v1.12 中变为了 apps/v1。k8s 有接口可以获取到当前版本所有的 OpenAPI ：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image.png"></p>
-<p>参考文档：<a href="https://kubernetes.io/docs/concepts/overview/kubernetes-api/" target="_blank" rel="noopener">The Kubernetes API</a></p>
-<p>虽然 k8s 中 resource version 都是向下兼容的，但是在升级完成后尽量使用当前版本的 resource version 避免不必要的麻烦。</p>
-<h3 id="2、kubelet-配置文件格式"><a href="#2、kubelet-配置文件格式" class="headerlink" title="2、kubelet 配置文件格式"></a>2、kubelet 配置文件格式</h3><p>v1.8 中 kubelet 的配置是在 /etc/kubernetes/kubelet 文件中的 KUBELET_ARGS 后面指定，但是在 v1.12 中开始使用 config.yaml 文件，即所有的配置都可以放在 yaml 文件中，由于配置是兼容的，所以暂时也可以继续用以前的方式，其中有些参数仅支持在 config.yaml 文件中指定。</p>
-<p>config.yaml 文件的官方说明：<a href="https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/" target="_blank" rel="noopener">Set Kubelet parameters via a config file</a></p>
-<p>一个例子：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: kubelet.config.k8s.io/v1beta1</span><br><span class="line">kind: KubeletConfiguration</span><br><span class="line">address: 0.0.0.0</span><br><span class="line">- pods</span><br><span class="line">eventBurst: 10</span><br><span class="line">eventRecordQPS: 5</span><br><span class="line">evictionHard:</span><br><span class="line">  imagefs.available: 15%</span><br><span class="line">  memory.available: 100Mi</span><br><span class="line">  nodefs.available: 10%</span><br><span class="line">  nodefs.inodesFree: 5%</span><br><span class="line">evictionPressureTransitionPeriod: 5m0s</span><br><span class="line">failSwapOn: true</span><br><span class="line">fileCheckFrequency: 20s</span><br><span class="line">healthzBindAddress: 127.0.0.1</span><br><span class="line">healthzPort: 10248</span><br><span class="line">httpCheckFrequency: 20s</span><br><span class="line">imageGCHighThresholdPercent: 85</span><br><span class="line">imageGCLowThresholdPercent: 80</span><br><span class="line">imageMinimumGCAge: 2m0s</span><br><span class="line">maxOpenFiles: 1000000</span><br><span class="line">maxPods: 110</span><br><span class="line">nodeLeaseDurationSeconds: 40</span><br><span class="line">nodeStatusUpdateFrequency: 10s</span><br><span class="line">oomScoreAdj: -999</span><br><span class="line">podPidsLimit: -1</span><br><span class="line">port: 10250</span><br><span class="line">staticPodPath: /etc/kubernetes/manifests</span><br></pre></td></tr></table></figure>
-<p>将 kubelet 配置文件中的 LOG_LEVEL 参数改为大于等于 5 可以看到 config.yaml 中配置的定义，以方便排查问题：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-8af5facac815e980.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image.png"></p>
-<p>对应的日志输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">I0228 16:14:14.064292  191819 server.go:260] KubeletConfiguration: </span><br><span class="line">config.KubeletConfiguration&#123;TypeMeta:v1.TypeMeta&#123;Kind:&quot;&quot;, </span><br><span class="line">APIVersion:&quot;&quot;&#125;, StaticPodPath:&quot;&quot;, Sync    </span><br><span class="line">Frequency:v1.Duration&#123;Duration:60000000000&#125;, </span><br><span class="line">FileCheckFrequency:v1.Duration&#123;Duration:20000000000&#125;,</span><br><span class="line">HTTPCheckFrequency:v1.Duration&#123;Duration:20000000000&#125;, </span><br><span class="line">StaticPodURL:&quot;&quot;, StaticPodURLHeader:map[string][]string(nil),</span><br><span class="line">Address:&quot;0.0.0.0&quot;, Port:10250, </span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+        <p>Go Modules 是 Go 语言的一种依赖管理方式，该  feature 是在 Go 1.11 版本中出现的，由于最近在做的项目中，团队都开始使用 go module 来替代以前的 Godep，Kubernetes 也从 v1.15 开始采用 go module 来进行包管理，所以有必要了解一下 go module。go module 相比于原来的 Godep，go module 在打包、编译等多个环节上有着明显的速度优势，并且能够在任意操作系统上方便的复现依赖包，更重要的是 go module 本身的设计使得自身被其他项目引用变得更加容易，这也是 Kubernetes 项目向框架化演进的又一个重要体现。</p>
+<p>使用 go module 管理依赖后会在项目根目录下生成两个文件  go.mod 和 go.sum。</p>
+<p><code>go.mod</code> 中会记录当前项目的所依赖，文件格式如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">module github.com/gosoon/audit-webhook</span><br><span class="line"></span><br><span class="line">go 1.12</span><br><span class="line"></span><br><span class="line">require (</span><br><span class="line">	github.com/elastic/go-elasticsearch v0.0.0</span><br><span class="line">	github.com/gorilla/mux v1.7.2</span><br><span class="line">	github.com/gosoon/glog v0.0.0-20180521124921-a5fbfb162a81</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p><code>go.sum</code>记录每个依赖库的版本和哈希值，文件格式如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">github.com/elastic/go-elasticsearch v0.0.0 h1:Pd5fqOuBxKxv83b0+xOAJDAkziWYwFinWnBO0y+TZaA=</span><br><span class="line">github.com/elastic/go-elasticsearch v0.0.0/go.mod h1:TkBSJBuTyFdBnrNqoPc54FN0vKf5c04IdM4zuStJ7xg=</span><br><span class="line">github.com/gorilla/mux v1.7.2 h1:zoNxOV7WjqXptQOVngLmcSQgXmgk4NMz1HibBchjl/I=</span><br><span class="line">github.com/gorilla/mux v1.7.2/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=</span><br><span class="line">github.com/gosoon/glog v0.0.0-20180521124921-a5fbfb162a81 h1:JP0LU0ajeawW2xySrbhDqtSUfVWohZ505Q4LXo+hCmg=</span><br><span class="line">github.com/gosoon/glog v0.0.0-20180521124921-a5fbfb162a81/go.mod h1:1e0N9vBl2wPF6qYa+JCRNIZnhxSkXkOJfD2iFw3eOfg=</span><br></pre></td></tr></table></figure>
+<h4 id="一、如何启用-go-module-功能"><a href="#一、如何启用-go-module-功能" class="headerlink" title="一、如何启用 go module 功能"></a>一、如何启用 go module 功能</h4><p>(1) go 版本 &gt;= v1.11</p>
+<p>(2) 设置<code>GO111MODULE</code>环境变量</p>
+<p>要使用<code>go module</code> 首先要设置<code>GO111MODULE=on</code>，<code>GO111MODULE</code> 有三个值，off、on、auto，off 和 on 即关闭和开启，auto 则会根据当前目录下是否有 go.mod 文件来判断是否使用 modules 功能。无论使用哪种模式，module 功能默认不在 GOPATH 目录下查找依赖文件，所以使用 modules 功能时请设置好代理。</p>
+<p>在使用 go module 时，将 <code>GO111MODULE</code> 全局环境变量设置为 off，在需要使用的时候再开启，避免在已有项目中意外引入  go module。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ echo export GO111MODULE=off &gt;&gt; ~/.zshrc</span><br><span class="line">or</span><br><span class="line">$ echo export GO111MODULE=off &gt;&gt; ~/.bashrc</span><br></pre></td></tr></table></figure>
+<p>go mod 命令的使用：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">download    download modules to local cache (下载依赖的module到本地cache))</span><br><span class="line">edit        edit go.mod from tools or scripts (编辑go.mod文件)</span><br><span class="line">graph       print module requirement graph (打印模块依赖图))</span><br><span class="line">init        initialize new module in current directory (在当前文件夹下初始化一个新的module, 创建go.mod文件))</span><br><span class="line">tidy        add missing and remove unused modules (增加丢失的module，去掉未使用的module)</span><br><span class="line">vendor      make vendored copy of dependencies (将依赖复制到vendor下)</span><br><span class="line">verify      verify dependencies have expected content (校验依赖)</span><br><span class="line">why         explain why packages or modules are needed (解释为什么需要依赖)</span><br></pre></td></tr></table></figure>
+<h4 id="二、使用-go-module-功能"><a href="#二、使用-go-module-功能" class="headerlink" title="二、使用 go module 功能"></a>二、使用 go module 功能</h4><p>对于新建项目使用 go module：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ export GO111MODULE=on</span><br><span class="line">	</span><br><span class="line">$ go mod init github.com/you/hello</span><br><span class="line">	</span><br><span class="line">...</span><br><span class="line">// go build 会将项目的依赖添加到 go.mod 中</span><br><span class="line">$ go build</span><br></pre></td></tr></table></figure>
+<p>对于已有项目要改为使用 go module：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ export GO111MODULE=on</span><br><span class="line"></span><br><span class="line">// 创建一个空的 go.mod 文件</span><br><span class="line">$ go mod init .</span><br><span class="line"></span><br><span class="line">// 查找依赖并记录在 go.mod 文件中</span><br><span class="line">$ go get ./...</span><br></pre></td></tr></table></figure>
 <blockquote>
-<p>注意：kubelet 配置文件中 ARGS 中定义的参数会覆盖 config.yaml 中的定义。</p>
+<p>go.mod 文件必须要提交到 git 仓库，但 go.sum 文件可以不用提交到 git 仓库(gi t忽略文件 .gitignore 中设置一下)。</p>
 </blockquote>
-<h3 id="3、feature-gates-中功能的使用"><a href="#3、feature-gates-中功能的使用" class="headerlink" title="3、feature-gates 中功能的使用"></a>3、feature-gates 中功能的使用</h3><p>v1.12 中 feature-gates 中许多功能默认为开启状态，需要根据实际场景选择，不必要的功能在配置文件中将其关闭。</p>
-<p>k8s 各版本中的 Feature 列表以及是否启用状态可以在 <a href="https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/" target="_blank" rel="noopener">Feature Gates</a> 中查看。</p>
-<h3 id="4、cadvisor-的使用"><a href="#4、cadvisor-的使用" class="headerlink" title="4、cadvisor 的使用"></a>4、cadvisor 的使用</h3><p>k8s 在 1.12 中将 cadvisor 从 kubelet 中移除了，若要使用 cadvisor，官方建议使用 DaemonSet 进行部署。由于我们一直从 cadvisor 获取容器的监控数据然后推送到自有的监控系统中进行展示，所以 cadvisor 还得继续使用。</p>
-<p>这是官方推荐的 cadvisor 部署方法，<a href="https://github.com/google/cadvisor/blob/master/deploy/kubernetes/README.md" target="_blank" rel="noopener">cAdvisor Kubernetes Daemonset</a>，其中用了 <code>k8s.gcr.io/cadvisor:v0.30.2</code> 镜像，在我们的测试环境中，该镜像无法启动，报错 <code>/sys/fs/cgroup/cpuacct,cpu: no such file or directory</code>, 经查 cadvisor v0.30.2 版本的镜像使用 cgroup v2，v2 版本中已经没有了 cpuacct subsystem，而 linux kernel 4.5 以上的版本才支持 cgroup v2，与我们的实际场景不太相符，最后测试发现 v0.28.0 的镜像可以正常使用。</p>
-<p>由于要兼容之前的使用方式，cadvisor 在宿主机上需要启动 4194 端口，但是创建容器又要结合自身的网络方案，最终我们使用 hostnetwork 的方式部署。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apps/v1</span><br><span class="line">kind: DaemonSet</span><br><span class="line">metadata:</span><br><span class="line">  name: cadvisor</span><br><span class="line">  namespace: kube-system</span><br><span class="line">  labels:</span><br><span class="line">    app: cadvisor</span><br><span class="line">spec:</span><br><span class="line">  selector:</span><br><span class="line">    matchLabels:</span><br><span class="line">      name: cadvisor</span><br><span class="line">  template:</span><br><span class="line">    metadata:</span><br><span class="line">      labels:</span><br><span class="line">        name: cadvisor</span><br><span class="line">    spec:</span><br><span class="line">      hostNetwork: true</span><br><span class="line">      tolerations:</span><br><span class="line">      - key: node-role.kubernetes.io/master</span><br><span class="line">        effect: NoSchedule</span><br><span class="line">        key: enabledDiskSchedule</span><br><span class="line">        value: &quot;true&quot;</span><br><span class="line">        effect: NoSchedule</span><br><span class="line">      containers:</span><br><span class="line">      - name: cadvisor</span><br><span class="line">        image: k8s.gcr.io/cadvisor:v0.28.0</span><br><span class="line">        imagePullPolicy: IfNotPresent</span><br><span class="line">        volumeMounts:</span><br><span class="line">        - name: rootfs</span><br><span class="line">          mountPath: /rootfs</span><br><span class="line">          readOnly: true</span><br><span class="line">        - name: var-run</span><br><span class="line">          mountPath: /var/run</span><br><span class="line">          readOnly: false</span><br><span class="line">        - name: sys</span><br><span class="line">          mountPath: /sys</span><br><span class="line">          readOnly: true</span><br><span class="line">        - name: docker</span><br><span class="line">          mountPath: /var/lib/docker</span><br><span class="line">          readOnly: true</span><br><span class="line">        ports:</span><br><span class="line">          - name: http</span><br><span class="line">            containerPort: 4194</span><br><span class="line">            protocol: TCP</span><br><span class="line">        readinessProbe:</span><br><span class="line">          tcpSocket:</span><br><span class="line">            port: 4194</span><br><span class="line">          initialDelaySeconds: 5</span><br><span class="line">          periodSeconds: 10</span><br><span class="line">        args:</span><br><span class="line">          - --housekeeping_interval=10s</span><br><span class="line">          - --port=4194</span><br><span class="line">      terminationGracePeriodSeconds: 30</span><br><span class="line">      volumes:</span><br><span class="line">      - name: rootfs</span><br><span class="line">        hostPath:</span><br><span class="line">          path: /</span><br><span class="line">      - name: var-run</span><br><span class="line">        hostPath:</span><br><span class="line">          path: /var/run</span><br><span class="line">      - name: sys</span><br><span class="line">        hostPath:</span><br><span class="line">          path: /sys</span><br><span class="line">      - name: docker</span><br><span class="line">        hostPath:</span><br><span class="line">          path: /var/lib/docker</span><br></pre></td></tr></table></figure>
-<p>官方建议使用 kustomize 进行部署，kustomize 是 k8s 的一个配置管理工具，此处暂不详细解释。</p>
-<blockquote>
-<p>注意：若集群中有打 taint 的宿主，需要在 yaml 文件中加上对应的 tolerations。</p>
-</blockquote>
+<h4 id="三、项目的打包"><a href="#三、项目的打包" class="headerlink" title="三、项目的打包"></a>三、项目的打包</h4><p>首先需要使用 <code>go mod vendor</code> 将项目所有的依赖下载到本地 vendor 目录中然后进行编译，下面是一个参考： </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line"></span><br><span class="line">export GO111MODULE=&quot;on&quot;</span><br><span class="line">export GOPROXY=&quot;https://goproxy.io&quot;</span><br><span class="line">export CGO_ENABLED=&quot;0&quot;</span><br><span class="line">export GOOS=&quot;linux&quot;</span><br><span class="line">export GOARCH=amd64</span><br><span class="line"></span><br><span class="line">go mod vendor</span><br><span class="line">go build -ldflags &quot;-s -w&quot; -a -installsuffix cgo -o audit-webhook .</span><br></pre></td></tr></table></figure>
+<h4 id="四、注意事项"><a href="#四、注意事项" class="headerlink" title="四、注意事项"></a>四、注意事项</h4><p>1、依赖下载</p>
+<p>go module 默认不在 GOPATH 目录下查找依赖文件，其首先会在<code>$GOPATH/pkg/mod</code>中查找有没有所需要的依赖，没有的直接会进行下载。可以使用 <code>go mod download</code>下载好所需要的依赖，依赖默认会下载到<code>$GOPATH/pkg/mod</code>中，其他项目也会使用缓存的 module。</p>
+<p>2、国内无法访问的依赖</p>
+<p>使用 Go 的其他包管理工具 godep、govendor、glide、dep 等都避免不了翻墙的问题，Go Modules 也是一样，但在<code>go.mod</code>中可以使用<code>replace</code>将特定的库替换成其他库：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">replace (</span><br><span class="line">	golang.org/x/text v0.3.0 =&gt; github.com/golang/text v0.3.0</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>或者也可以在其他机器上使用 <code>go mod download</code>下载好所需要的依赖，然后再传输到本机。</p>
+<p>参考：</p>
+<p><a href="https://github.com/kubernetes/enhancements/blob/master/keps/sig-architecture/2019-03-19-go-modules.md" target="_blank" rel="noopener">https://github.com/kubernetes/enhancements/blob/master/keps/sig-architecture/2019-03-19-go-modules.md</a></p>
+<p><a href="https://blog.golang.org/using-go-modules" target="_blank" rel="noopener">https://blog.golang.org/using-go-modules</a></p>
 
       
     </div>
@@ -418,7 +420,7 @@
       
         <div class="post-tags">
           
-            <a href="/tags/kubernetes-v1-12/" rel="tag"># kubernetes v1.12</a>
+            <a href="/tags/go-module/" rel="tag"># go module</a>
           
         </div>
       
@@ -431,8 +433,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2019/02/26/k8s_events/" rel="next" title="kubernets 中事件处理机制">
-                <i class="fa fa-chevron-left"></i> kubernets 中事件处理机制
+              <a href="/2019/06/09/node_status/" rel="next" title="kubelet 状态上报的方式">
+                <i class="fa fa-chevron-left"></i> kubelet 状态上报的方式
               </a>
             
           </div>
@@ -440,10 +442,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2019/03/13/k8s_leader_election/" rel="prev" title="kubernets 中组件高可用的实现方式">
-                kubernets 中组件高可用的实现方式 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -574,7 +572,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#1、注意-k8s-中-resource-version-的变化"><span class="nav-number">1.</span> <span class="nav-text">1、注意 k8s 中 resource version 的变化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2、kubelet-配置文件格式"><span class="nav-number">2.</span> <span class="nav-text">2、kubelet 配置文件格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3、feature-gates-中功能的使用"><span class="nav-number">3.</span> <span class="nav-text">3、feature-gates 中功能的使用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4、cadvisor-的使用"><span class="nav-number">4.</span> <span class="nav-text">4、cadvisor 的使用</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、如何启用-go-module-功能"><span class="nav-number">1.</span> <span class="nav-text">一、如何启用 go module 功能</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、使用-go-module-功能"><span class="nav-number">2.</span> <span class="nav-text">二、使用 go module 功能</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、项目的打包"><span class="nav-number">3.</span> <span class="nav-text">三、项目的打包</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、注意事项"><span class="nav-number">4.</span> <span class="nav-text">四、注意事项</span></a></li></ol></div>
             
 
           </div>
