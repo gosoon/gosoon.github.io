@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="kubectl plugin,">
+  <meta name="keywords" content="crd,admission control,">
 
 
 
@@ -79,18 +79,20 @@
 
 
 
-<meta name="description" content="由于笔者所维护的集群规模较大，经常需要使用 kubectl 来排查一些问题，但是 kubectl 功能有限，有些操作还是需要写一个脚本对 kubectl 做一些封装才能达到目的。比如我经常做的一个操作就是排查一下线上哪些宿主的 cpu/memory request 使用率超过某个阈值，kubectl 并不能直接看到一个 master 下所有宿主的 request 使用率，但可以使用 kubectl">
-<meta name="keywords" content="kubectl plugin">
+<meta name="description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
+<meta name="keywords" content="crd,admission control">
 <meta property="og:type" content="article">
-<meta property="og:title" content="使用插件扩展 kubectl">
-<meta property="og:url" content="http://yoursite.com/2019/05/16/kubectl_plugin/index.html">
+<meta property="og:title" content="kubernetes 自定义资源（CRD）的校验">
+<meta property="og:url" content="http://yoursite.com/2019/07/02/k8s_crd_verify/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="由于笔者所维护的集群规模较大，经常需要使用 kubectl 来排查一些问题，但是 kubectl 功能有限，有些操作还是需要写一个脚本对 kubectl 做一些封装才能达到目的。比如我经常做的一个操作就是排查一下线上哪些宿主的 cpu/memory request 使用率超过某个阈值，kubectl 并不能直接看到一个 master 下所有宿主的 request 使用率，但可以使用 kubectl">
+<meta property="og:description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.309Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/1562032999173.jpg">
+<meta property="og:updated_time" content="2019-07-02T03:07:01.313Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="使用插件扩展 kubectl">
-<meta name="twitter:description" content="由于笔者所维护的集群规模较大，经常需要使用 kubectl 来排查一些问题，但是 kubectl 功能有限，有些操作还是需要写一个脚本对 kubectl 做一些封装才能达到目的。比如我经常做的一个操作就是排查一下线上哪些宿主的 cpu/memory request 使用率超过某个阈值，kubectl 并不能直接看到一个 master 下所有宿主的 request 使用率，但可以使用 kubectl">
+<meta name="twitter:title" content="kubernetes 自定义资源（CRD）的校验">
+<meta name="twitter:description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/1562032999173.jpg">
 
 
 
@@ -120,13 +122,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/05/16/kubectl_plugin/">
+  <link rel="canonical" href="http://yoursite.com/2019/07/02/k8s_crd_verify/">
 
 
 
 
 
-  <title>使用插件扩展 kubectl | 田飞雨</title>
+  <title>kubernetes 自定义资源（CRD）的校验 | 田飞雨</title>
   
 
 
@@ -290,12 +292,12 @@
   
   
 
-  <article class="post post-type-kubectl plugin" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-crd" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/05/16/kubectl_plugin/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/02/k8s_crd_verify/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -312,7 +314,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">使用插件扩展 kubectl</h1>
+          <h1 class="post-title" itemprop="name headline">kubernetes 自定义资源（CRD）的校验</h1>
         
 
         <div class="post-meta">
@@ -324,8 +326,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-05-16T11:20:30+08:00">
-                2019-05-16
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-02T11:00:00+08:00">
+                2019-07-02
               </time>
             
 
@@ -343,8 +345,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/05/16/kubectl_plugin/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/05/16/kubectl_plugin/" itemprop="commentsCount"></span>
+                <a href="/2019/07/02/k8s_crd_verify/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/07/02/k8s_crd_verify/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -372,35 +374,50 @@
       
 
       
-        <p>由于笔者所维护的集群规模较大，经常需要使用 kubectl 来排查一些问题，但是 kubectl 功能有限，有些操作还是需要写一个脚本对 kubectl 做一些封装才能达到目的。比如我经常做的一个操作就是排查一下线上哪些宿主的 cpu/memory request 使用率超过某个阈值，kubectl 并不能直接看到一个 master 下所有宿主的 request 使用率，但可以使用 <code>kubectl describe node xxx</code>查看某个宿主机的 request 使用率，所以只好写一个脚本来扫一遍了。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line"></span><br><span class="line">echo -e &quot;node\tcpu_requets  memory_requets&quot;</span><br><span class="line">for i in `kubectl get node | grep -v NAME | awk &apos;&#123;print $1&#125;&apos;`;do</span><br><span class="line">    res=$(kubectl describe node $i  | grep -A 3 &quot;Resource&quot;)</span><br><span class="line">    cpu_requets=$(echo $&#123;res&#125; | awk &apos;&#123;print $9&#125;&apos; | awk -F &apos;%&apos; &apos;&#123;print $1&#125;&apos; | awk -F &apos;(&apos; &apos;&#123;print $2&#125;&apos;)</span><br><span class="line">    memory_requets=$(echo $&#123;res&#125; | awk &apos;&#123;print $14&#125;&apos; | awk -F &apos;%&apos; &apos;&#123;print $1&#125;&apos; | awk -F &apos;(&apos; &apos;&#123;print $2&#125;&apos;)</span><br><span class="line">    echo -e &quot;$i\t$&#123;cpu_requets&#125; \t$&#123;memory_requets&#125;&quot;</span><br><span class="line">done</span><br></pre></td></tr></table></figure>
-<p>类似的需求比较多，此处不一一列举，这种操作经常需要做，虽然写一个脚本也能完全搞定，但确实比较 low，也不便提供给别人使用，基于此了解到目前官方对 kubectl 的插件机制做了一些改进，对 kubectl 的扩展也比较容易，所以下文会带你了解一下 kubectl 的扩展功能。</p>
-<h4 id="一、编写-kubectl-插件"><a href="#一、编写-kubectl-插件" class="headerlink" title="一、编写 kubectl 插件"></a>一、编写 kubectl 插件</h4><p>kubectl 命令从 <code>v1.8.0</code> 版本开始支持插件机制，之后的版本中我们都可以对 <code>kubectl</code> 命令进行扩展，kubernetes 在 <code>v1.12</code> 以后插件可以直接是以 kubectl- 开头命令的一个二进制文件，插件机制在 <code>v1.14</code> 进入 GA 状态，这种改进是希望用户以二进制文件形式可以扩展自己的 kubectl 子命令。当然，kubectl 插件机制是与语言无关的，也就是说你可以用任何语言编写插件。</p>
-<p>如 <a href="https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/" target="_blank" rel="noopener">kubernetes 官方文档</a>中描述，只要将二进制文件放在系统 PATH 下，kubectl 即可识别，二进制文件类似 <code>kubectl-foo-bar</code>，并且在使用时 kubectl 会匹配最长的二进制文件。</p>
-<p>官方建议使用  <a href="https://github.com/kubernetes/cli-runtime" target="_blank" rel="noopener">k8s.io/cli-runtime</a> 库进行编写，若你的插件需要支持一些命令行参数，可以参考使用，官方也给了一个例子 <a href="https://github.com/kubernetes/sample-cli-plugin" target="_blank" rel="noopener">sample-cli-plugin</a>。</p>
-<p>还是回到最初的问题，对于获取一个集群写所有 node 的资源使用率，笔者基于也编写了一个简单的插件。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 安装插件</span><br><span class="line"></span><br><span class="line">$ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/kubectl-view-node-resource cmd/view-node-resource/main.go</span><br><span class="line"></span><br><span class="line">$ mv bin/kubectl-view-node-resource /usr/bin/</span><br></pre></td></tr></table></figure>
-<p>使用 <code>kubectl plugin list</code> 查看 PATH 下有哪些可用的插件。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">// 查看插件</span><br><span class="line"></span><br><span class="line">$ kubectl plugin list</span><br><span class="line">The following kubectl-compatible plugins are available:</span><br><span class="line"></span><br><span class="line">/usr/bin/kubectl-view-node-resource</span><br></pre></td></tr></table></figure>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">// 使用插件</span><br><span class="line"></span><br><span class="line">$ kubectl view node taints --help</span><br><span class="line">A longer description that spans multiple lines and likely contains</span><br><span class="line">examples and usage of using your application. For example:</span><br><span class="line">Cobra is a CLI library for Go that empowers applications.</span><br><span class="line">This application is a tool to generate the needed files</span><br><span class="line">to quickly create a Cobra application.</span><br><span class="line"></span><br><span class="line">Usage:</span><br><span class="line">  view-node-taints [flags]</span><br><span class="line"></span><br><span class="line">Flags:</span><br><span class="line">      --config string   config file (default is $HOME/.view-node-taints.yaml)</span><br><span class="line">  -h, --help            help for view-node-taints</span><br><span class="line">  -t, --toggle          Help message for toggle</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">$ kubectl view node resource</span><br><span class="line"> Name            PodCount  CPURequests  MemoryRequests  CPULimits     MemoryLimits</span><br><span class="line"> 192.168.1.110   4         0 (0.00%)    6.4 (41.26%)    8 (100.00%)   16.0 (103.14%)</span><br></pre></td></tr></table></figure>
-<p>此外，还开发一个查看集群下所有 node taints 的插件，kubectl 支持查看宿主的 label，但是没有直接查看所有宿主 taints 的命令，插件效果如下：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl view node taints</span><br><span class="line"> Name            Status                       Age   Version                         Taints</span><br><span class="line"> 192.168.1.110   Ready,SchedulingDisabled     49d   v1.8.1-35+9406f9d9909c61-dirty  enabledDiskSchedule=true:NoSchedule</span><br></pre></td></tr></table></figure>
-<blockquote>
-<p>插件代码地址：<a href="https://github.com/gosoon/kubectl-plugin" target="_blank" rel="noopener">kubectl-plugin</a></p>
+        <p>在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的<code>ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota</code> 等都是 apiserver 的准入控制器，但这些都是 kubernetes 中默认内置的。在 v1.9 中，kubernetes 的动态准入控制器功能中支持了  Admission Webhooks，即用户可以以插件的方式对 apiserver 的请求做一些访问控制，要使用该功能需要自己写一个 admission webhook，apiserver 会在请求通过认证和授权之后、对象被持久化之前拦截该请求，然后调用 webhook 已达到准入控制，比如 Istio 中 sidecar 的注入就是通过这种方式实现的，在创建 Pod 阶段 apiserver 会回调 webhook 然后将 Sidecar 代理注入至用户 Pod。 本文主要介绍如何使用 AdmissionWebhook 对 CR 的校验，一般在开发 operator 过程中，都是通过对 CR 的操作实现某个功能的，若 CR 不规范可能会导致某些问题，所以对提交 CR 的校验是不可避免的一个步骤。</p>
+<p>kubernetes 目前提供了两种方式来对 CR 的校验，语法校验(<code>OpenAPI v3 schema</code>） 和语义校验<br>(<code>validatingadmissionwebhook</code>）。</p>
+<p>CRD 的一个示例：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  # name must match the spec fields below, and be in the form: &lt;plural&gt;.&lt;group&gt;</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  # group name to use for REST API: /apis/&lt;group&gt;/&lt;version&gt;</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  # list of versions supported by this CustomResourceDefinition</span><br><span class="line">  versions:</span><br><span class="line">    - name: v1</span><br><span class="line">      # Each version can be enabled/disabled by Served flag.</span><br><span class="line">      served: true</span><br><span class="line">      # One and only one version must be marked as the storage version.</span><br><span class="line">      storage: true</span><br><span class="line">  # either Namespaced or Cluster</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  names:</span><br><span class="line">    # plural name to be used in the URL: /apis/&lt;group&gt;/&lt;version&gt;/&lt;plural&gt;</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    # singular name to be used as an alias on the CLI and for display</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    # kind is normally the CamelCased singular type. Your resource manifests use this.</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">	  # listKind</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    # shortNames allow shorter string to match your resource on the CLI</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br></pre></td></tr></table></figure>
+<p>CRD 的一个对象：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: ecs.yun.com/v1</span><br><span class="line">kind: KubernetesCluster</span><br><span class="line">metadata:</span><br><span class="line">  name: test-cluster</span><br><span class="line">spec:</span><br><span class="line">  clusterType: kubernetes</span><br><span class="line">  serviceCIDR: &apos;&apos;</span><br><span class="line">  masterList:</span><br><span class="line">  - ip: 192.168.1.10</span><br><span class="line">  nodeList:</span><br><span class="line">  - ip: 192.168.1.11</span><br><span class="line">  privateSSHKey: &apos;&apos;</span><br><span class="line">  scaleUp: 0</span><br><span class="line">  scaleDown: 0</span><br></pre></td></tr></table></figure>
+<h4 id="一、OpenAPI-v3-schema"><a href="#一、OpenAPI-v3-schema" class="headerlink" title="一、OpenAPI v3 schema"></a>一、OpenAPI v3 schema</h4><p><a href="https://github.com/OAI/OpenAPI-Specification" target="_blank" rel="noopener">OpenAPI</a> 是针对 REST API 的 API 描述格式，也是一种规范。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  versions:</span><br><span class="line">    - name: v1</span><br><span class="line">      served: true</span><br><span class="line">      storage: true</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  names:</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br><span class="line">  validation:</span><br><span class="line">    openAPIV3Schema:</span><br><span class="line">      properties:</span><br><span class="line">        spec:</span><br><span class="line">		      type: object</span><br><span class="line">          required:</span><br><span class="line">          - clusterType</span><br><span class="line">          - masterList</span><br><span class="line">          - nodeList</span><br><span class="line">          properties:</span><br><span class="line">            clusterType:</span><br><span class="line">              type: string</span><br><span class="line">            scaleUp:</span><br><span class="line">              type: integer</span><br><span class="line">            scaleDown:</span><br><span class="line">              type: integer</span><br><span class="line">              minimum: 0</span><br></pre></td></tr></table></figure>
+<p>上面是使用 OpenAPI v3 检验的一个例子，OpenAPI v3 仅支持一些简单的校验规则，可以校验参数的类型，参数值的类型(支持正则)，是否为必要参数等，但若要使用与、或、非等操作对多个字段同时校验还是做不到的，所以针对一些特定场景的校验需要使用 admission webhook。 </p>
+<h4 id="二、Admission-Webhooks"><a href="#二、Admission-Webhooks" class="headerlink" title="二、Admission Webhooks"></a>二、Admission Webhooks</h4><p>admission control 在 apiserver 中进行配置的，使用<code>--enable-admission-plugins</code> 或 <code>--admission-control</code>进行启用，admission control 配置的控制器列表是有顺序的，越靠前的越先执行，一旦某个控制器返回的结果是reject 的，那么整个准入控制阶段立刻结束，所以这里的配置顺序是有序的，建议使用官方的顺序配置。</p>
+<p>在 v1.9 中，admission webhook 是通过在 <code>--admission-control</code> 中配置 <code>ValidatingAdmissionWebhook</code> 或 <code>MutatingAdmissionWebhook</code> 来支持使用的，两者区别如下：</p>
+<ul>
+<li>MutatingAdmissionWebhook：允许在 webhook 中对 object 进行 mutate 修改，但匹配到的 webhook <strong>串行</strong>执行，因为每个 webhook 都可能会 mutate object。</li>
+<li>ValidatingAdmissionWebhook: 不允许在 webhook 中对 Object 进行 mutate 修改，仅返回 true 或 false。</li>
+</ul>
+<p>启用 admission webhook 后，每次对 CR 做 CRUD 操作时，请求就会被 apiserver 拦住，至于 CRUD 中哪些请求被拦住都是提前在 WebhookConfiguration 中配置的，然后会调用 AdmissionWebhook 进行检查是否 Admit 通过。</p>
+<p><img src="http://cdn.tianfeiyu.com/1562032999173.jpg" alt="kubernetes API request lifecycle"></p>
+<h4 id="三、启用-Admission-Webhooks-功能"><a href="#三、启用-Admission-Webhooks-功能" class="headerlink" title="三、启用 Admission Webhooks 功能"></a>三、启用 Admission Webhooks 功能</h4><blockquote>
+<p>kubernetes 版本 &gt;= v1.9</p>
 </blockquote>
-<h4 id="二、kubectl-插件管理工具-krew"><a href="#二、kubectl-插件管理工具-krew" class="headerlink" title="二、kubectl 插件管理工具 krew"></a>二、kubectl 插件管理工具 krew</h4><p>上文讲了如何编写一个插件，但是官方也提供一个插件库并提供了一个插件管理工具 <a href="https://github.com/kubernetes-sigs/krew" target="_blank" rel="noopener">krew</a>  ，<a href="https://github.com/kubernetes-sigs/krew" target="_blank" rel="noopener">krew</a> 是 kubectl 插件的管理器，使用 krew 可以轻松的查找、安装和管理 kubectl 插件，它类似于 yum、apt、 dnf，krew 也可以帮助你将已写好的插件在多个平台上打包和分发，krew 自己也作为一个 kubectl 插件存在。</p>
+<p>1、在 apiserver 中开启 admission webhooks</p>
+<p>在 v1.9 版本中使用的是：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota</span><br></pre></td></tr></table></figure>
+<p>在 v1.10 以后会弃用 <code>--admission-control</code>，取而代之的是  <code>--enable-admission-plugins</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">--enable-admission-plugins=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota</span><br></pre></td></tr></table></figure>
+<p>启用之后在 api-resources 可以看到：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># kubectl api-resources | grep admissionregistration</span><br><span class="line">mutatingwebhookconfigurations                  admissionregistration.k8s.io   false        MutatingWebhookConfiguration</span><br><span class="line">validatingwebhookconfigurations                admissionregistration.k8s.io   false        ValidatingWebhookConfiguration</span><br></pre></td></tr></table></figure>
+<p>2、启用 <code>admissionregistration.k8s.io/v1alpha1</code> API</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">//  检查 API 是否已启用</span><br><span class="line">$ kubectl api-versions | grep admissionregistration.k8s.io</span><br></pre></td></tr></table></figure>
+<p>若不存在则需要在 apiserver 的配置中添加<code>--runtime-config=admissionregistration.k8s.io/v1alpha1</code>。</p>
+<h4 id="四、编写-Admission-Webhook-Server"><a href="#四、编写-Admission-Webhook-Server" class="headerlink" title="四、编写 Admission Webhook Server"></a>四、编写 Admission Webhook Server</h4><p>webhook 其实就是一个 RESTful API 里面加上自己的一些校验逻辑。</p>
+<p>可以参考官方的示例：<br><a href="https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go</a><br>或者<br><a href="https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/e2e/apimachinery/webhook.go" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/e2e/apimachinery/webhook.go</a></p>
 <blockquote>
-<p>krew 仅支持在 v1.12 及之后的版本中使用。</p>
+<p>完整代码参考：<a href="https://github.com/gosoon/admission-webhook" target="_blank" rel="noopener">https://github.com/gosoon/admission-webhook</a></p>
 </blockquote>
-<p>1、安装 krew</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ (</span><br><span class="line">  set -x; cd &quot;$(mktemp -d)&quot; &amp;&amp;</span><br><span class="line">  curl -fsSLO &quot;https://storage.googleapis.com/krew/v0.2.1/krew.&#123;tar.gz,yaml&#125;&quot; &amp;&amp;</span><br><span class="line">  tar zxvf krew.tar.gz &amp;&amp;</span><br><span class="line">  ./krew-&quot;$(uname | tr &apos;[:upper:]&apos; &apos;[:lower:]&apos;)_amd64&quot; install \</span><br><span class="line">    --manifest=krew.yaml --archive=krew.tar.gz</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">$ export PATH=&quot;$&#123;KREW_ROOT:-$HOME/.krew&#125;/bin:$PATH&quot;</span><br></pre></td></tr></table></figure>
-<p>2、krew 的使用</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl krew search               								# show all plugins</span><br><span class="line">$ kubectl krew install view-secret  								# install a plugin named &quot;view-secret&quot;</span><br><span class="line">$ kubectl view-secret default-token-4cwvh           # use the plugin</span><br><span class="line">$ kubectl krew upgrade              								# upgrade installed plugins</span><br><span class="line">$ kubectl krew remove view-secret   								# uninstall a plugin</span><br></pre></td></tr></table></figure>
-<p>若想让你自己的插件加入到 krew 的索引中，可以参考：<a href="https://github.com/kubernetes-sigs/krew/blob/master/docs/DEVELOPER_GUIDE.md" target="_blank" rel="noopener">how to package and publish a plugin for krew</a>。</p>
-<p>参考：</p>
-<p><a href="https://github.com/kubernetes-sigs/krew/blob/master/docs/NAMING_GUIDE.md" target="_blank" rel="noopener">kubectl 插件命明规范</a></p>
-<p><a href="https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/" target="_blank" rel="noopener">https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/</a></p>
-<p><a href="https://github.com/gosoon/kubectl-plugin" target="_blank" rel="noopener">https://github.com/gosoon/kubectl-plugin</a></p>
+<h4 id="五、部署-Admission-Webhook-Service"><a href="#五、部署-Admission-Webhook-Service" class="headerlink" title="五、部署 Admission Webhook Service"></a>五、部署 Admission Webhook Service</h4><p>由于 apiserver 调用 webhook 时强制使用 TLS 认证，所以 WebhookConfiguration 中一定要配置 caBundle，也就是需要自己生成一套私有证书。</p>
+<p>生成证书的方式比较多，以下使用 openssl 生成，脚本如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line"></span><br><span class="line"># Generate the CA cert and private key</span><br><span class="line">openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj &quot;/CN=admission-webhook CA&quot;</span><br><span class="line"></span><br><span class="line"># Generate the private key for the webhook server</span><br><span class="line">openssl genrsa -out admission-webhook-tls.key 2048</span><br><span class="line"></span><br><span class="line"># Generate a Certificate Signing Request (CSR) for the private key, and sign it with the private key of the CA.</span><br><span class="line">openssl req -new -key admission-webhook-tls.key -subj &quot;/CN=admission-webhook.ecs-system.svc&quot; \</span><br><span class="line">    | openssl x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -out admission-webhook-tls.crt</span><br><span class="line"></span><br><span class="line"># Generate pem</span><br><span class="line">openssl base64 -A &lt; ca.crt &gt; ca.pem</span><br></pre></td></tr></table></figure>
+<p>生成证书后将 ca.pem 中的内容复制到 caBundle 处。</p>
+<p>ValidatingWebhook yaml 文件如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: admissionregistration.k8s.io/v1beta1</span><br><span class="line">kind: ValidatingWebhookConfiguration</span><br><span class="line">metadata:</span><br><span class="line">  name: admission-webhook</span><br><span class="line">webhooks:</span><br><span class="line">  - name: admission-webhook.ecs-system.svc  # 必须为 &lt;svc_name&gt;.&lt;svc_namespace&gt;.svc.</span><br><span class="line">    failurePolicy: Ignore</span><br><span class="line">    clientConfig:</span><br><span class="line">      service:</span><br><span class="line">        name: admission-webhook</span><br><span class="line">        namespace: ecs-system</span><br><span class="line">        path: /ecs/operator/cluster  # webhook controller</span><br><span class="line">      caBundle: xxx</span><br><span class="line">    rules:</span><br><span class="line">      - operations:   # 需要校验的方法</span><br><span class="line">        - CREATE</span><br><span class="line">        - UPDATE</span><br><span class="line">        apiGroups:    # api group</span><br><span class="line">        - ecs.yun.com</span><br><span class="line">        apiVersions:  # version</span><br><span class="line">        - v1</span><br><span class="line">        resources:    # resource</span><br><span class="line">        - kubernetesclusters</span><br></pre></td></tr></table></figure>
+<p>注意 <code>failurePolicy</code> 可以为 <code>Ignore</code>或者<code>Fail</code>，意味着如果和 webhook 通信出现问题导致调用失败，将根据 <code>failurePolicy</code>决定忽略失败（admit）还是准入失败(reject)。</p>
+<p>最后将 webhook 部署在集群中。</p>
+<p>参考：<br><a href="https://github.com/gosoon/admission-webhook" target="_blank" rel="noopener">https://github.com/gosoon/admission-webhook</a><br><a href="https://banzaicloud.com/blog/k8s-admission-webhooks/" target="_blank" rel="noopener">https://banzaicloud.com/blog/k8s-admission-webhooks/</a><br><a href="http://blog.fatedier.com/2019/03/20/k8s-crd/" target="_blank" rel="noopener">http://blog.fatedier.com/2019/03/20/k8s-crd/</a><br><a href="https://my.oschina.net/jxcdwangtao/blog/1591681" target="_blank" rel="noopener">https://my.oschina.net/jxcdwangtao/blog/1591681</a><br><a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/</a><br><a href="https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#is-there-a-recommended-set-of-admission-controllers-to-use" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#is-there-a-recommended-set-of-admission-controllers-to-use</a><br><a href="https://istio.io/zh/help/ops/setup/validation/" target="_blank" rel="noopener">https://istio.io/zh/help/ops/setup/validation/</a><br><a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/" target="_blank" rel="noopener">https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/</a></p>
 
       
     </div>
@@ -418,7 +435,9 @@
       
         <div class="post-tags">
           
-            <a href="/tags/kubectl-plugin/" rel="tag"># kubectl plugin</a>
+            <a href="/tags/crd/" rel="tag"># crd</a>
+          
+            <a href="/tags/admission-control/" rel="tag"># admission control</a>
           
         </div>
       
@@ -431,8 +450,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2019/04/22/k8s_dashboard_prometheus/" rel="next" title="部署 kubernetes 可视化监控组件">
-                <i class="fa fa-chevron-left"></i> 部署 kubernetes 可视化监控组件
+              <a href="/2019/06/22/golang_modules/" rel="next" title="使用 Go Modules 管理依赖">
+                <i class="fa fa-chevron-left"></i> 使用 Go Modules 管理依赖
               </a>
             
           </div>
@@ -440,10 +459,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2019/05/17/client-go_informer/" rel="prev" title="kubernetes 中 informer 的使用">
-                kubernetes 中 informer 的使用 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -574,7 +589,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、编写-kubectl-插件"><span class="nav-number">1.</span> <span class="nav-text">一、编写 kubectl 插件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、kubectl-插件管理工具-krew"><span class="nav-number">2.</span> <span class="nav-text">二、kubectl 插件管理工具 krew</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、OpenAPI-v3-schema"><span class="nav-number">1.</span> <span class="nav-text">一、OpenAPI v3 schema</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Admission-Webhooks"><span class="nav-number">2.</span> <span class="nav-text">二、Admission Webhooks</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、启用-Admission-Webhooks-功能"><span class="nav-number">3.</span> <span class="nav-text">三、启用 Admission Webhooks 功能</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、编写-Admission-Webhook-Server"><span class="nav-number">4.</span> <span class="nav-text">四、编写 Admission Webhook Server</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、部署-Admission-Webhook-Service"><span class="nav-number">5.</span> <span class="nav-text">五、部署 Admission Webhook Service</span></a></li></ol></div>
             
 
           </div>
