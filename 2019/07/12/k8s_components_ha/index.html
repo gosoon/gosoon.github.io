@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="kubernetes,HA,">
 
 
 
@@ -79,17 +79,20 @@
 
 
 
-<meta name="description" content="kubernetes、docker">
-<meta name="keywords" content="kubernetes tianfeiyu">
-<meta property="og:type" content="website">
-<meta property="og:title" content="田飞雨">
-<meta property="og:url" content="http://yoursite.com/archives/2018/index.html">
+<meta name="description" content="kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）">
+<meta name="keywords" content="kubernetes,HA">
+<meta property="og:type" content="article">
+<meta property="og:title" content="部署高可用 kubernetes 集群">
+<meta property="og:url" content="http://yoursite.com/2019/07/12/k8s_components_ha/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="kubernetes、docker">
+<meta property="og:description" content="kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）">
 <meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/image-1.png">
+<meta property="og:updated_time" content="2019-07-12T08:44:33.116Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="田飞雨">
-<meta name="twitter:description" content="kubernetes、docker">
+<meta name="twitter:title" content="部署高可用 kubernetes 集群">
+<meta name="twitter:description" content="kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/image-1.png">
 
 
 
@@ -119,13 +122,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/archives/2018/">
+  <link rel="canonical" href="http://yoursite.com/2019/07/12/k8s_components_ha/">
 
 
 
 
 
-  <title>归档 | 田飞雨</title>
+  <title>部署高可用 kubernetes 集群 | 田飞雨</title>
   
 
 
@@ -144,7 +147,7 @@
     
   
 
-  <div class="container sidebar-position-left page-archive">
+  <div class="container sidebar-position-left page-post-detail">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
@@ -280,177 +283,174 @@
           <div id="content" class="content">
             
 
-  
-  
-  
-  <div class="post-block archive">
-    <div id="posts" class="posts-collapse">
-      <span class="archive-move-on"></span>
+  <div id="posts" class="posts-expand">
+    
 
-      <span class="archive-page-counter">
+  
+
+  
+  
+  
+
+  <article class="post post-type-HA" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/12/k8s_components_ha/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
         
         
+          <h1 class="post-title" itemprop="name headline">部署高可用 kubernetes 集群</h1>
         
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-12T16:30:00+08:00">
+                2019-07-12
+              </time>
+            
+
+            
+
+            
+          </span>
+
           
-        
-        嗯..! 目前共计 23 篇日志。 继续努力。
-      </span>
 
-      
-
-        
-        
-        
-
-        
           
-          <div class="collection-title">
-            <h1 class="archive-year" id="archive-year-2018">2018</h1>
-          </div>
-        
-        
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/07/12/k8s_components_ha/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2019/07/12/k8s_components_ha/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
 
-        
+          
+          
 
-  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
+          
 
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2018/12/23/kubelet_init/" itemprop="url">
-              
-                <span itemprop="name">kubelet 启动流程分析</span>
-              
-            </a>
-        
-      </h2>
+          
 
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2018-12-23T21:22:30+08:00" content="2018-12-23">
-          12-23
-        </time>
-      </div>
+          
 
-    </header>
-  </article>
+        </div>
+      </header>
+    
 
-
-
-      
-
-        
-        
-        
-
-        
-        
-
-        
-
-  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2018/12/16/kubelet-modules/" itemprop="url">
-              
-                <span itemprop="name">kubelet 架构浅析</span>
-              
-            </a>
-        
-      </h2>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2018-12-16T17:35:30+08:00" content="2018-12-16">
-          12-16
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
 
       
-
-        
-        
-        
-
-        
-        
-
-        
-
-  <article class="post post-type-docker" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2018/12/05/docker-introduces/" itemprop="url">
-              
-                <span itemprop="name">Docker 架构中的几个核心概念</span>
-              
-            </a>
-        
-      </h2>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2018-12-05T20:57:00+08:00" content="2018-12-05">
-          12-05
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-
       
 
-        
-        
-        
-
-        
-        
-
-        
-
-  <article class="post post-type-kubernetes" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2018/09/02/kubernetes-api/" itemprop="url">
-              
-                <span itemprop="name">kubernetes 常用 API</span>
-              
-            </a>
-        
-      </h2>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2018-09-02T13:13:00+08:00" content="2018-09-02">
-          09-02
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
+      
+        <p>kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）KV 存储系统，其天然具备高可用。而 apiserver 作为整个系统的核心，所有对数据的修改操作都是通过 apiserver 间接操作 etcd 的，所以 apiserver 的高可用实现是比较关键的。 </p>
+<h4 id="kube-apiserver-的高可用配置"><a href="#kube-apiserver-的高可用配置" class="headerlink" title="kube-apiserver 的高可用配置"></a>kube-apiserver 的高可用配置</h4><p>apiserver 本身是无状态的，可以横向扩展，其借助外部负载均衡软件配置高可用也相对容易，实现方案比较多，但一般会采用外部组件 LVS 或 HAProxy 的方式实现，我们生产环境是通过 LVS 实现的。apiserver 的高可用可以分为集群外高可用和集群内高可用。集群外高可用指对于直接调用 k8s API 的外部用户（例如 kubectl 、kubelet），客户端需要调用 apiserver 的 VIP 以达到高可用，此处 LVS 的部署以及 VIP 的配置不再详细说明。</p>
+<p>集群内的高可用配置是指对于部署到集群中的 pod 访问 kubernetes，kubernetes 集群创建完成后默认会启动一个<code>kubernetes</code>的 service 供集群内的 pod 访问，service 的 ClusterIP 默认值为 <code>172.0.0.1</code> ，每一个 service 对象生成时，都会生成一个用于暴露该对象后端对应 pod 的对象 endpoints，endpoints 中可以看到 apiserver 的实例。访问 kubernetes 的 service，service 会将请求转发到 endpoints 中的 ip 上，此时若 service 中的 endpoints 中没有 IP，则表示 apiserver 无法访问。 </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get svc kubernetes</span><br><span class="line">NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE</span><br><span class="line">kubernetes   ClusterIP   172.0.0.1    &lt;none&gt;        443/TCP   21d</span><br><span class="line"></span><br><span class="line">$ kubectl get endpoints kubernetes</span><br><span class="line">NAME         ENDPOINTS                       AGE</span><br><span class="line">kubernetes   10.0.2.15:6443, 10.0.2.16:6443  21d</span><br></pre></td></tr></table></figure>
+<p>kubernetes v1.9 之前 kube-apiserver service 的高可用也就是 master ip 要加入到 kubernetes service 的 endpoints 中必须要在参数中指定 <code>--apiserver-count</code> 的值，v1.9 出现了另外一个参数 <code>--endpoint-reconciler-type</code> 要取代以前的 <code>--apiserver-count</code>，但是此时该参数默认是禁用的（Alpha 版本），v1.10 也是默认禁用的。v1.11 中 <code>--endpoint-reconciler-type</code> 参数默认开启了，默认值是 <code>lease</code>。<code>--apiserver-count</code> 参数会在 v1.13 中被移除。v1.11 和 v1.12 中还可以使用 <code>--apiserver-count</code>，但前提是需要设置 <code>--endpoint-reconciler-type=master-count</code>。也就是说在 v1.11 以及之后的版本中 apiserver 中不需要进行配置了，启用了几个 apiserver 实例默认都会加到 对应的 endpoints 中。</p>
+<h4 id="kube-controller-manager-和-kube-scheduler-的高可用配置"><a href="#kube-controller-manager-和-kube-scheduler-的高可用配置" class="headerlink" title="kube-controller-manager 和 kube-scheduler 的高可用配置"></a>kube-controller-manager 和 kube-scheduler 的高可用配置</h4><p>kube-controller-manager 和 kube-scheduler 是由 leader election 实现高可用的，通过向 apiserver 中的 endpoint 加锁的方式来进行 leader election， 启用 leader election 需要在组件的配置中加入以下几个参数：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">--leader-elect=true</span><br><span class="line">--leader-elect-lease-duration=15s</span><br><span class="line">--leader-elect-renew-deadline=10s</span><br><span class="line">--leader-elect-resource-lock=endpoints</span><br><span class="line">--leader-elect-retry-period=2s</span><br></pre></td></tr></table></figure>
+<p>组件当前的 leader 会写在 endpoints 的 holderIdentity 字段中， 使用以下命令查看组件当前的 leader:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get endpoints kube-controller-manager --namespace=kube-system -o yaml </span><br><span class="line"></span><br><span class="line">$ kubectl get endpoints kube-scheduler --namespace=kube-system -o yaml</span><br></pre></td></tr></table></figure>
+<p>关于 kube-controller-manager 和 kube-scheduler 高可用的实现细节可以参考之前写的一篇文章：<a href="http://blog.tianfeiyu.com/2019/03/13/k8s_leader_election/" target="_blank" rel="noopener">kubernets 中组件高可用的实现方式</a>。</p>
+<h4 id="etcd-的高可用配置"><a href="#etcd-的高可用配置" class="headerlink" title="etcd 的高可用配置"></a>etcd 的高可用配置</h4><p>etcd 是一个分布式集群，也是一个有状态的服务，其天生就是高可用的架构。为了防止 etcd 脑裂，其组成 etcd 集群的个数一般为奇数个(3 或 5 个节点) 。若使用物理机搭建 k8s 集群，理论上集群的规模也会比较大，此时 etcd 也应该使用 3 个或者5 个节点部署一套独立运行的集群。若想要对 etcd 做到自动化运维，可以考虑使用 <a href="https://github.com/coreos/etcd-operator" target="_blank" rel="noopener">etcd-operator</a> 将 etcd 集群部署在 k8s 中。</p>
+<p> <strong>kubernetes 中组件高可用部署的一个架构图</strong>：</p>
+<p><img src="http://cdn.tianfeiyu.com/image-1.png" alt="image-20190712163334068"></p>
+<h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><p>本文主要介绍如何配置一个高可用 kubernetes 集群，kubernetes 新版本已经越来越趋近全面 TLS + RBAC 配置，若 kubernetes 集群还在使用 8080 端口，此时每个 master 节点上的 kube-controller-manager 和 kube-scheduler 都是通过 8080 端口连接 apiserver，若节点上的 apiserver 挂掉，则 kube-controller-manager 和 kube-scheduler 也会随之挂掉。apiserver 作为集群的核心组件，其必须高可用部署，其他组件实现高可用相对容易。</p>
+<p>参考：</p>
+<p><a href="https://k8smeetup.github.io/docs/admin/high-availability/" target="_blank" rel="noopener">https://k8smeetup.github.io/docs/admin/high-availability/</a></p>
 
       
-
     </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kubernetes/" rel="tag"># kubernetes</a>
+          
+            <a href="/tags/HA/" rel="tag"># HA</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/07/02/k8s_crd_verify/" rel="next" title="kubernetes 自定义资源（CRD）的校验">
+                <i class="fa fa-chevron-left"></i> kubernetes 自定义资源（CRD）的校验
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
   </div>
   
   
   
+  </article>
 
-  
 
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
 
 
           </div>
@@ -458,6 +458,18 @@
 
 
           
+
+  
+    <div class="comments" id="comments">
+      
+        <div onclick="showGitment()" id="gitment-display-button">显示 Gitment 评论</div>
+        <div id="gitment-container" style="display:none"></div>
+      
+    </div>
+
+  
+
+
 
         </div>
         
@@ -478,8 +490,17 @@
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
 
-      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+      <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
             
@@ -530,6 +551,22 @@
         </div>
       </section>
 
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-apiserver-的高可用配置"><span class="nav-number">1.</span> <span class="nav-text">kube-apiserver 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-controller-manager-和-kube-scheduler-的高可用配置"><span class="nav-number">2.</span> <span class="nav-text">kube-controller-manager 和 kube-scheduler 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#etcd-的高可用配置"><span class="nav-number">3.</span> <span class="nav-text">etcd 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
       
 
       
@@ -663,6 +700,10 @@
   
 
   
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
 
   
 
@@ -714,6 +755,34 @@
       </style>
     
 
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'gosoon',
+            repo: 'gosoon.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: '770ff2f1d0e40044356b497ca7de0b21dae0e656',
+            
+                client_id: 'a491177dd735d4d07697'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      function showGitment(){
+        document.getElementById("gitment-display-button").style.display = "none";
+        document.getElementById("gitment-container").style.display = "block";
+        renderGitment();
+      }
+      
+      </script>
     
 
 
