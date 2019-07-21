@@ -88,7 +88,7 @@
 <meta property="og:description" content="kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-1.png">
-<meta property="og:updated_time" content="2019-07-12T08:44:33.116Z">
+<meta property="og:updated_time" content="2019-07-12T08:56:21.988Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="部署高可用 kubernetes 集群">
 <meta name="twitter:description" content="kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，都是通过 etcd 全局锁进行选举实现的，etcd 是一个分布式，强一致的（满足 CAP 的 CP）">
@@ -386,7 +386,7 @@
 <p>关于 kube-controller-manager 和 kube-scheduler 高可用的实现细节可以参考之前写的一篇文章：<a href="http://blog.tianfeiyu.com/2019/03/13/k8s_leader_election/" target="_blank" rel="noopener">kubernets 中组件高可用的实现方式</a>。</p>
 <h4 id="etcd-的高可用配置"><a href="#etcd-的高可用配置" class="headerlink" title="etcd 的高可用配置"></a>etcd 的高可用配置</h4><p>etcd 是一个分布式集群，也是一个有状态的服务，其天生就是高可用的架构。为了防止 etcd 脑裂，其组成 etcd 集群的个数一般为奇数个(3 或 5 个节点) 。若使用物理机搭建 k8s 集群，理论上集群的规模也会比较大，此时 etcd 也应该使用 3 个或者5 个节点部署一套独立运行的集群。若想要对 etcd 做到自动化运维，可以考虑使用 <a href="https://github.com/coreos/etcd-operator" target="_blank" rel="noopener">etcd-operator</a> 将 etcd 集群部署在 k8s 中。</p>
 <p> <strong>kubernetes 中组件高可用部署的一个架构图</strong>：</p>
-<p><img src="http://cdn.tianfeiyu.com/image-1.png" alt="image-20190712163334068"></p>
+<p><img src="http://cdn.tianfeiyu.com/image-1.png" alt="kubernetes 组件高可用部署"></p>
 <h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><p>本文主要介绍如何配置一个高可用 kubernetes 集群，kubernetes 新版本已经越来越趋近全面 TLS + RBAC 配置，若 kubernetes 集群还在使用 8080 端口，此时每个 master 节点上的 kube-controller-manager 和 kube-scheduler 都是通过 8080 端口连接 apiserver，若节点上的 apiserver 挂掉，则 kube-controller-manager 和 kube-scheduler 也会随之挂掉。apiserver 作为集群的核心组件，其必须高可用部署，其他组件实现高可用相对容易。</p>
 <p>参考：</p>
 <p><a href="https://k8smeetup.github.io/docs/admin/high-availability/" target="_blank" rel="noopener">https://k8smeetup.github.io/docs/admin/high-availability/</a></p>
