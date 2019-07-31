@@ -87,15 +87,15 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="随着 kubernetes 的大规模使用，对 kubernetes 组件及其上运行服务的监控也是非常重要的一个环节，目前开源的监控组件有很多种，例如 cAdvisor、Heapster、metrics-server、kube-state-metrics、Prometheus 等，对监控数据的可视化查看组件有 Dashboard、 Prometheus、Grafana 等，本文会介绍 kube-da">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-5fefdb4cfa190543.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-4888de572ff9a0c9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-58e439a2407773ca.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-b97f2279fadbd3a1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.308Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/dash-1.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/dash-2.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/dash-3.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/dash-4.png">
+<meta property="og:updated_time" content="2019-07-21T10:03:57.982Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="部署 kubernetes 可视化监控组件">
 <meta name="twitter:description" content="随着 kubernetes 的大规模使用，对 kubernetes 组件及其上运行服务的监控也是非常重要的一个环节，目前开源的监控组件有很多种，例如 cAdvisor、Heapster、metrics-server、kube-state-metrics、Prometheus 等，对监控数据的可视化查看组件有 Dashboard、 Prometheus、Grafana 等，本文会介绍 kube-da">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-5fefdb4cfa190543.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/dash-1.png">
 
 
 
@@ -397,18 +397,18 @@
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl proxy --address=IP --disable-filter=true</span><br></pre></td></tr></table></figure>
 <p>访问 <a href="http://IP:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login" target="_blank" rel="noopener">http://IP:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login</a></p>
 <p>已部署 kube-proxy 的可直接访问 <a href="https://IP:nodePort" target="_blank" rel="noopener">https://IP:nodePort</a> </p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-5fefdb4cfa190543.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+<p><img src="http://cdn.tianfeiyu.com/dash-1.png" alt=""></p>
 <p>选择令牌方式使用上面生成的 token 登录。</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-4888de572ff9a0c9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+<p><img src="http://cdn.tianfeiyu.com/dash-2.png" alt=""></p>
 <p>Dashboard 可以使用 Ingress、Let’s Encrypt 等多种方式配置 ssl，关于 ssl 的详细配置此处不进行详解。</p>
 <h3 id="二、部署-prometheus"><a href="#二、部署-prometheus" class="headerlink" title="二、部署 prometheus"></a>二、部署 prometheus</h3><p>prometheus 作为 CNCF 生态圈中的重要一员，其活跃度仅次于 Kubernetes, 现已广泛用于 Kubernetes 集群的监控系统中。prometheus 的部署相对比较简单，社区已经有了 <a href="https://github.com/coreos/kube-prometheus" target="_blank" rel="noopener">kube-prometheus</a>，kube-prometheus 会部署包含 prometheus-operator、grafana、kube-state-metrics 等多个组件。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ git clone https://github.com/coreos/kube-prometheus</span><br><span class="line"></span><br><span class="line">$ kubectl apply -f manifests/</span><br></pre></td></tr></table></figure>
 <p>为了使用简单，我也会将 prometheus 和 grafana 的端口修改为 nodePort 的方式进行暴露：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl edit svc prometheus-k8s -n monitoring</span><br><span class="line"></span><br><span class="line">$ kubectl edit svc grafana -n monitoring</span><br><span class="line"></span><br><span class="line">$ kubectl get svc -n monitoring</span><br><span class="line">NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE</span><br><span class="line">alertmanager-main       NodePort    10.102.81.118   &lt;none&gt;        9093:8007/TCP       5d1h</span><br><span class="line">alertmanager-operated   ClusterIP   None            &lt;none&gt;        9093/TCP,6783/TCP   5d1h</span><br><span class="line">grafana                 NodePort    10.96.19.82     &lt;none&gt;        3000:8006/TCP       5d1h</span><br><span class="line">kube-state-metrics      ClusterIP   None            &lt;none&gt;        8443/TCP,9443/TCP   5d1h</span><br><span class="line">node-exporter           ClusterIP   None            &lt;none&gt;        9100/TCP            5d1h</span><br><span class="line">prometheus-adapter      ClusterIP   10.107.103.58   &lt;none&gt;        443/TCP             5d1h</span><br><span class="line">prometheus-k8s          NodePort    10.110.222.41   &lt;none&gt;        9090:8005/TCP       5d1h</span><br><span class="line">prometheus-operated     ClusterIP   None            &lt;none&gt;        9090/TCP            5d1h</span><br><span class="line">prometheus-operator     ClusterIP   None            &lt;none&gt;        8080/TCP            5d1h</span><br><span class="line"></span><br><span class="line">$ kubectl get pod -n monitoring</span><br><span class="line">NAME                                   READY   STATUS    RESTARTS   AGE</span><br><span class="line">alertmanager-main-0                    2/2     Running   0          4d</span><br><span class="line">alertmanager-main-1                    2/2     Running   0          4d</span><br><span class="line">alertmanager-main-2                    2/2     Running   0          4d</span><br><span class="line">grafana-9d97dfdc7-qfjts                1/1     Running   0          4d</span><br><span class="line">kube-state-metrics-74d7dcd7dc-qfz5m    4/4     Running   0          3d11h</span><br><span class="line">node-exporter-5cdl2                    2/2     Running   0          4d</span><br><span class="line">prometheus-adapter-b7d894c9c-dvzzq     1/1     Running   0          4d</span><br><span class="line">prometheus-k8s-0                       3/3     Running   1          2d2h</span><br><span class="line">prometheus-k8s-1                       3/3     Running   1          4d</span><br><span class="line">prometheus-operator-77b8b97459-7qfxj   1/1     Running   0          4d</span><br></pre></td></tr></table></figure>
 <p>上面几个组件成功运行后就可以在页面访问 prometheus 和 ganfana ：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-58e439a2407773ca.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+<p><img src="http://cdn.tianfeiyu.com/dash-3.png" alt=""></p>
 <p>进入 grafana 的 web 端，默认用户名和密码均为 admin：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-b97f2279fadbd3a1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+<p><img src="http://cdn.tianfeiyu.com/dash-4.png" alt=""></p>
 <p>grafana 支持导入其他的 Dashboard，在 grafana 官方网站可以搜到大量与 k8s 相关的 dashboard。 </p>
 <h3 id="三、总结"><a href="#三、总结" class="headerlink" title="三、总结"></a>三、总结</h3><p>本文介绍了对 kubernetes 和容器监控比较成熟的两个方案，虽然目前开源的方案比较多，但是要形成采集、存储、展示、报警一个完成的体系还需要在使用过程中不断探索与完善。</p>
 

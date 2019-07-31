@@ -87,12 +87,12 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="一、概要kubelet 是运行在每个节点上的主要的“节点代理”，每个节点都会启动 kubelet进程，用来处理 Master 节点下发到本节点的任务，按照 PodSpec 描述来管理Pod 和其中的容器（PodSpec 是用来描述一个 pod 的 YAML 或者 JSON 对象）。 kubelet 通过各种机制（主要通过 apiserver ）获取一组 PodSpec 并保证在这些 PodSpec">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-91b13623d3cf45ec.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.309Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/kubelet-4.png">
+<meta property="og:updated_time" content="2019-07-21T09:49:06.807Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubelet 架构浅析">
 <meta name="twitter:description" content="一、概要kubelet 是运行在每个节点上的主要的“节点代理”，每个节点都会启动 kubelet进程，用来处理 Master 节点下发到本节点的任务，按照 PodSpec 描述来管理Pod 和其中的容器（PodSpec 是用来描述一个 pod 的 YAML 或者 JSON 对象）。 kubelet 通过各种机制（主要通过 apiserver ）获取一组 PodSpec 并保证在这些 PodSpec">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-91b13623d3cf45ec.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/kubelet-4.png">
 
 
 
@@ -401,7 +401,7 @@
 <li><p>容器监控：kubelet 会监控所在节点的资源使用情况，并定时向 master 报告，资源使用数据都是通过 cAdvisor 获取的。知道整个集群所有节点的资源情况，对于 pod 的调度和正常运行至关重要。</p>
 </li>
 </ul>
-<h2 id="三、kubelet-组件中的模块"><a href="#三、kubelet-组件中的模块" class="headerlink" title="三、kubelet 组件中的模块"></a>三、kubelet 组件中的模块</h2><p> <img src="https://upload-images.jianshu.io/upload_images/1262158-91b13623d3cf45ec.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kubelet 组件中的模块"></p>
+<h2 id="三、kubelet-组件中的模块"><a href="#三、kubelet-组件中的模块" class="headerlink" title="三、kubelet 组件中的模块"></a>三、kubelet 组件中的模块</h2><p> <img src="http://cdn.tianfeiyu.com/kubelet-4.png" alt="kubelet 组件中的模块"></p>
 <p>上图展示了 kubelet 组件中的模块以及模块间的划分。</p>
 <ul>
 <li><p>1、PLEG(Pod Lifecycle Event Generator）<br>PLEG 是 kubelet 的核心模块,PLEG 会一直调用 container runtime 获取本节点 containers/sandboxes 的信息，并与自身维护的 pods cache 信息进行对比，生成对应的 PodLifecycleEvent，然后输出到 eventChannel 中，通过 eventChannel 发送到 kubelet syncLoop 进行消费，然后由 kubelet syncPod 来触发 pod 同步处理过程，最终达到用户的期望状态。</p>

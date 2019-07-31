@@ -87,13 +87,13 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="一、Docker 开源之路2015 年 6 月 ，docker 公司将 libcontainer 捐出并改名为 runC 项目，交由一个完全中立的基金会管理，然后以 runC 为依据，大家共同制定一套容器和镜像的标准和规范 OCI。 2016 年 4 月，docker 1.11 版本之后开始引入了 containerd 和 runC，Docker 开始依赖于 containerd 和 runC 来">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-eee83eb356fccdb8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-3f74443f956fa132.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.307Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/docker-1.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/docker-2.png">
+<meta property="og:updated_time" content="2019-07-21T09:50:55.384Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Docker 架构中的几个核心概念">
 <meta name="twitter:description" content="一、Docker 开源之路2015 年 6 月 ，docker 公司将 libcontainer 捐出并改名为 runC 项目，交由一个完全中立的基金会管理，然后以 runC 为依据，大家共同制定一套容器和镜像的标准和规范 OCI。 2016 年 4 月，docker 1.11 版本之后开始引入了 containerd 和 runC，Docker 开始依赖于 containerd 和 runC 来">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-eee83eb356fccdb8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/docker-1.png">
 
 
 
@@ -378,8 +378,8 @@
         <h2 id="一、Docker-开源之路"><a href="#一、Docker-开源之路" class="headerlink" title="一、Docker 开源之路"></a>一、Docker 开源之路</h2><p>2015 年 6 月 ，docker 公司将 libcontainer 捐出并改名为 runC 项目，交由一个完全中立的基金会管理，然后以 runC 为依据，大家共同制定一套容器和镜像的标准和规范 OCI。</p>
 <p>2016 年 4 月，docker 1.11 版本之后开始引入了 containerd 和 runC，Docker 开始依赖于 containerd 和 runC 来管理容器，containerd 也可以操作满足 OCI 标准规范的其他容器工具，之后只要是按照 OCI 标准规范开发的容器工具，都可以被 containerd 使用起来。</p>
 <p>从 2017 年开始，Docker 公司先是将 Docker项目的容器运行时部分 Containerd 捐赠给CNCF 社区，紧接着，Docker 公司宣布将 Docker 项目改名为 Moby。</p>
-<h2 id="二、Docker-架构"><a href="#二、Docker-架构" class="headerlink" title="二、Docker 架构"></a>二、Docker 架构</h2><p><img src="https://upload-images.jianshu.io/upload_images/1262158-eee83eb356fccdb8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="docker 架构"></p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-3f74443f956fa132.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="docker 进程关系"></p>
+<h2 id="二、Docker-架构"><a href="#二、Docker-架构" class="headerlink" title="二、Docker 架构"></a>二、Docker 架构</h2><p><img src="http://cdn.tianfeiyu.com/docker-1.png" alt="docker 架构"></p>
+<p><img src="http://cdn.tianfeiyu.com/docker-2.png" alt="docker 进程关系"></p>
 <h3 id="三、核心概念"><a href="#三、核心概念" class="headerlink" title="三、核心概念"></a>三、核心概念</h3><p>docker 1.13 版本中包含以下几个二进制文件。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ docker --version</span><br><span class="line">Docker version 1.13.1, build 092cba3</span><br><span class="line"></span><br><span class="line">$ docker</span><br><span class="line">docker             docker-containerd-ctr   dockerd      docker-proxy</span><br><span class="line">docker-containerd  docker-containerd-shim  docker-init  docker-runc</span><br></pre></td></tr></table></figure></p>
 <h4 id="1、docker"><a href="#1、docker" class="headerlink" title="1、docker"></a>1、docker</h4><p>docker 的命令行工具，是给用户和 docker daemon 建立通信的客户端。</p>
 <h4 id="2、dockerd"><a href="#2、dockerd" class="headerlink" title="2、dockerd"></a>2、dockerd</h4><p>dockerd 是 docker 架构中一个常驻在后台的系统进程，称为 docker daemon，dockerd 实际调用的还是 containerd 的 api 接口（rpc 方式实现）,docker daemon 的作用主要有以下两方面：</p>

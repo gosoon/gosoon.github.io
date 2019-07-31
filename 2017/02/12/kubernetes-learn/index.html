@@ -87,12 +87,12 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 kubernetes + docker 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 API 进行某些操作。 1，kubernetes 搭建kubernetes 是 google 的一个开源软件，其社区活跃量远超">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.310Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/bank.png">
+<meta property="og:updated_time" content="2019-07-21T09:41:08.891Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubernetes 学习笔记">
 <meta name="twitter:description" content="1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 kubernetes + docker 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 API 进行某些操作。 1，kubernetes 搭建kubernetes 是 google 的一个开源软件，其社区活跃量远超">
-<meta name="twitter:image" content="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/bank.png">
 
 
 
@@ -376,7 +376,7 @@
       
         <p>1 月初办理了入职手续，所在的团队是搞私有云的，目前只有小规模的应用，所采用 <strong>kubernetes + docker</strong> 技术栈，年前所做的事情也不算多，熟悉了 kubernetes 的架构，自己搭建单机版的 kubernetes，以及在程序中调用 kubernetes 的 <code>API</code> 进行某些操作。</p>
 <h2 id="1，kubernetes-搭建"><a href="#1，kubernetes-搭建" class="headerlink" title="1，kubernetes 搭建"></a>1，kubernetes 搭建</h2><p><a href="https://github.com/kubernetes/kubernetes" target="_blank" rel="noopener">kubernetes</a> 是 google 的一个开源软件，其社区活跃量远超 <strong>Mesos，Coreos</strong> 的，若想深入学习建议参考<strong>《kubernetes 权威指南》</strong>，我们团队的人都是从这本书学起的，作为一个新技术，会踩到的坑非常多，以下提及的是我学习过程中整理的部分资料。</p>
-<p><img src="http://upload-images.jianshu.io/upload_images/1262158-e050e035d6fa64ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kubernetes 架构图"></p>
+<p><img src="http://cdn.tianfeiyu.com/bank.png" alt="kubernetes 架构图"></p>
 <p>kubernetes 是一个分布式系统，所以它有多个组件，并且需要安装在多个节点，一般来说有三个节点，etcd，master 和 minion，但是每个节点却又有多台机器，etcd 作为高性能存储服务，一般独立为一个节点，当然容错是必不可少的，官方建议集群使用奇数个节点，我们的线下集群使用 3 个节点。etcd 的学习可以参考 <strong>gitbook</strong> 上面某大神的一本书 一 <a href="https://skyao.gitbooks.io/leaning-etcd3/content/documentation/leaning/" target="_blank" rel="noopener">etcd3学习笔记</a>。master 端需要安装 kube-apiserver、kube-controller-manager和kube-scheduler 组件，minion 节点需要部署 kubelet、kube-proxy、docker 组件。</p>
 <blockquote>
 <p>注意：内核版本 &gt; 3.10 的系统才支持 kubernetes，所以一般安装在centos 7 上。 </p>

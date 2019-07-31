@@ -87,13 +87,13 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-4f2f879989eef369.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.306Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/informer-1.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/informer-2.png">
+<meta property="og:updated_time" content="2019-07-21T10:07:57.293Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubernetes 中 informer 的使用">
 <meta name="twitter:description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/informer-1.png">
 
 
 
@@ -385,7 +385,7 @@
 <li>根据对应的事件类型，触发事先注册好的 ResourceEventHandler</li>
 </ul>
 <h5 id="1、Informer-中几个组件的作用"><a href="#1、Informer-中几个组件的作用" class="headerlink" title="1、Informer 中几个组件的作用"></a>1、Informer 中几个组件的作用</h5><p>Informer 中主要有 Reflector、Delta FIFO Queue、Local Store、WorkQueue 几个组件。以下是 Informer 的工作流程图。</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-1fd8ae6c9e00e92b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="Informer 组件"></p>
+<p><img src="http://cdn.tianfeiyu.com/informer-1.png" alt="Informer 组件"></p>
 <p>根据流程图来解释一下 Informer 中几个组件的作用：</p>
 <ul>
 <li><p>Reflector：称之为反射器，实现对 apiserver 指定类型对象的监控(ListAndWatch)，其中反射实现的就是把监控的结果实例化成具体的对象，最终也是调用 Kubernetes 的 List/Watch API；</p>
@@ -449,7 +449,7 @@
 <h4 id="四、使用中的一些问题"><a href="#四、使用中的一些问题" class="headerlink" title="四、使用中的一些问题"></a>四、使用中的一些问题</h4><h5 id="1、Informer-二级缓存中的同步问题"><a href="#1、Informer-二级缓存中的同步问题" class="headerlink" title="1、Informer 二级缓存中的同步问题"></a>1、Informer 二级缓存中的同步问题</h5><p>虽然 Informer 和 Kubernetes 之间没有 resync 机制，但 Informer 内部的这两级缓存 DeltaIFIFO 和 LocalStore 之间会存在 resync 机制，k8s 中 kube-controller-manager 的 StatefulSetController 中使用了两级缓存的 resync 机制（如下图所示），我们在生产环境中发现 sts 创建后过了很久 pod 才会创建，主要是由于 StatefulSetController 的两级缓存之间 30s 会同步一次，由于  StatefulSetController watch 到变化后就会把对应的 sts 放入 DeltaIFIFO 中，且每隔30s会把 LocalStore 中全部的 sts 重新入一遍 DeltaIFIFO，入队时会做一些处理，过滤掉一些不需要重复入队列的 sts，若间隔的 30s 内没有处理完队列中所有的 sts，则待处理队列中始终存在未处理完的 sts，并且在同步过程中产生的 sts 会加的队列的尾部，新加入队尾的 sts 只能等到前面的 sts 处理完成（也就是 resync 完成）才会被处理，所以导致的现象就是 sts 创建后过了很久 pod 才会创建。</p>
 <p>优化的方法就是去掉二级缓存的同步策略（将 setInformer.Informer().AddEventHandlerWithResyncPeriod() 改为 informer.AddEventHandler()）或者调大同步周期，但是在研究 kube-controller-manager 其他 controller 时发现并不是所有的 controller 都有同步策略，社区也有相关的 issue 反馈了这一问题，<a href="https://github.com/kubernetes/kubernetes/pull/75622" target="_blank" rel="noopener">Remove resync period for sset controller</a>，社区也会在以后的版本中去掉两级缓存之间的 resync 策略。</p>
 <p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set.go</code></p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-4f2f879989eef369.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="kube-controller-manager sts controller"></p>
+<p><img src="http://cdn.tianfeiyu.com/informer-2.png" alt="kube-controller-manager sts controller"></p>
 <h5 id="2、使用-Informer-如何监听所有资源对象？"><a href="#2、使用-Informer-如何监听所有资源对象？" class="headerlink" title="2、使用 Informer 如何监听所有资源对象？"></a>2、使用 Informer 如何监听所有资源对象？</h5><p>一个 Informer 实例只能监听一种 resource，每个 resource 需要创建对应的 Informer 实例。</p>
 <h5 id="3、为什么不是使用-workqueue？"><a href="#3、为什么不是使用-workqueue？" class="headerlink" title="3、为什么不是使用 workqueue？"></a>3、为什么不是使用 workqueue？</h5><p>建议使用 RateLimitingQueue，它相比普通的 workqueue 多了以下的功能: </p>
 <ul>

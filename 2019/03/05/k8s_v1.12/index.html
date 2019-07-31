@@ -87,13 +87,13 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题： 1、注意 k">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:image" content="https://upload-images.jianshu.io/upload_images/1262158-8af5facac815e980.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
-<meta property="og:updated_time" content="2019-06-01T14:26:16.308Z">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/openapi-1.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/iterm-1.png">
+<meta property="og:updated_time" content="2019-07-21T09:58:04.316Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubernetes 集群升级至 v1.12 需要注意的几个问题">
 <meta name="twitter:description" content="最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题： 1、注意 k">
-<meta name="twitter:image" content="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/openapi-1.png">
 
 
 
@@ -377,7 +377,7 @@
       
         <p>最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行 v1.12 一段时间后发现问题不大，于是开始升级。此处记录几个升级过程要注意的问题：</p>
 <h3 id="1、注意-k8s-中-resource-version-的变化"><a href="#1、注意-k8s-中-resource-version-的变化" class="headerlink" title="1、注意 k8s 中 resource version 的变化"></a>1、注意 k8s 中 resource version 的变化</h3><p>k8s 中许多 resouce 都是随着 k8s 的版本变化而变化的，例如，statefulset 在 v1.8 版本中 apiVersion 是 apps/v1beta1，在 v1.12 中变为了 apps/v1。k8s 有接口可以获取到当前版本所有的 OpenAPI ：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-272c63b4eabe3cee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image.png"></p>
+<p><img src="http://cdn.tianfeiyu.com/openapi-1.png" alt="OpenAPI"></p>
 <p>参考文档：<a href="https://kubernetes.io/docs/concepts/overview/kubernetes-api/" target="_blank" rel="noopener">The Kubernetes API</a></p>
 <p>虽然 k8s 中 resource version 都是向下兼容的，但是在升级完成后尽量使用当前版本的 resource version 避免不必要的麻烦。</p>
 <h3 id="2、kubelet-配置文件格式"><a href="#2、kubelet-配置文件格式" class="headerlink" title="2、kubelet 配置文件格式"></a>2、kubelet 配置文件格式</h3><p>v1.8 中 kubelet 的配置是在 /etc/kubernetes/kubelet 文件中的 KUBELET_ARGS 后面指定，但是在 v1.12 中开始使用 config.yaml 文件，即所有的配置都可以放在 yaml 文件中，由于配置是兼容的，所以暂时也可以继续用以前的方式，其中有些参数仅支持在 config.yaml 文件中指定。</p>
@@ -385,7 +385,7 @@
 <p>一个例子：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: kubelet.config.k8s.io/v1beta1</span><br><span class="line">kind: KubeletConfiguration</span><br><span class="line">address: 0.0.0.0</span><br><span class="line">- pods</span><br><span class="line">eventBurst: 10</span><br><span class="line">eventRecordQPS: 5</span><br><span class="line">evictionHard:</span><br><span class="line">  imagefs.available: 15%</span><br><span class="line">  memory.available: 100Mi</span><br><span class="line">  nodefs.available: 10%</span><br><span class="line">  nodefs.inodesFree: 5%</span><br><span class="line">evictionPressureTransitionPeriod: 5m0s</span><br><span class="line">failSwapOn: true</span><br><span class="line">fileCheckFrequency: 20s</span><br><span class="line">healthzBindAddress: 127.0.0.1</span><br><span class="line">healthzPort: 10248</span><br><span class="line">httpCheckFrequency: 20s</span><br><span class="line">imageGCHighThresholdPercent: 85</span><br><span class="line">imageGCLowThresholdPercent: 80</span><br><span class="line">imageMinimumGCAge: 2m0s</span><br><span class="line">maxOpenFiles: 1000000</span><br><span class="line">maxPods: 110</span><br><span class="line">nodeLeaseDurationSeconds: 40</span><br><span class="line">nodeStatusUpdateFrequency: 10s</span><br><span class="line">oomScoreAdj: -999</span><br><span class="line">podPidsLimit: -1</span><br><span class="line">port: 10250</span><br><span class="line">staticPodPath: /etc/kubernetes/manifests</span><br></pre></td></tr></table></figure>
 <p>将 kubelet 配置文件中的 LOG_LEVEL 参数改为大于等于 5 可以看到 config.yaml 中配置的定义，以方便排查问题：</p>
-<p><img src="https://upload-images.jianshu.io/upload_images/1262158-8af5facac815e980.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="image.png"></p>
+<p><img src="http://cdn.tianfeiyu.com/iterm-1.png" alt="config"></p>
 <p>对应的日志输出：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">I0228 16:14:14.064292  191819 server.go:260] KubeletConfiguration: </span><br><span class="line">config.KubeletConfiguration&#123;TypeMeta:v1.TypeMeta&#123;Kind:&quot;&quot;, </span><br><span class="line">APIVersion:&quot;&quot;&#125;, StaticPodPath:&quot;&quot;, Sync    </span><br><span class="line">Frequency:v1.Duration&#123;Duration:60000000000&#125;, </span><br><span class="line">FileCheckFrequency:v1.Duration&#123;Duration:20000000000&#125;,</span><br><span class="line">HTTPCheckFrequency:v1.Duration&#123;Duration:20000000000&#125;, </span><br><span class="line">StaticPodURL:&quot;&quot;, StaticPodURLHeader:map[string][]string(nil),</span><br><span class="line">Address:&quot;0.0.0.0&quot;, Port:10250, </span><br><span class="line">...</span><br></pre></td></tr></table></figure>
 <blockquote>
