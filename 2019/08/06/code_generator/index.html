@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="code-generator,crd,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="kubernetes 项目中有相当一部分代码是自动生成的，主要是 API 的定义和调用方法，kubernetes 项目下 k8s.io/kubernetes/hack/ 目录中以 update 开头的大部分脚本都是用来生成代码的。code-generator 是官方提供的代码生成工具，在实现自定义 controller 的时候需要用到 CRD，也需要使用该工具生成对 CRD 操作的代码。 要生成哪">
+<meta name="keywords" content="code-generator,crd">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 code-generator 为 CustomResources 生成代码">
+<meta property="og:url" content="http://yoursite.com/2019/08/06/code_generator/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kubernetes 项目中有相当一部分代码是自动生成的，主要是 API 的定义和调用方法，kubernetes 项目下 k8s.io/kubernetes/hack/ 目录中以 update 开头的大部分脚本都是用来生成代码的。code-generator 是官方提供的代码生成工具，在实现自定义 controller 的时候需要用到 CRD，也需要使用该工具生成对 CRD 操作的代码。 要生成哪">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-08-06T12:54:12.526Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="使用 code-generator 为 CustomResources 生成代码">
+<meta name="twitter:description" content="kubernetes 项目中有相当一部分代码是自动生成的，主要是 API 的定义和调用方法，kubernetes 项目下 k8s.io/kubernetes/hack/ 目录中以 update 开头的大部分脚本都是用来生成代码的。code-generator 是官方提供的代码生成工具，在实现自定义 controller 的时候需要用到 CRD，也需要使用该工具生成对 CRD 操作的代码。 要生成哪">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/08/06/code_generator/">
+
+
+
+
+
+  <title>使用 code-generator 为 CustomResources 生成代码 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-code-generator" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/06/code_generator/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">使用 code-generator 为 CustomResources 生成代码</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-06T20:50:30+08:00">
+                2019-08-06
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/08/06/code_generator/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/06/code_generator/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>kubernetes 项目中有相当一部分代码是自动生成的，主要是 API 的定义和调用方法，kubernetes 项目下 <code>k8s.io/kubernetes/hack/</code> 目录中以 update 开头的大部分脚本都是用来生成代码的。<a href="https://github.com/kubernetes/code-generator/" target="_blank" rel="noopener">code-generator</a> 是官方提供的代码生成工具，在实现自定义 controller 的时候需要用到 CRD，也需要使用该工具生成对 CRD 操作的代码。</p>
+<h3 id="要生成哪些代码"><a href="#要生成哪些代码" class="headerlink" title="要生成哪些代码"></a>要生成哪些代码</h3><p>在自定义 controller 时需要用到 typed clientsets，informers，listers 和 deep-copy 等函数，这些函数都可以使用 <a href="https://github.com/kubernetes/code-generator/" target="_blank" rel="noopener">code-generator</a> 来生成，具体的作用可以参考：<a href="[http://blog.tianfeiyu.com/2019/05/17/client-go_informer/](http://blog.tianfeiyu.com/2019/05/17/client-go_informer/">kubernetes 中 informer 的使用</a>)。</p>
+<p>code-generator 里面包含多个生成代码的工具，下面是需要用到的几个：</p>
+<ul>
+<li><p>deepcopy-gen：为每种类型T生成方法： <code>func (t* T) DeepCopy() *T</code>，CustomResources 必须实现runtime.Object 接口且要有 DeepCopy 方法</p>
+</li>
+<li><p>client-gen：为 CustomResource APIGroups 生成 typed clientsets</p>
+</li>
+<li><p>informer-gen：为 CustomResources 创建 informers，用来 watch 对应 CRD 所触发的事件，以便对 CustomResources 的变化进行对应的处理</p>
+</li>
+<li><p>lister-gen：为 CustomResources 创建 listers，用来对 GET/List 请求提供只读的缓存层</p>
+</li>
+</ul>
+<p>除了上面几个工具外，code-generator 中还提供了 conversion-gen、defaulter-gen、register-gen、set-gen，这些生成器可以应用在其他场景，比如构建聚合 API 服务时会用到一些内部的类型，conversion-gen 会为这些内部和外部类型之间创建转换函数，defaulter-gen 会处理某些字段的默认值。</p>
+<h3 id="代码生成步骤"><a href="#代码生成步骤" class="headerlink" title="代码生成步骤"></a>代码生成步骤</h3><p>使用 code-generator 生成代码还需要以下几步：</p>
+<ul>
+<li>创建指定的目录格式</li>
+<li>在代码中使用 tag 标注要生成哪些代码</li>
+</ul>
+<p>首先要创建指定的目录格式，目录的格式可以参考官方提供的示例项目：<a href="https://github.com/kubernetes/sample-controller" target="_blank" rel="noopener">sample-controller</a>，下文也会讲到，目录中需要包含对应 CustomResources 的定义以及  group 和 version 信息。</p>
+<p>其次要在在代码中使用 tag 标注要生成哪些代码，tag 有两钟类型，全局的和局部的，所有类型的 deepcopy tag 会默认启用，更多关于 tag 的使用方法可以参考：<a href="https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/" target="_blank" rel="noopener">Kubernetes Deep Dive: Code Generation for CustomResources</a>，也可以参考官方的示例 <a href="https://github.com/kubernetes/code-generator/blob/master/_examples/crd/apis/example" target="_blank" rel="noopener">code-generator/_example</a> 。</p>
+<h3 id="开始生成代码"><a href="#开始生成代码" class="headerlink" title="开始生成代码"></a>开始生成代码</h3><p>本文以该 CRD 为例子进行演示，group 为<code>ecs.yun.com</code> ，version 为 <code>v1</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  names:</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  subresources:</span><br><span class="line">    status: &#123;&#125;</span><br><span class="line">  version: v1</span><br><span class="line">  versions:</span><br><span class="line">  - name: v1</span><br><span class="line">    served: true</span><br><span class="line">    storage: true</span><br></pre></td></tr></table></figure>
+<p>创建指定目录结构 pkg/apis/${group}/${version}，group 可以定义一个 shortNames，也就是 CRD 中的 shortNames</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ mkdir -pv pkg/apis/ecs/v1</span><br></pre></td></tr></table></figure>
+<p>创建 doc.go：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ cat &lt;&lt; EOF &gt; pkg/apis/ecs/v1/doc.go</span><br><span class="line">// Package v1 contains API Schema definitions for the ecs v1 API group</span><br><span class="line">// +k8s:deepcopy-gen=package,register</span><br><span class="line">// +groupName=ecs.yun.com</span><br><span class="line">package v1</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure></p>
+<p>创建 register.go：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">$ cat &lt;&lt; EOF &gt; pkg/apis/ecs/v1/register.go</span><br><span class="line">package v1</span><br><span class="line"></span><br><span class="line">import (</span><br><span class="line">	&quot;github.com/gosoon/kubernetes-operator/pkg/apis/ecs&quot;</span><br><span class="line"></span><br><span class="line">	metav1 &quot;k8s.io/apimachinery/pkg/apis/meta/v1&quot;</span><br><span class="line">	&quot;k8s.io/apimachinery/pkg/runtime&quot;</span><br><span class="line">	&quot;k8s.io/apimachinery/pkg/runtime/schema&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// SchemeGroupVersion is group version used to register these objects</span><br><span class="line">var SchemeGroupVersion = schema.GroupVersion&#123;Group: ecs.GroupName, Version: &quot;v1&quot;&#125;</span><br><span class="line"></span><br><span class="line">// Kind takes an unqualified kind and returns back a Group qualified GroupKind</span><br><span class="line">func Kind(kind string) schema.GroupKind &#123;</span><br><span class="line">	return SchemeGroupVersion.WithKind(kind).GroupKind()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// Resource takes an unqualified resource and returns a Group qualified GroupResource</span><br><span class="line">func Resource(resource string) schema.GroupResource &#123;</span><br><span class="line">	return SchemeGroupVersion.WithResource(resource).GroupResource()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">var (</span><br><span class="line">	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)</span><br><span class="line">	AddToScheme   = SchemeBuilder.AddToScheme</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// Adds the list of known types to Scheme.</span><br><span class="line">func addKnownTypes(scheme *runtime.Scheme) error &#123;</span><br><span class="line">	scheme.AddKnownTypes(SchemeGroupVersion,</span><br><span class="line">		&amp;KubernetesCluster&#123;&#125;,</span><br><span class="line">		&amp;KubernetesClusterList&#123;&#125;,</span><br><span class="line">	)</span><br><span class="line">	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)</span><br><span class="line">	return nil</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+<p>创建 types.go，该文件中会定义多个 tag</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br></pre></td><td class="code"><pre><span class="line">$ cat &lt;&lt; EOF &gt; pkg/apis/ecs/v1/types.go</span><br><span class="line">package v1</span><br><span class="line"></span><br><span class="line">import (</span><br><span class="line">	metav1 &quot;k8s.io/apimachinery/pkg/apis/meta/v1&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// +genclient</span><br><span class="line">// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object</span><br><span class="line"></span><br><span class="line">// KubernetesCluster is the Schema for the kubernetesclusters API</span><br><span class="line">type KubernetesCluster struct &#123;</span><br><span class="line">	metav1.TypeMeta   `json:&quot;,inline&quot;`</span><br><span class="line">	metav1.ObjectMeta `json:&quot;metadata,omitempty&quot;`</span><br><span class="line"></span><br><span class="line">	Spec   KubernetesClusterSpec   `json:&quot;spec,omitempty&quot;`</span><br><span class="line">	Status KubernetesClusterStatus `json:&quot;status,omitempty&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// KubernetesClusterSpec defines the desired state of KubernetesCluster</span><br><span class="line">type KubernetesClusterSpec struct &#123;</span><br><span class="line">	// Add custom validation using kubebuilder tags:</span><br><span class="line">    // https://book.kubebuilder.io/beyond_basics/generating_crd.html</span><br><span class="line">	TimeoutMins   string     `json:&quot;timeout_mins,omitempty&quot;`</span><br><span class="line">	ClusterType   string     `json:&quot;clusterType,omitempty&quot;`</span><br><span class="line">	ContainerCIDR string     `json:&quot;containerCIDR,omitempty&quot;`</span><br><span class="line">	ServiceCIDR   string     `json:&quot;serviceCIDR,omitempty&quot;`</span><br><span class="line">	MasterList    []Node     `json:&quot;masterList&quot; tag:&quot;required&quot;`</span><br><span class="line">	MasterVIP     string     `json:&quot;masterVIP,omitempty&quot;`</span><br><span class="line">	NodeList      []Node     `json:&quot;nodeList&quot; tag:&quot;required&quot;`</span><br><span class="line">	EtcdList      []Node     `json:&quot;etcdList,omitempty&quot;`</span><br><span class="line">	Region        string     `json:&quot;region,omitempty&quot;`</span><br><span class="line">	AuthConfig    AuthConfig `json:&quot;authConfig,omitempty&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// AuthConfig defines the nodes peer authentication</span><br><span class="line">type AuthConfig struct &#123;</span><br><span class="line">	Username      string `json:&quot;username,omitempty&quot;`</span><br><span class="line">	Password      string `json:&quot;password,omitempty&quot;`</span><br><span class="line">	PrivateSSHKey string `json:&quot;privateSSHKey,omitempty&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// KubernetesClusterStatus defines the observed state of KubernetesCluster</span><br><span class="line">type KubernetesClusterStatus struct &#123;</span><br><span class="line">	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html</span><br><span class="line">	Phase KubernetesOperatorPhase `json:&quot;phase,omitempty&quot;`</span><br><span class="line"></span><br><span class="line">	// when job failed callback or job timeout used</span><br><span class="line">	Reason string `json:&quot;reason,omitempty&quot;`</span><br><span class="line"></span><br><span class="line">	// JobName is store each job name</span><br><span class="line">	JobName string `json:&quot;jobName,omitempty&quot;`</span><br><span class="line"></span><br><span class="line">	// Last time the condition transitioned from one status to another.</span><br><span class="line">	LastTransitionTime metav1.Time `json:&quot;lastTransitionTime,omitempty&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// +genclient:nonNamespaced</span><br><span class="line">// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object</span><br><span class="line"></span><br><span class="line">// KubernetesClusterList contains a list of KubernetesCluster</span><br><span class="line">type KubernetesClusterList struct &#123;</span><br><span class="line">	metav1.TypeMeta `json:&quot;,inline&quot;`</span><br><span class="line">	metav1.ListMeta `json:&quot;metadata,omitempty&quot;`</span><br><span class="line">	Items           []KubernetesCluster `json:&quot;items&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// users</span><br><span class="line">// &quot;None,Creating,Running,Failed,Scaling&quot;</span><br><span class="line">type KubernetesOperatorPhase string</span><br><span class="line"></span><br><span class="line">type Node struct &#123;</span><br><span class="line">	IP string `json:&quot;ip,omitempty&quot;`</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+<p>执行命令生成代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ $GOPATH/src/k8s.io/code-generator/generate-groups.sh all github.com/gosoon/test/pkg/client github.com/gosoon/test/pkg/apis ecs:v1</span><br></pre></td></tr></table></figure>
+<p>generate-groups.sh 需要四个参数：</p>
+<ul>
+<li>第一个 参数：all，也就是要生成所有的模块，clientset，informers，listers</li>
+<li>第二个参数：github.com/gosoon/test/pkg/client  这个是你要生成代码的目录，目录的名称一般定义为 client</li>
+<li>第三个参数：github.com/gosoon/test/pkg/apis  这个目录是已经创建好的源目录</li>
+<li>第四个参数：”ecs:v1” 是 group 和 version 信息，ecs 是 apis 下的目录，v1 是 ecs 下面的目录</li>
+</ul>
+<p>生成的代码如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">└── pkg</span><br><span class="line">    ├── apis</span><br><span class="line">    │   └── ecs</span><br><span class="line">    │       └── v1</span><br><span class="line">    │           ├── doc.go</span><br><span class="line">    │           ├── register.go</span><br><span class="line">    │           ├── types.go</span><br><span class="line">    │           └── zz_generated.deepcopy.go</span><br><span class="line">    └── client</span><br><span class="line">        ├── clientset</span><br><span class="line">        │   └── versioned</span><br><span class="line">        │       ├── clientset.go</span><br><span class="line">        │       ├── doc.go</span><br><span class="line">        │       ├── fake</span><br><span class="line">        │       │   ├── clientset_generated.go</span><br><span class="line">        │       │   ├── doc.go</span><br><span class="line">        │       │   └── register.go</span><br><span class="line">        │       ├── scheme</span><br><span class="line">        │       │   ├── doc.go</span><br><span class="line">        │       │   └── register.go</span><br><span class="line">        │       └── typed</span><br><span class="line">        │           └── ecs</span><br><span class="line">        │               └── v1</span><br><span class="line">        │                   ├── doc.go</span><br><span class="line">        │                   ├── ecs_client.go</span><br><span class="line">        │                   ├── fake</span><br><span class="line">        │                   │   ├── doc.go</span><br><span class="line">        │                   │   ├── fake_ecs_client.go</span><br><span class="line">        │                   │   └── fake_kubernetescluster.go</span><br><span class="line">        │                   ├── generated_expansion.go</span><br><span class="line">        │                   └── kubernetescluster.go</span><br><span class="line">        ├── informers</span><br><span class="line">        │   └── externalversions</span><br><span class="line">        │       ├── ecs</span><br><span class="line">        │       │   ├── interface.go</span><br><span class="line">        │       │   └── v1</span><br><span class="line">        │       │       ├── interface.go</span><br><span class="line">        │       │       └── kubernetescluster.go</span><br><span class="line">        │       ├── factory.go</span><br><span class="line">        │       ├── generic.go</span><br><span class="line">        │       └── internalinterfaces</span><br><span class="line">        │           └── factory_interfaces.go</span><br><span class="line">        └── listers</span><br><span class="line">            └── ecs</span><br><span class="line">                └── v1</span><br><span class="line">                    ├── expansion_generated.go</span><br><span class="line">                    └── kubernetescluster.go</span><br><span class="line"></span><br><span class="line">21 directories, 26 files</span><br></pre></td></tr></table></figure>
+<p>CRD 以及生成的代码见：<a href="https://github.com/gosoon/kubernetes-operator" target="_blank" rel="noopener">kubernetes-operator</a></p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本问讲述了如何使用 code-generator 生成代码，要使用自定义 controller 代码生成是最开始的一步，下文会继续讲述自定义 controller 的详细步骤，感兴趣的可以关注笔者 github 的项目 <a href="https://github.com/gosoon/kubernetes-operator" target="_blank" rel="noopener">kubernetes-operator</a>。</p>
+<p>参考：</p>
+<p><a href="https://github.com/kubernetes/sample-controller" target="_blank" rel="noopener">https://github.com/kubernetes/sample-controller</a></p>
+<p><a href="https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/" target="_blank" rel="noopener">https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/</a></p>
+<p><a href="https://hexo.do1618.com/2018/04/04/Kubernetes-Deep-Dive-Code-Generation-for-CustomResources/" target="_blank" rel="noopener">https://hexo.do1618.com/2018/04/04/Kubernetes-Deep-Dive-Code-Generation-for-CustomResources/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/code-generator/" rel="tag"># code-generator</a>
+          
+            <a href="/tags/crd/" rel="tag"># crd</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/08/05/kube_on_kube_operator_1/" rel="next" title="kube-on-kube-operator 开发(一)">
+                <i class="fa fa-chevron-left"></i> kube-on-kube-operator 开发(一)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">25</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">26</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#要生成哪些代码"><span class="nav-number">1.</span> <span class="nav-text">要生成哪些代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#代码生成步骤"><span class="nav-number">2.</span> <span class="nav-text">代码生成步骤</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#开始生成代码"><span class="nav-number">3.</span> <span class="nav-text">开始生成代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
