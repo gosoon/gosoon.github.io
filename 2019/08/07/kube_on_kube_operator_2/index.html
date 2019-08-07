@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="operator,kube-on-kube,">
 
 
 
@@ -79,17 +79,21 @@
 
 
 
-<meta name="description" content="kubernetes、docker">
-<meta name="keywords" content="kubernetes tianfeiyu">
-<meta property="og:type" content="website">
-<meta property="og:title" content="田飞雨">
-<meta property="og:url" content="http://yoursite.com/tags/kubeadm/index.html">
+<meta name="description" content="本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望及时指正。 kubernetes-operator 组件介绍kubernetes-operator 中主要包含一个自定义的 co">
+<meta name="keywords" content="operator,kube-on-kube">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-on-kube-operator 开发(二)">
+<meta property="og:url" content="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="kubernetes、docker">
+<meta property="og:description" content="本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望及时指正。 kubernetes-operator 组件介绍kubernetes-operator 中主要包含一个自定义的 co">
 <meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/operator-2.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/operator-3.png">
+<meta property="og:updated_time" content="2019-08-07T09:49:08.764Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="田飞雨">
-<meta name="twitter:description" content="kubernetes、docker">
+<meta name="twitter:title" content="kube-on-kube-operator 开发(二)">
+<meta name="twitter:description" content="本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望及时指正。 kubernetes-operator 组件介绍kubernetes-operator 中主要包含一个自定义的 co">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/operator-2.png">
 
 
 
@@ -119,13 +123,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/tags/kubeadm/">
+  <link rel="canonical" href="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/">
 
 
 
 
 
-  <title>标签: kubeadm | 田飞雨</title>
+  <title>kube-on-kube-operator 开发(二) | 田飞雨</title>
   
 
 
@@ -144,7 +148,7 @@
     
   
 
-  <div class="container sidebar-position-left ">
+  <div class="container sidebar-position-left page-post-detail">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
@@ -280,52 +284,188 @@
           <div id="content" class="content">
             
 
-  
-  
-  
-  <div class="post-block tag">
+  <div id="posts" class="posts-expand">
+    
 
-    <div id="posts" class="posts-collapse">
-      <div class="collection-title">
-        <h1>kubeadm<small>标签</small>
-        </h1>
-      </div>
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubernetes-operator" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-on-kube-operator 开发(二)</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-07T17:47:30+08:00">
+                2019-08-07
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/08/07/kube_on_kube_operator_2/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/07/kube_on_kube_operator_2/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
 
       
-        
+      
 
-  <article class="post post-type-kubeadm" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2019/01/17/kubeadm/" itemprop="url">
-              
-                <span itemprop="name">kubeadm 安装 kubernetes</span>
-              
-            </a>
-        
-      </h2>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2019-01-17T10:11:30+08:00" content="2019-01-17">
-          01-17
-        </time>
-      </div>
-
-    </header>
-  </article>
-
+      
+        <p>本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望及时指正。</p>
+<h3 id="kubernetes-operator-组件介绍"><a href="#kubernetes-operator-组件介绍" class="headerlink" title="kubernetes-operator 组件介绍"></a>kubernetes-operator 组件介绍</h3><p>kubernetes-operator 中主要包含一个自定义的 controller 和一个 HTTP Server，如下图所示，controller 主要是监听 CRD 的变化以及使其达到终态，HTTP Server 提供了多个 RESTful API，用于操作 CRD(创建、删除、扩缩容、接收回调等)。</p>
+<p><img src="http://cdn.tianfeiyu.com/operator-2.png" alt=""></p>
+<p>除此之外还有其他的组件，ansibleinit、precheck、admission-webhook，ansibleinit 是一个二进制文件用来作为容器内的 1 号进程，会调用 ansible 相关的命令以及处理信号、子进程收割等。precheck 主要用于在对集群操作前检查目标宿主机的环境，由于对集群的操作需要耗费数十秒，为了保证成功率需要在部署前检查宿主的环境。admission-webhook 暂时用于校验 CR 中字段，比如集群执行扩容操作时，master 等字段的值肯定是不能改变的。</p>
+<h3 id="kubernetes-operator-的开发"><a href="#kubernetes-operator-的开发" class="headerlink" title="kubernetes-operator 的开发"></a>kubernetes-operator 的开发</h3><p>下面主要讲 kubernetes-operator 中核心组件的开发，主要有以下几步：</p>
+<ul>
+<li>定义 CRD</li>
+<li>生成代码</li>
+<li>开发 controller</li>
+<li>开发 RESTful API</li>
+</ul>
+<h4 id="定义-CRD"><a href="#定义-CRD" class="headerlink" title="定义 CRD"></a>定义 CRD</h4><p>下面是 CRD 的定义，kubernetes-operator 中的自定义资源为 <code>KubernetesCluster</code>，项目中简称为 <code>ecs</code>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  names:</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  subresources:</span><br><span class="line">    status: &#123;&#125;</span><br><span class="line">  version: v1</span><br><span class="line">  versions:</span><br><span class="line">  - name: v1</span><br><span class="line">    served: true</span><br><span class="line">    storage: true</span><br></pre></td></tr></table></figure>
+<p>将 CRD 部署到 kubernetes 集群中，CRD 中的自定义资源<code>KubernetesCluster</code>(CR) 就成为了 kubernetes 中的一种资源，和 pod、deployment 等类似。</p>
+<h4 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h4><p>生成代码可以参考上一篇文章<a href="http://blog.tianfeiyu.com/2019/08/06/code_generator/" target="_blank" rel="noopener">使用 code-generator 为 CustomResources 生成代码</a>，此处不再详解。</p>
+<h4 id="开发-controller"><a href="#开发-controller" class="headerlink" title="开发 controller"></a>开发 controller</h4><p>如下所示是 controller 最简单的一个声明：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">for &#123;</span><br><span class="line">  desired := getDesiredState()</span><br><span class="line">  current := getCurrentState()</span><br><span class="line">  makeChanges(desired, current)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>所有 controller 也都是以此进行演变的，controller 的代码模式或者套路可以参考<a href="https://github.com/kubernetes/sample-controller" target="_blank" rel="noopener">sample-controller</a> 或者 kube-controller-manager 中所有 <a href="https://github.com/kubernetes/kubernetes/tree/master/pkg/controller" target="_blank" rel="noopener">controller</a> 的实现。</p>
+<p>下面是 kubernetes-operator 中 controller 实现的一个流程图：</p>
+<p><img src="http://cdn.tianfeiyu.com/operator-3.png" alt=""></p>
+<p>更新 CR 都是客户端的操作，所以在设计时客户端都是操作 annotation 中的字段，然后 operator 监听到相关的时间后会进行处理。例如，当用户要创建一个集群时，首先客户端将 <code>app.kubernetes.io/operation</code>设置为 <strong>creating</strong>，此时 operator watch 到 CR 变化后会处理新建集群的操作，operator 会创建一个用来部署集群的 job，以及创建 configmap 来保存本次的操作记录以及关联对应的 job，也能用来查询本次操作的日志，然后会更新 CR 中 status.phase 中的 <strong>Creating</strong> (新创建的 CR status.phase 为 “”)，接下来为 CR 设置 finalizers，最后会启动一个 goroutine 检测 job 的状态。此时需要等待 job 的完成以及回调，若 job 失败或者超时都会被最后启动的 goroutine 检测到，job 成功与否都会触发更新 CR status.phase 的操作。若 job 执行完成成功回调，客户端会更新  <code>app.kubernetes.io/operation</code>为 <strong>create-finished</strong>，客户端更新完成后会触发一次事件，然后 operator 会将 status.phase 更新为 <strong>Running</strong> 状态，否则 job 异常 operator 会直接更新 status.phase 为 <strong>Failed</strong>。</p>
+<p>关于 CR 中  <code>app.kubernetes.io/operation</code> 字段以及 status.phase 中所有的定义请参见 <a href="https://github.com/gosoon/kubernetes-operator/blob/master/pkg/enum/task.go" target="_blank" rel="noopener">kubernetes-operator/pkg/enum/task.go</a>。</p>
+<h4 id="开发-RESTful-API"><a href="#开发-RESTful-API" class="headerlink" title="开发 RESTful API"></a>开发 RESTful API</h4><p>在前后端分离的场景中，RESTful API 的开发仅需要一个 route 框架即可，kubernetes-operator 中用的是  mux，具体的代码在 <a href="https://github.com/gosoon/kubernetes-operator/tree/master/pkg/server" target="_blank" rel="noopener">kubernetes-operator/pkg/server</a> 下。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲述了 kubernetes-operator 中主要的模块以及 controller 的具体实现，其中许多细节暂未提及到，详细的实现请参考代码，目前项目只是笔者利用业余时间进行开发的，毕竟个人精力有限，在阅读文章或者代码的过程中如有问题可以随时留言，笔者会持续迭代版本。下一篇文章会讲述如何使用二进制文件部署 kubernetes 集群。</p>
+<p>参考：</p>
+<p><a href="https://github.com/kubernetes/community/blob/8decfe4/contributors/devel/controllers.md" target="_blank" rel="noopener">https://github.com/kubernetes/community/blob/8decfe4/contributors/devel/controllers.md</a>  </p>
+<p><a href="https://github.com/kubernetes/sample-controller" target="_blank" rel="noopener">https://github.com/kubernetes/sample-controller</a>  </p>
+<p><a href="https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html" target="_blank" rel="noopener">https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html</a>  </p>
+<p><a href="https://www.cnblogs.com/gaorong/p/8854934.html" target="_blank" rel="noopener">https://www.cnblogs.com/gaorong/p/8854934.html</a></p>
+<p><a href="https://yucs.github.io/2017/12/21/2017-12-21-operator/" target="_blank" rel="noopener">https://yucs.github.io/2017/12/21/2017-12-21-operator/</a></p>
 
       
     </div>
+    
+    
+    
 
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/operator/" rel="tag"># operator</a>
+          
+            <a href="/tags/kube-on-kube/" rel="tag"># kube-on-kube</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/08/06/code_generator/" rel="next" title="使用 code-generator 为 CustomResources 生成代码">
+                <i class="fa fa-chevron-left"></i> 使用 code-generator 为 CustomResources 生成代码
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
   </div>
   
   
   
+  </article>
 
-  
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
 
 
           </div>
@@ -333,6 +473,13 @@
 
 
           
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
 
         </div>
         
@@ -353,8 +500,17 @@
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
 
-      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+      <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
             
@@ -405,6 +561,22 @@
         </div>
       </section>
 
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-operator-组件介绍"><span class="nav-number">1.</span> <span class="nav-text">kubernetes-operator 组件介绍</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-operator-的开发"><span class="nav-number">2.</span> <span class="nav-text">kubernetes-operator 的开发</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#定义-CRD"><span class="nav-number">2.1.</span> <span class="nav-text">定义 CRD</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#生成代码"><span class="nav-number">2.2.</span> <span class="nav-text">生成代码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#开发-controller"><span class="nav-number">2.3.</span> <span class="nav-text">开发 controller</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#开发-RESTful-API"><span class="nav-number">2.4.</span> <span class="nav-text">开发 RESTful API</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
       
 
       
@@ -538,6 +710,10 @@
   
 
   
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
 
   
 
