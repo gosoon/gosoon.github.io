@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="operator,kube-on-kube,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="kube-on-kube-operator 开发(一)  kube-on-kube-operator 开发(二)   本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：  kube-on-kube kube-to-kube kube-to-cloud-kube  目前笔者主要在开发">
+<meta name="keywords" content="operator,kube-on-kube">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-on-kube-operator 开发(三)">
+<meta property="og:url" content="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kube-on-kube-operator 开发(一)  kube-on-kube-operator 开发(二)   本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：  kube-on-kube kube-to-kube kube-to-cloud-kube  目前笔者主要在开发">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-09-01T09:32:09.529Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-on-kube-operator 开发(三)">
+<meta name="twitter:description" content="kube-on-kube-operator 开发(一)  kube-on-kube-operator 开发(二)   本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：  kube-on-kube kube-to-kube kube-to-cloud-kube  目前笔者主要在开发">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">
+
+
+
+
+
+  <title>kube-on-kube-operator 开发(三) | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注容器生态圈</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubernetes-operator" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-on-kube-operator 开发(三)</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-09-01T17:05:30+08:00">
+                2019-09-01
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/09/01/kube_on_kube_operator_3/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/09/01/kube_on_kube_operator_3/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <ul>
+<li><p><a href="http://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/" target="_blank" rel="noopener">kube-on-kube-operator 开发(一)</a></p>
+</li>
+<li><p><a href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/" target="_blank" rel="noopener">kube-on-kube-operator 开发(二)</a></p>
+</li>
+</ul>
+<p>本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：</p>
+<ul>
+<li>kube-on-kube</li>
+<li>kube-to-kube</li>
+<li>kube-to-cloud-kube</li>
+</ul>
+<p>目前笔者主要在开发 kube-to-kube，这一节会介绍 kube-to-kube 中如何使用二进制方式部署一个集群，问什么要先支持部署二进制集群呢，可以参考之前的文章。目前 kubernetes-operator 中部署集群是通过 ansible 调用笔者写的一些脚本部署的，由于 kubernetes 二进制文件比较大，暂时仅支持离线部署，部署前请下载好所需的二进制文件，笔者也提供了部署 v1.14 需要的所有二进制文件、镜像、yaml 等。</p>
+<p>二进制安装 kubernetes 最困难的地方就在于其复杂的认证(Authentication)及鉴权(Authorization)机制，上篇文章已经介绍了 kubernetes 中的认证与鉴权机制以及其中的证书链，若安装过程中有疑问请参考  <a href="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/" target="_blank" rel="noopener">浅析 kubernetes 的认证与鉴权机制</a>。</p>
+<p>使用 kubernetes-operator 管理集群时首选需要有一个元集群，元集群可以使用 minkube 或者 kind 部署一个单机版集群，然后将 kubernetes-operator 部署到该集群中再通过创建 CR 来部署一个业务集群，最后使用该业务集群作为元集群即可，或者也可以使用 kubernetes-operator 中部署业务集群的方式来部署元集群。</p>
+<blockquote>
+<p>部署集群前请先克隆 <a href="https://github.com/gosoon/kubernetes-operator" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-operator</a> 和 <a href="https://github.com/gosoon/kubernetes-utils" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-utils</a> 项目，部署集群所需要的一些工具、配置以及 bin 文件都存放在这两个项目中，你也可以使用自己的配置。</p>
+</blockquote>
+<h3 id="准备环境"><a href="#准备环境" class="headerlink" title="准备环境"></a>准备环境</h3><p>禁用防火墙：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ systemctl stop firewalld</span><br><span class="line">$ systemctl disable firewalld</span><br></pre></td></tr></table></figure>
+<p>禁用 SELinux：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ setenforce 0</span><br><span class="line">$ sed -i &apos;s/^SELINUX=enforcing$/SELINUX=permissive/&apos; /etc/selinux/config</span><br></pre></td></tr></table></figure>
+<p>关闭 swap：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">swapoff -a</span><br></pre></td></tr></table></figure>
+<p>修改内核参数：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">cat &lt;&lt;EOF &gt; /etc/sysctl.d/k8s.conf</span><br><span class="line">net.bridge.bridge-nf-call-ip6tables = 1</span><br><span class="line">net.bridge.bridge-nf-call-iptables = 1</span><br><span class="line">EOF</span><br><span class="line">sysctl --system</span><br></pre></td></tr></table></figure>
+<h3 id="配置-CA-及创建-TLS-证书"><a href="#配置-CA-及创建-TLS-证书" class="headerlink" title="配置 CA 及创建 TLS 证书"></a>配置 CA 及创建 TLS 证书</h3><p>安装证书生成工具，本文使用 cfssl</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-utils/scripts/bin/certs/* /usr/bin/</span><br></pre></td></tr></table></figure>
+<h4 id="etcd"><a href="#etcd" class="headerlink" title="etcd"></a>etcd</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br></pre></td><td class="code"><pre><span class="line">$ cat &lt;&lt; EOF &gt; etcd-root-ca-csr.json</span><br><span class="line">&#123;</span><br><span class="line">    &quot;CN&quot;: &quot;etcd-root-ca&quot;,</span><br><span class="line">    &quot;key&quot;: &#123;</span><br><span class="line">        &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">        &quot;size&quot;: 4096</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;names&quot;: [</span><br><span class="line">        &#123;</span><br><span class="line">            &quot;O&quot;: &quot;etcd&quot;,</span><br><span class="line">            &quot;OU&quot;: &quot;etcd Security&quot;,</span><br><span class="line">            &quot;L&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;ST&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;C&quot;: &quot;CN&quot;</span><br><span class="line">        &#125;</span><br><span class="line">    ],</span><br><span class="line">    &quot;ca&quot;: &#123;</span><br><span class="line">        &quot;expiry&quot;: &quot;87600h&quot;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">$ cat &lt;&lt; EOF &gt; etcd-gencert.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;signing&quot;: &#123;</span><br><span class="line">    &quot;default&quot;: &#123;</span><br><span class="line">        &quot;usages&quot;: [</span><br><span class="line">          &quot;signing&quot;,</span><br><span class="line">          &quot;key encipherment&quot;,</span><br><span class="line">          &quot;server auth&quot;,</span><br><span class="line">          &quot;client auth&quot;</span><br><span class="line">        ],</span><br><span class="line">        &quot;expiry&quot;: &quot;87600h&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">$ cat &lt;&lt; EOF &gt; etcd-csr.json</span><br><span class="line">&#123;</span><br><span class="line">    &quot;key&quot;: &#123;</span><br><span class="line">        &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">        &quot;size&quot;: 2048</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;names&quot;: [</span><br><span class="line">        &#123;</span><br><span class="line">            &quot;O&quot;: &quot;etcd&quot;,</span><br><span class="line">            &quot;OU&quot;: &quot;etcd Security&quot;,</span><br><span class="line">            &quot;L&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;ST&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;C&quot;: &quot;CN&quot;</span><br><span class="line">        &#125;</span><br><span class="line">    ],</span><br><span class="line">    &quot;CN&quot;: &quot;etcd&quot;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">$ cat &lt;&lt; EOF &gt; config-etcd-peer.json</span><br><span class="line">&#123;</span><br><span class="line">    &quot;key&quot;: &#123;</span><br><span class="line">        &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">        &quot;size&quot;: 2048</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;names&quot;: [</span><br><span class="line">        &#123;</span><br><span class="line">            &quot;O&quot;: &quot;etcd&quot;,</span><br><span class="line">            &quot;OU&quot;: &quot;etcd Security&quot;,</span><br><span class="line">            &quot;L&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;ST&quot;: &quot;Beijing&quot;,</span><br><span class="line">            &quot;C&quot;: &quot;CN&quot;</span><br><span class="line">        &#125;</span><br><span class="line">    ],</span><br><span class="line">    &quot;CN&quot;: &quot;etcd&quot;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">$ cfssl gencert --initca=true etcd-root-ca-csr.json | cfssljson -bare output/ca</span><br><span class="line"></span><br><span class="line">// 指定 etcd hosts，etcd server 和 etcd peer 中必须包含所有 etcd 的 hosts，eg：ETCD_HOSTS=&quot;10.0.4.15，10.0.2.15&quot;</span><br><span class="line"># etcd server</span><br><span class="line">$ cfssl gencert \</span><br><span class="line">  -ca=output/ca.pem \</span><br><span class="line">  -ca-key=output/ca-key.pem \</span><br><span class="line">  -config=ca-config.json \</span><br><span class="line">  -hostname=127.0.0.1,$&#123;ETCD_HOSTS&#125; \</span><br><span class="line">  -profile=server \</span><br><span class="line">  server.json | cfssljson -bare output/etcd-server</span><br><span class="line">  </span><br><span class="line"># etcd peer</span><br><span class="line">$ cfssl gencert \</span><br><span class="line">  -ca=output/ca.pem \</span><br><span class="line">  -ca-key=output/ca-key.pem \</span><br><span class="line">  -config=ca-config.json \</span><br><span class="line">  -hostname=127.0.0.1,$&#123;ETCD_HOSTS&#125; \</span><br><span class="line">  -profile=peer \</span><br><span class="line">  server.json | cfssljson -bare output/etcd-peer</span><br></pre></td></tr></table></figure>
+<p>生成证书后反解 etcd server 和 peer 证书校验 ip 是否正确：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cfssl certinfo -cert etcd-peer.pem</span><br></pre></td></tr></table></figure>
+<h4 id="master"><a href="#master" class="headerlink" title="master"></a>master</h4><p>由于 master 组件的 CSR 配置与 kubernetes 中的认证与鉴权相关联，需要严格按照 kubernetes 中默认的 RBAC 进行配置，每个组件都有默认的 user 或者 group。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br></pre></td><td class="code"><pre><span class="line">$ cat &lt;&lt; EOF &gt; ca-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">$ cat &lt;&lt; EOF &gt; ca-config.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;signing&quot;: &#123;</span><br><span class="line">    &quot;default&quot;: &#123;</span><br><span class="line">      &quot;expiry&quot;: &quot;87600h&quot;</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;profiles&quot;: &#123;</span><br><span class="line">      &quot;kubernetes&quot;: &#123;</span><br><span class="line">        &quot;usages&quot;: [&quot;signing&quot;, &quot;key encipherment&quot;, &quot;server auth&quot;, &quot;client auth&quot;],</span><br><span class="line">        &quot;expiry&quot;: &quot;87600h&quot;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">// kube-apiserver csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt; kube-apiserver-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;kubernetes&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// kube-controller-manager csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt; kube-controller-manager-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;system:kube-controller-manager&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:kube-controller-manager&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// kube-scheduler csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt; kube-scheduler-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;system:kube-scheduler&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:kube-scheduler&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// kubelet csr，请替换 nodeName</span><br><span class="line">$ cat &lt;&lt; EOF &gt; kubelet-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;system:node:&lt;nodeName&gt;&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:nodes&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// apiserver client csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt; apiserver-kubelet-client-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;system:kubelet-api-admin&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">      &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">      &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:masters&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// kube-proxy csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt;  kube-proxy-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;system:kube-proxy&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:node-proxier&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">// kubectl csr</span><br><span class="line">$ cat &lt;&lt; EOF &gt;  admin-csr.json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;CN&quot;: &quot;admin&quot;,</span><br><span class="line">  &quot;key&quot;: &#123;</span><br><span class="line">    &quot;algo&quot;: &quot;rsa&quot;,</span><br><span class="line">    &quot;size&quot;: 2048</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;names&quot;: [</span><br><span class="line">    &#123;</span><br><span class="line">      &quot;C&quot;: &quot;China&quot;,</span><br><span class="line">      &quot;L&quot;: &quot;Shanghai&quot;,</span><br><span class="line">      &quot;O&quot;: &quot;system:masters&quot;,</span><br><span class="line">      &quot;OU&quot;: &quot;Kubernetes&quot;,</span><br><span class="line">      &quot;ST&quot;: &quot;Shanghai&quot;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">$ cfssl gencert -initca ca-csr.json | cfssljson -bare output/ca</span><br><span class="line"></span><br><span class="line">为了保证客户端与 Kubernetes API 的认证，Kubernetes API Server 凭证中必需包含 master 的静态 IP 地址,在 hostname 中指定</span><br><span class="line"># apiserver</span><br><span class="line">$ cfssl gencert \</span><br><span class="line">  -ca=output/ca.pem \</span><br><span class="line">  -ca-key=output/ca-key.pem \</span><br><span class="line">  -config=ca-config.json \</span><br><span class="line">  -hostname=10.250.0.1,$&#123;MASTER_HOSTS&#125;,$&#123;MASTER_VIP&#125;,127.0.0.1,kubernetes,kubernetes.default,kubernetes.default.svc \</span><br><span class="line">  -profile=kubernetes \</span><br><span class="line">  kube-apiserver-csr.json | cfssljson -bare output/kube-apiserver</span><br><span class="line"></span><br><span class="line"># kubelet</span><br><span class="line">for node in `echo $&#123;NODE_HOSTS&#125; | tr &apos;,&apos; &apos; &apos;`;do</span><br><span class="line">    cfssl gencert \</span><br><span class="line">      -ca=output/ca.pem \</span><br><span class="line">      -ca-key=output/ca-key.pem \</span><br><span class="line">      -config=ca-config.json \</span><br><span class="line">      -hostname=$&#123;NODE_HOSTS&#125; \</span><br><span class="line">      -profile=kubernetes \</span><br><span class="line">      kubelet-csr.json | cfssljson -bare output/kubelet</span><br><span class="line">done</span><br><span class="line"></span><br><span class="line"># other component</span><br><span class="line">for component in kube-controller-manager kube-scheduler kube-proxy apiserver-kubelet-client admin service-account;do</span><br><span class="line">    cfssl gencert \</span><br><span class="line">      -ca=output/ca.pem \</span><br><span class="line">      -ca-key=output/ca-key.pem \</span><br><span class="line">      -config=ca-config.json \</span><br><span class="line">      -profile=kubernetes \</span><br><span class="line">      $&#123;component&#125;-csr.json | cfssljson -bare output/$&#123;component&#125;</span><br><span class="line">done</span><br></pre></td></tr></table></figure>
+<h3 id="生成-kubeconfig"><a href="#生成-kubeconfig" class="headerlink" title="生成 kubeconfig"></a>生成 kubeconfig</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br></pre></td><td class="code"><pre><span class="line">// 替换 apiserver </span><br><span class="line">KUBE_APISERVER=&quot;https://10.0.4.15:6443&quot;</span><br><span class="line">CERTS_DIR=&quot;/etc/kubernetes/ssl&quot;</span><br><span class="line"></span><br><span class="line"># 生成 kubectl 配置文件</span><br><span class="line">echo &quot;Create kubectl kubeconfig...&quot;</span><br><span class="line">kubectl config set-cluster kubernetes \</span><br><span class="line">  --certificate-authority=$&#123;CERTS_DIR&#125;/ca.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --server=$&#123;KUBE_APISERVER&#125; \</span><br><span class="line">  --kubeconfig=output/kubectl.kubeconfig</span><br><span class="line">kubectl config set-credentials &quot;system:masters&quot; \</span><br><span class="line">  --client-certificate=$&#123;CERTS_DIR&#125;/admin.pem \</span><br><span class="line">  --client-key=$&#123;CERTS_DIR&#125;/admin-key.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --kubeconfig=output/kubectl.kubeconfig</span><br><span class="line">kubectl config set-context default \</span><br><span class="line">  --cluster=kubernetes \</span><br><span class="line">  --user=system:masters \</span><br><span class="line">  --kubeconfig=output/kubectl.kubeconfig</span><br><span class="line">kubectl config use-context default --kubeconfig=output/kubectl.kubeconfig</span><br><span class="line"></span><br><span class="line"># 生成 kube-controller-manager 配置文件</span><br><span class="line">echo &quot;Create kube-controller-manager kubeconfig...&quot;</span><br><span class="line">kubectl config set-cluster kubernetes \</span><br><span class="line">  --certificate-authority=$&#123;CERTS_DIR&#125;/ca.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --server=$&#123;KUBE_APISERVER&#125; \</span><br><span class="line">  --kubeconfig=output/kube-controller-manager.kubeconfig</span><br><span class="line">kubectl config set-credentials &quot;system:kube-controller-manager&quot; \</span><br><span class="line">  --client-certificate=$&#123;CERTS_DIR&#125;/kube-controller-manager.pem \</span><br><span class="line">  --client-key=$&#123;CERTS_DIR&#125;/kube-controller-manager-key.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --kubeconfig=output/kube-controller-manager.kubeconfig</span><br><span class="line">kubectl config set-context default \</span><br><span class="line">  --cluster=kubernetes \</span><br><span class="line">  --user=system:kube-controller-manager \</span><br><span class="line">  --kubeconfig=output/kube-controller-manager.kubeconfig</span><br><span class="line">kubectl config use-context default --kubeconfig=output/kube-controller-manager.kubeconfig</span><br><span class="line"></span><br><span class="line"># 生成 kube-scheduler 配置文件</span><br><span class="line">echo &quot;Create kube-scheduler kubeconfig...&quot;</span><br><span class="line">kubectl config set-cluster kubernetes \</span><br><span class="line">  --certificate-authority=$&#123;CERTS_DIR&#125;/ca.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --server=$&#123;KUBE_APISERVER&#125; \</span><br><span class="line">  --kubeconfig=output/kube-scheduler.kubeconfig</span><br><span class="line">kubectl config set-credentials &quot;system:kube-scheduler&quot; \</span><br><span class="line">  --client-certificate=$&#123;CERTS_DIR&#125;/kube-scheduler.pem \</span><br><span class="line">  --client-key=$&#123;CERTS_DIR&#125;/kube-scheduler-key.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --kubeconfig=output/kube-scheduler.kubeconfig</span><br><span class="line">kubectl config set-context default \</span><br><span class="line">  --cluster=kubernetes \</span><br><span class="line">  --user=system:kube-scheduler \</span><br><span class="line">  --kubeconfig=output/kube-scheduler.kubeconfig</span><br><span class="line">kubectl config use-context default --kubeconfig=output/kube-scheduler.kubeconfig</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 生成 kubelet 配置文件,需要添加对应的 nodeName</span><br><span class="line">echo &quot;Create kubelet kubeconfig...&quot;</span><br><span class="line">kubectl config set-cluster kubernetes \</span><br><span class="line">  --certificate-authority=$&#123;CERTS_DIR&#125;/ca.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --server=$&#123;KUBE_APISERVER&#125; \</span><br><span class="line">  --kubeconfig=output/kubelet-$&#123;node&#125;.kubeconfig</span><br><span class="line"></span><br><span class="line">kubectl config set-credentials system:node:$&#123;node&#125; \</span><br><span class="line">  --client-certificate=$&#123;CERTS_DIR&#125;/kubelet.pem \</span><br><span class="line">  --client-key=$&#123;CERTS_DIR&#125;/kubelet-key.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --kubeconfig=output/kubelet-$&#123;node&#125;.kubeconfig</span><br><span class="line"></span><br><span class="line">kubectl config set-context default \</span><br><span class="line">  --cluster=kubernetes \</span><br><span class="line">  --user=system:node:$&#123;node&#125; \</span><br><span class="line">  --kubeconfig=$&#123;CERTS_DIR&#125;/kubelet-$&#123;node&#125;.kubeconfig</span><br><span class="line">kubectl config use-context default --kubeconfig=output/kubelet-$&#123;node&#125;.kubeconfig</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 生成 kube-proxy 配置文件</span><br><span class="line">echo &quot;Create kube-proxy kubeconfig...&quot;</span><br><span class="line">kubectl config set-cluster kubernetes \</span><br><span class="line">  --certificate-authority=$&#123;CERTS_DIR&#125;/ca.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --server=$&#123;KUBE_APISERVER&#125; \</span><br><span class="line">  --kubeconfig=output/kube-proxy.kubeconfig</span><br><span class="line">kubectl config set-credentials &quot;system:kube-proxy&quot; \</span><br><span class="line">  --client-certificate=$&#123;CERTS_DIR&#125;/kube-proxy.pem \</span><br><span class="line">  --client-key=$&#123;CERTS_DIR&#125;/kube-proxy-key.pem \</span><br><span class="line">  --embed-certs=true \</span><br><span class="line">  --kubeconfig=output/kube-proxy.kubeconfig</span><br><span class="line">kubectl config set-context default \</span><br><span class="line">  --cluster=kubernetes \</span><br><span class="line">  --user=system:kube-proxy \</span><br><span class="line">  --kubeconfig=output/kube-proxy.kubeconfig</span><br><span class="line">kubectl config use-context default --kubeconfig=output/kube-proxy.kubeconfig</span><br></pre></td></tr></table></figure>
+<h3 id="部署"><a href="#部署" class="headerlink" title="部署"></a>部署</h3><h4 id="部署-etcd"><a href="#部署-etcd" class="headerlink" title="部署 etcd"></a>部署 etcd</h4><p>拷贝证书文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp output/* /etc/etcd/ssl/</span><br></pre></td></tr></table></figure>
+<p>拷贝 bin 文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-utils/scripts/bin/etcd_v3.3.13/* /usr/bin/</span><br></pre></td></tr></table></figure>
+<p>拷贝配置文件，配置文件中的 ip 需要手动替换掉：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-operator/scripts/config/etcd/etcd.conf /etc/etcd/</span><br></pre></td></tr></table></figure>
+<h4 id="部署-k8s-master-组件"><a href="#部署-k8s-master-组件" class="headerlink" title="部署 k8s master 组件"></a>部署 k8s master 组件</h4><p>拷贝证书文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp output/* /etc/kubernetes/ssl/</span><br></pre></td></tr></table></figure>
+<p>拷贝 bin 文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-utils/scripts/bin/kubernetes_v1.14.0/* /usr/bin/</span><br></pre></td></tr></table></figure>
+<p>拷贝配置文件，配置文件中的 ip 需要手动替换掉：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-operator/scripts/config/master/* /etc/kubernetes/</span><br></pre></td></tr></table></figure>
+<h4 id="部署-k8s-node-组件"><a href="#部署-k8s-node-组件" class="headerlink" title="部署 k8s node 组件"></a>部署 k8s node 组件</h4><p>部署 docker，拷贝 bin 文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-utils/scripts/bin/docker-ce-18.06.1.ce/*  /usr/bin/</span><br></pre></td></tr></table></figure>
+<p>拷贝证书文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp output/* /etc/kubernetes/ssl/</span><br></pre></td></tr></table></figure>
+<p>拷贝配置文件，配置文件中的 ip 需要手动替换掉：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-operator/scripts/config/node/* /etc/kubernetes/</span><br></pre></td></tr></table></figure>
+<h4 id="创建-systemd-文件"><a href="#创建-systemd-文件" class="headerlink" title="创建 systemd 文件"></a>创建 systemd 文件</h4><p>拷贝所有服务的 systemd 文件：</p>
+<p>拷贝配置文件，配置文件中的 ip 需要手动替换掉：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ cp kubernetes-operator/scripts/systemd/* /usr/lib/systemd/system/</span><br></pre></td></tr></table></figure>
+<h3 id="启动服务"><a href="#启动服务" class="headerlink" title="启动服务"></a>启动服务</h3><p>首先启动 etcd 服务，etcd 所部署的几个节点需要同时启动，否则服务会启动失败。</p>
+<p>然后依次启动 master 上的组件和 node 上的组件。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲述了 kubernetes-operator 中 kube-to-kube 部署集群的方式，介绍了主要的部署步骤，文中部署集群所有的操作都提供了脚本的方式：<a href="https://github.com/gosoon/kubernetes-operator/tree/master/scripts。" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-operator/tree/master/scripts。</a> kube-to-kube 的部署方式暂时是以 ansible + 自定义脚本的方式部署，部署方式也在持续更新与完善中。接下来会继续开发 kube-on-kube 的部署方式，kube-on-kube 会将业务集群的 master 组件部署在元集群中，kube-on-kube 方式暂时会采用对 kubeadm 封装的形式进行部署。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/operator/" rel="tag"># operator</a>
+          
+            <a href="/tags/kube-on-kube/" rel="tag"># kube-on-kube</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/08/18/k8s_auth_rbac/" rel="next" title="浅析 kubernetes 的认证与鉴权机制">
+                <i class="fa fa-chevron-left"></i> 浅析 kubernetes 的认证与鉴权机制
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">kubernetes、docker</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">28</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">30</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#准备环境"><span class="nav-number">1.</span> <span class="nav-text">准备环境</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#配置-CA-及创建-TLS-证书"><span class="nav-number">2.</span> <span class="nav-text">配置 CA 及创建 TLS 证书</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#etcd"><span class="nav-number">2.1.</span> <span class="nav-text">etcd</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#master"><span class="nav-number">2.2.</span> <span class="nav-text">master</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#生成-kubeconfig"><span class="nav-number">3.</span> <span class="nav-text">生成 kubeconfig</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#部署"><span class="nav-number">4.</span> <span class="nav-text">部署</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#部署-etcd"><span class="nav-number">4.1.</span> <span class="nav-text">部署 etcd</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#部署-k8s-master-组件"><span class="nav-number">4.2.</span> <span class="nav-text">部署 k8s master 组件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#部署-k8s-node-组件"><span class="nav-number">4.3.</span> <span class="nav-text">部署 k8s node 组件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#创建-systemd-文件"><span class="nav-number">4.4.</span> <span class="nav-text">创建 systemd 文件</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#启动服务"><span class="nav-number">5.</span> <span class="nav-text">启动服务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">6.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
