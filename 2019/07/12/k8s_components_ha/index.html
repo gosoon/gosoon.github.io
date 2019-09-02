@@ -390,7 +390,7 @@
 <h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><p>本文主要介绍如何配置一个高可用 kubernetes 集群，kubernetes 新版本已经越来越趋近全面 TLS + RBAC 配置，若 kubernetes 集群还在使用 8080 端口，此时每个 master 节点上的 kube-controller-manager 和 kube-scheduler 都是通过 8080 端口连接 apiserver，若节点上的 apiserver 挂掉，则 kube-controller-manager 和 kube-scheduler 也会随之挂掉。apiserver 作为集群的核心组件，其必须高可用部署，其他组件实现高可用相对容易。</p>
 <p>参考：</p>
 <p><a href="https://k8smeetup.github.io/docs/admin/high-availability/" target="_blank" rel="noopener">https://k8smeetup.github.io/docs/admin/high-availability/</a></p>
-<div><h1>推荐文章<span style="font-size:0.45em; color:gray">（由<a href="https://github.com/huiwang/hexo-recommended-posts">hexo文章推荐插件</a>驱动）</span></h1><ul><li><a href="https://hanyajun.com/kubernetes/kubenetes_concept/">kubernetes从入门到放弃--k8s基本概念</a></li></ul></div>
+<div><h1>相关推荐<span style="font-size:0.45em; color:gray">（由<a href="https://github.com/huiwang/hexo-recommended-posts">hexo文章推荐插件</a>驱动）</span></h1><ul><li><a href="https://hanyajun.com/kubernetes/kubenetes_concept/">kubernetes从入门到放弃--k8s基本概念</a></li></ul></div>
       
     </div>
     
@@ -561,7 +561,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-apiserver-的高可用配置"><span class="nav-number">1.</span> <span class="nav-text">kube-apiserver 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-controller-manager-和-kube-scheduler-的高可用配置"><span class="nav-number">2.</span> <span class="nav-text">kube-controller-manager 和 kube-scheduler 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#etcd-的高可用配置"><span class="nav-number">3.</span> <span class="nav-text">etcd 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">推荐文章（由hexo文章推荐插件驱动）</span></a></li></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-apiserver-的高可用配置"><span class="nav-number">1.</span> <span class="nav-text">kube-apiserver 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#kube-controller-manager-和-kube-scheduler-的高可用配置"><span class="nav-number">2.</span> <span class="nav-text">kube-controller-manager 和 kube-scheduler 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#etcd-的高可用配置"><span class="nav-number">3.</span> <span class="nav-text">etcd 的高可用配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐（由hexo文章推荐插件驱动）</span></a></li></div>
             
 
           </div>
