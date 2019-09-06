@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="kind,deploy,">
 
 
 
@@ -79,17 +79,18 @@
 
 
 
-<meta name="description" content="kubernetes、docker">
-<meta name="keywords" content="kubernetes tianfeiyu">
-<meta property="og:type" content="website">
-<meta property="og:title" content="田飞雨">
-<meta property="og:url" content="http://yoursite.com/tags/audit/index.html">
+<meta name="description" content="kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：  https://github.com/bsycorp/kind https://github.com/ub">
+<meta name="keywords" content="kind,deploy">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 kind 部署单机版 kubernetes 集群">
+<meta property="og:url" content="http://yoursite.com/2019/09/06/kind_deploy/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="kubernetes、docker">
+<meta property="og:description" content="kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：  https://github.com/bsycorp/kind https://github.com/ub">
 <meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-09-06T02:36:38.481Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="田飞雨">
-<meta name="twitter:description" content="kubernetes、docker">
+<meta name="twitter:title" content="使用 kind 部署单机版 kubernetes 集群">
+<meta name="twitter:description" content="kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：  https://github.com/bsycorp/kind https://github.com/ub">
 
 
 
@@ -119,13 +120,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/tags/audit/">
+  <link rel="canonical" href="http://yoursite.com/2019/09/06/kind_deploy/">
 
 
 
 
 
-  <title>标签: audit | 田飞雨</title>
+  <title>使用 kind 部署单机版 kubernetes 集群 | 田飞雨</title>
   
 
 
@@ -144,7 +145,7 @@
     
   
 
-  <div class="container sidebar-position-left ">
+  <div class="container sidebar-position-left page-post-detail">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
@@ -280,52 +281,197 @@
           <div id="content" class="content">
             
 
-  
-  
-  
-  <div class="post-block tag">
+  <div id="posts" class="posts-expand">
+    
 
-    <div id="posts" class="posts-collapse">
-      <div class="collection-title">
-        <h1>audit<small>标签</small>
-        </h1>
-      </div>
+  
+
+  
+  
+  
+
+  <article class="post post-type-kind" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/09/06/kind_deploy/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">使用 kind 部署单机版 kubernetes 集群</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-09-06T10:30:30+08:00">
+                2019-09-06
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/09/06/kind_deploy/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/09/06/kind_deploy/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
 
       
-        
+      
 
-  <article class="post post-type-audit" itemscope="" itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h2 class="post-title">
-        
-            <a class="post-title-link" href="/2019/01/30/k8s-audit-webhook/" itemprop="url">
-              
-                <span itemprop="name">kubernetes 审计日志功能</span>
-              
-            </a>
-        
-      </h2>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated" datetime="2019-01-30T16:26:30+08:00" content="2019-01-30">
-          01-30
-        </time>
-      </div>
-
-    </header>
-  </article>
-
+      
+        <p>kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：</p>
+<ul>
+<li><a href="https://github.com/bsycorp/kind" target="_blank" rel="noopener">https://github.com/bsycorp/kind</a></li>
+<li><a href="https://github.com/ubuntu/microk8s" target="_blank" rel="noopener">https://github.com/ubuntu/microk8s</a></li>
+<li><a href="https://github.com/kinvolk/kube-spawn" target="_blank" rel="noopener">https://github.com/kinvolk/kube-spawn</a></li>
+<li><a href="https://github.com/kubernetes/minikube" target="_blank" rel="noopener">https://github.com/kubernetes/minikube</a></li>
+<li><a href="https://github.com/danderson/virtuakube" target="_blank" rel="noopener">https://github.com/danderson/virtuakube</a></li>
+<li><a href="https://github.com/kubernetes-sigs/kubeadm-dind-cluster" target="_blank" rel="noopener">https://github.com/kubernetes-sigs/kubeadm-dind-cluster</a></li>
+</ul>
+<p>而本文主要讲述使用 <a href="https://github.com/kubernetes-sigs/kind" target="_blank" rel="noopener">kind</a>（Kubernetes In Docker）部署 k8s 集群，因为 kind 使用起来实在太简单了，特别适用于在本机部署测试环境。</p>
+<p>kind 的原理就是将 k8s 所需要的所有组件，全部部署在一个 docker 容器中，只需要一个镜像即可部署一套 k8s 环境，其底层是使用 kubeadm 进行部署，CRI 使用 Containerd，CNI 使用 weave。下面就来看看如何使用 kind 部署一套 kubernetes 环境，在使用 kind 前你需要确保目标机器已经安装了 docker 服务。</p>
+<h3 id="一、使用-kind-部署-k8s-集群"><a href="#一、使用-kind-部署-k8s-集群" class="headerlink" title="一、使用 kind 部署 k8s 集群"></a>一、使用 kind 部署 k8s 集群</h3><blockquote>
+<p>以下安装环境为 mac os。</p>
+</blockquote>
+<p>安装 kind ：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ wget https://github.com/kubernetes-sigs/kind/releases/download/v0.5.1/kind-darwin-amd64</span><br><span class="line">$ chmod +x kind-darwin-amd64</span><br><span class="line">$ mv kind-darwin-amd64 /usr/local/bin/kind</span><br></pre></td></tr></table></figure>
+<p>使用 kind 部署 kubernetes 集群：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">// 默认的 cluster name 为 kind，可以使用 --name 指定</span><br><span class="line">$ kind create cluster</span><br><span class="line">Creating cluster &quot;kind&quot; ...</span><br><span class="line"> ✓ Ensuring node image (kindest/node:v1.15.3) 🖼</span><br><span class="line"> ✓ Preparing nodes 📦</span><br><span class="line"> ✓ Creating kubeadm config 📜</span><br><span class="line"> ✓ Starting control-plane 🕹️</span><br><span class="line"> ✓ Installing CNI 🔌</span><br><span class="line"> ✓ Installing StorageClass 💾</span><br><span class="line">Cluster creation complete. You can now use the cluster with:</span><br></pre></td></tr></table></figure>
+<p>使用 <strong>kind create cluster</strong> 安装，是没有指定任何配置文件的安装方式。从安装打印出的输出来看，分为 6 步：</p>
+<ol>
+<li>安装基础镜像 kindest/node:v1.15.4，这个镜像里面包含了所需要的二进制文件、配置文件以及 k8s 左右组件镜像的 tar 包</li>
+<li>准备 node，检查环境、启动镜像等工作</li>
+<li>生成 kubeadm 的配置，然后使用 kubeadm 安装，和直接使用 kubeadm 的步骤类似</li>
+<li>启动服务</li>
+<li>部署 CNI 插件，kind 默认使用 weave。</li>
+<li>创建 StorageClass。</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 查看 kubeconfig path</span><br><span class="line">$ kind get kubeconfig-path</span><br><span class="line">/Users/feiyu/.kube/kind-config-kind</span><br><span class="line"></span><br><span class="line">$ export KUBECONFIG=&quot;$(kind get kubeconfig-path --name=&quot;kind&quot;)&quot;</span><br></pre></td></tr></table></figure>
+<p>kind 还有多个子命令，此处不再一一详解。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">// 查看集群信息，</span><br><span class="line">$ kubectl cluster-info</span><br><span class="line">Kubernetes master is running at https://127.0.0.1:55387</span><br><span class="line">KubeDNS is running at https://127.0.0.1:55387/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy</span><br><span class="line"></span><br><span class="line">To further debug and diagnose cluster problems, use &apos;kubectl cluster-info dump&apos;.</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">// 查看本地的 kind 容器</span><br><span class="line">$ docker ps</span><br><span class="line">CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                                  NAMES</span><br><span class="line">e26545538cc7        kindest/node:v1.15.3   &quot;/usr/local/bin/entr…&quot;   15 minutes ago      Up 15 minutes       55387/tcp, 127.0.0.1:55387-&gt;6443/tcp   kind-control-plane</span><br></pre></td></tr></table></figure>
+<p>可以看到，kind 容器暴露的 6443 端口映射在本机的一个随机端口(55387)上。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">// 查看 node 的详细信息，可以看到 cni 为 containerd</span><br><span class="line">$ kubectl describe node kind-control-plane</span><br><span class="line">...</span><br><span class="line"> Container Runtime Version:  containerd://1.2.6-0ubuntu1</span><br><span class="line"> Kubelet Version:            v1.15.3</span><br><span class="line"> Kube-Proxy Version:         v1.15.3</span><br><span class="line">PodCIDR:                     10.244.0.0/24</span><br><span class="line">ExternalID:                  kind-control-plane</span><br><span class="line">...</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 进入 kind 容器查看 k8s 的配置，和单独使用 kubeadm 时一致</span><br><span class="line">$ docker exec -it e26545538cc  bash</span><br><span class="line">root@kind-control-plane:~# ls /etc/kubernetes/</span><br><span class="line">admin.conf  controller-manager.conf  kubelet.conf  manifests  pki  scheduler.conf</span><br><span class="line">root@kind-control-plane:~# ls /etc/kubernetes/manifests/</span><br><span class="line">etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 查看 cni 配置</span><br><span class="line">root@kind-control-plane:/etc/kubernetes# cat /var/lib/kubelet/kubeadm-flags.env</span><br><span class="line">KUBELET_KUBEADM_ARGS=&quot;--container-runtime=remote --container-runtime-endpoint=/run/containerd/containerd.sock --fail-swap-on=false --node-ip=172.17.0.2&quot;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 查看容器的状态</span><br><span class="line">root@kind-control-plane:~# crictl pods</span><br><span class="line">POD ID              CREATED             STATE               NAME                                         NAMESPACE           ATTEMPT</span><br><span class="line">fc8700af77ca2       About an hour ago   Ready               coredns-5c98db65d4-bjxl2                     kube-system         0</span><br><span class="line">6378297d32811       About an hour ago   Ready               coredns-5c98db65d4-q2drh                     kube-system         0</span><br><span class="line">124b42a35e0d1       About an hour ago   Ready               kube-proxy-99nc9                             kube-system         0</span><br><span class="line">54b9511069534       About an hour ago   Ready               kindnet-xz8dp                                kube-system         0</span><br><span class="line">61cb720ddece8       About an hour ago   Ready               etcd-kind-control-plane                      kube-system         0</span><br><span class="line">4514b98de1a44       About an hour ago   Ready               kube-scheduler-kind-control-plane            kube-system         0</span><br><span class="line">9a29dbebc8dd1       About an hour ago   Ready               kube-controller-manager-kind-control-plane   kube-system         0</span><br><span class="line">ab028c5f5a3e5       About an hour ago   Ready               kube-apiserver-kind-control-plane            kube-system         0</span><br></pre></td></tr></table></figure>
+<p>删除集群：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kind delete cluster</span><br></pre></td></tr></table></figure>
+<p>kind 也支持创建多 master 以及多 work 节点的集群，需要自定义 yaml 配置：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"># a cluster with 3 control-plane nodes and 3 workers</span><br><span class="line">kind: Cluster</span><br><span class="line">apiVersion: kind.sigs.k8s.io/v1alpha3</span><br><span class="line">nodes:</span><br><span class="line">- role: control-plane</span><br><span class="line">- role: control-plane</span><br><span class="line">- role: control-plane</span><br><span class="line">- role: worker</span><br><span class="line">- role: worker</span><br><span class="line">- role: worker</span><br><span class="line"></span><br><span class="line">// 创建集群指定 config</span><br><span class="line">$ kind create cluster --config kind.yaml</span><br></pre></td></tr></table></figure>
+<p>kind 还支持自定义映射的端口号、支持使用自定义镜像仓库、支持启用 Feature Gates 等多个功能，详细的使用请参考官方文档 <a href="https://kind.sigs.k8s.io/docs/user/quick-start/" target="_blank" rel="noopener">quick-start</a>。</p>
+<h3 id="二、本地测试"><a href="#二、本地测试" class="headerlink" title="二、本地测试"></a>二、本地测试</h3><p>既然 kind 不能用作生产环境，那怎么在本地测试时使用呢？由于 k8s 的新版已经全面启用了 TLS，不再支持非安全端口，访问 APIServer 的接口都需要认证，但是本地测试不需要那么麻烦，如下所示，为匿名用户设置访问权限即可。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">// 为匿名用户关联 RBAC 规则</span><br><span class="line">$ kubectl create clusterrolebinding system:anonymous --clusterrole=cluster-admin --user=system:anonymous</span><br><span class="line"></span><br><span class="line">// 请求相关的 API</span><br><span class="line">$ curl -k https://127.0.0.1:55387/api/v1/nodes</span><br><span class="line">&#123;</span><br><span class="line">  &quot;kind&quot;: &quot;NodeList&quot;,</span><br><span class="line">  &quot;apiVersion&quot;: &quot;v1&quot;,</span><br><span class="line">  &quot;metadata&quot;: &#123;</span><br><span class="line">    &quot;selfLink&quot;: &quot;/api/v1/nodes&quot;,</span><br><span class="line">    &quot;resourceVersion&quot;: &quot;11844&quot;</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;items&quot;: [</span><br><span class="line">  ...</span><br></pre></td></tr></table></figure>
 
       
     </div>
+    
+    
+    
 
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kind/" rel="tag"># kind</a>
+          
+            <a href="/tags/deploy/" rel="tag"># deploy</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/09/01/kube_on_kube_operator_3/" rel="next" title="kube-on-kube-operator 开发(三)">
+                <i class="fa fa-chevron-left"></i> kube-on-kube-operator 开发(三)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
   </div>
   
   
   
+  </article>
 
-  
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
 
 
           </div>
@@ -333,6 +479,13 @@
 
 
           
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
 
         </div>
         
@@ -353,8 +506,17 @@
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
 
-      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+      <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
             
@@ -406,6 +568,22 @@
         </div>
       </section>
 
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、使用-kind-部署-k8s-集群"><span class="nav-number">1.</span> <span class="nav-text">一、使用 kind 部署 k8s 集群</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二、本地测试"><span class="nav-number">2.</span> <span class="nav-text">二、本地测试</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
       
 
       
@@ -539,6 +717,10 @@
   
 
   
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
 
   
 
