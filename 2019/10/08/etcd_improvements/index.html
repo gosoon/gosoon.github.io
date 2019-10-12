@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。 etcd 性能优化 官方文档原文：https://github.com/etcd-io/etcd/blob/master/Documentation/tuning.md 译文参考：https://skyao.gitbooks.io/l">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-08T07:17:58.594Z">
+<meta property="og:updated_time" content="2019-10-08T08:11:13.643Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="etcd 性能测试与调优">
 <meta name="twitter:description" content="etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。 etcd 性能优化 官方文档原文：https://github.com/etcd-io/etcd/blob/master/Documentation/tuning.md 译文参考：https://skyao.gitbooks.io/l">
@@ -592,7 +592,7 @@
 <td>1000</td>
 <td>all members</td>
 <td>1198</td>
-<td>1536.8</td>
+<td>1536.8ms</td>
 <td>-</td>
 <td>是</td>
 <td>否</td>
@@ -909,7 +909,7 @@
 <p>由于仅在本地进行测试，所受网络带宽影响不大，所以仅调整 io。</p>
 </blockquote>
 <h3 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h3><p>可以看到，测试结果中写入操作与以上列出的几种因素关联比较大。读取指标的时候，串行化要比线性化要好，但为了一致性，线性化(Linearizable)读取请求要通过集群成员的法定人数来获取最新的数据。串行化(Serializable)读取请求比线性化读取要廉价一些，因为他们是通过任意单台 etcd 服务器来提供服务，而不是成员的法定人数，代价是可能提供过期数据。</p>
-<p>本文在力所能及的范围内对 etcd 的性能进行了一定的评估，所的到的数据并不能作为最终的参考数据，应当根据自己的环境进行评估，结合以上性能优化的方法得到最终的结论。</p>
+<p>本文在力所能及的范围内对 etcd 的性能进行了一定的评估，所得到的数据并不能作为最终的参考数据，应当根据自己的环境进行评估，结合以上性能优化的方法得到最终的结论。</p>
 <p>参考：</p>
 <p><a href="https://github.com/maemual/raft-zh_cn" target="_blank" rel="noopener">Raft一致性算法论文的中文翻译</a></p>
 <p><a href="https://www.infoq.cn/article/Dit9YCy2-ziDrLfFeQzq" target="_blank" rel="noopener">etcd 在超大规模数据场景下的性能优化</a></p>
@@ -959,6 +959,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/10/12/k8s_improvements/" rel="prev" title="大规模场景下 kubernetes 集群的性能优化">
+                大规模场景下 kubernetes 集群的性能优化 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -1038,7 +1042,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">31</span>
+                  <span class="site-state-item-count">32</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
