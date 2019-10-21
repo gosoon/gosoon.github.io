@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-scheduler,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="kube-scheduler 的设计Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podList，通过执行一系列调度算法为 pod 选择一个合适的 node，提交数据到 apiserver，其核">
+<meta name="keywords" content="kube-scheduler">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-scheduler 源码分析">
+<meta property="og:url" content="http://yoursite.com/2019/10/21/kube_scheduler_process/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kube-scheduler 的设计Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podList，通过执行一系列调度算法为 pod 选择一个合适的 node，提交数据到 apiserver，其核">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-10-21T09:49:12.782Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-scheduler 源码分析">
+<meta name="twitter:description" content="kube-scheduler 的设计Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podList，通过执行一系列调度算法为 pod 选择一个合适的 node，提交数据到 apiserver，其核">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/10/21/kube_scheduler_process/">
+
+
+
+
+
+  <title>kube-scheduler 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/21/kube_scheduler_process/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-scheduler 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-21T17:30:30+08:00">
+                2019-10-21
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/10/21/kube_scheduler_process/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/21/kube_scheduler_process/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="kube-scheduler-的设计"><a href="#kube-scheduler-的设计" class="headerlink" title="kube-scheduler 的设计"></a>kube-scheduler 的设计</h3><p>Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podList，通过执行一系列调度算法为 pod 选择一个合适的 node，提交数据到 apiserver，其核心则是一系列调度算法的设计与执行。</p>
+<p>官方对 kube-scheduler 的调度流程描述 <a href="https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduler.md" target="_blank" rel="noopener">The Kubernetes Scheduler</a>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">For given pod:</span><br><span class="line"></span><br><span class="line">    +---------------------------------------------+</span><br><span class="line">    |               Schedulable nodes:            |</span><br><span class="line">    |                                             |</span><br><span class="line">    | +--------+    +--------+      +--------+    |</span><br><span class="line">    | | node 1 |    | node 2 |      | node 3 |    |</span><br><span class="line">    | +--------+    +--------+      +--------+    |</span><br><span class="line">    |                                             |</span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line">                        |</span><br><span class="line">                        |</span><br><span class="line">                        v</span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line"></span><br><span class="line">    Pred. filters: node 3 doesn&apos;t have enough resource</span><br><span class="line"></span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line">                        |</span><br><span class="line">                        |</span><br><span class="line">                        v</span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line">    |             remaining nodes:                |</span><br><span class="line">    |   +--------+                 +--------+     |</span><br><span class="line">    |   | node 1 |                 | node 2 |     |</span><br><span class="line">    |   +--------+                 +--------+     |</span><br><span class="line">    |                                             |</span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line">                        |</span><br><span class="line">                        |</span><br><span class="line">                        v</span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line"></span><br><span class="line">    Priority function:    node 1: p=2</span><br><span class="line">                          node 2: p=5</span><br><span class="line"></span><br><span class="line">    +-------------------+-------------------------+</span><br><span class="line">                        |</span><br><span class="line">                        |</span><br><span class="line">                        v</span><br><span class="line">            select max&#123;node priority&#125; = node 2</span><br></pre></td></tr></table></figure>
+<p>kube-scheduler 目前包含两部分调度算法 predicates 和 priorities，首先执行 predicates 算法过滤部分 node 然后执行  priorities 算法为所有 node 打分，最后从所有 node 中选出分数最高的最为最佳的 node。 </p>
+<h3 id="kube-scheduler-源码分析"><a href="#kube-scheduler-源码分析" class="headerlink" title="kube-scheduler 源码分析"></a>kube-scheduler 源码分析</h3><blockquote>
+<p>kubernetes 版本: v1.16</p>
+</blockquote>
+<p>kubernetes 中所有组件的启动流程都是类似的，首先会解析命令行参数、添加默认值，kube-scheduler 的默认参数在 <code>k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1/defaults.go</code> 中定义的。然后会执行  run 方法启动主逻辑，下面直接看 kube-scheduler 的主逻辑 run 方法执行过程。</p>
+<p><code>Run()</code> 方法主要做了以下工作：</p>
+<ul>
+<li>初始化 scheduler 对象</li>
+<li>启动 kube-scheduler server，kube-scheduler 监听 10251 和 10259 端口，10251 端口不需要认证，可以获取 healthz metrics 等信息，10259 为安全端口，需要认证</li>
+<li>启动所有的 informer</li>
+<li>执行 <code>sched.Run()</code> 方法，执行主调度逻辑</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-scheduler/app/server.go:160</code>  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line">func Run(cc schedulerserverconfig.CompletedConfig, stopCh &lt;-chan struct&#123;&#125;, registryOptions ...Option) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    // 1、初始化 scheduler 对象</span><br><span class="line">    sched, err := scheduler.New(......）</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、启动事件广播</span><br><span class="line">    if cc.Broadcaster != nil &amp;&amp; cc.EventClient != nil &#123;</span><br><span class="line">        cc.Broadcaster.StartRecordingToSink(stopCh)</span><br><span class="line">    &#125;</span><br><span class="line">    if cc.LeaderElectionBroadcaster != nil &amp;&amp; cc.CoreEventClient != nil &#123;</span><br><span class="line">        cc.LeaderElectionBroadcaster.StartRecordingToSink(&amp;corev1.EventSinkImpl&#123;Interface: cc.CoreEventClient.Events(&quot;&quot;)&#125;)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    // 3、启动 http server</span><br><span class="line">    if cc.InsecureServing != nil &#123;</span><br><span class="line">        separateMetrics := cc.InsecureMetricsServing != nil</span><br><span class="line">        handler := buildHandlerChain(newHealthzHandler(&amp;cc.ComponentConfig, separateMetrics, checks...), nil, nil)</span><br><span class="line">        if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to start healthz server: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    // 4、启动所有 informer</span><br><span class="line">    go cc.PodInformer.Informer().Run(stopCh)</span><br><span class="line">    cc.InformerFactory.Start(stopCh)</span><br><span class="line"></span><br><span class="line">    cc.InformerFactory.WaitForCacheSync(stopCh)</span><br><span class="line"></span><br><span class="line">    run := func(ctx context.Context) &#123;</span><br><span class="line">        sched.Run()</span><br><span class="line">        &lt;-ctx.Done()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ctx, cancel := context.WithCancel(context.TODO()) // TODO once Run() accepts a context, it should be used here</span><br><span class="line">    defer cancel()</span><br><span class="line">    go func() &#123;</span><br><span class="line">        select &#123;</span><br><span class="line">        case &lt;-stopCh:</span><br><span class="line">            cancel()</span><br><span class="line">        case &lt;-ctx.Done():</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    // 5、选举 leader</span><br><span class="line">    if cc.LeaderElection != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    // 6、执行 sched.Run() 方法</span><br><span class="line">    run(ctx)</span><br><span class="line">    return fmt.Errorf(&quot;finished without leader elect&quot;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>下面看一下 <code>scheduler.New()</code> 方法是如何初始化 scheduler 结构体的，该方法主要的功能是初始化默认的调度算法以及默认的调度器 GenericScheduler。</p>
+<ul>
+<li>创建 scheduler 配置文件</li>
+<li>根据默认的 DefaultProvider 初始化  schedulerAlgorithmSource 然后加载默认的预选及优选算法，然后初始化 GenericScheduler</li>
+<li>若启动参数提供了 policy config 则使用其覆盖默认的预选及优选算法并初始化 GenericScheduler，不过该参数现已被弃用</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:166</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">func New(......) (*Scheduler, error) &#123;</span><br><span class="line">	......</span><br><span class="line">    // 1、创建 scheduler 的配置文件</span><br><span class="line">    configurator := factory.NewConfigFactory(&amp;factory.ConfigFactoryArgs&#123;</span><br><span class="line">  	    ......</span><br><span class="line">  	&#125;)</span><br><span class="line">    var config *factory.Config</span><br><span class="line">    source := schedulerAlgorithmSource</span><br><span class="line">    // 2、加载默认的调度算法</span><br><span class="line">    switch &#123;</span><br><span class="line">    case source.Provider != nil:</span><br><span class="line">        // 使用默认的 ”DefaultProvider“ 初始化 config</span><br><span class="line">        sc, err := configurator.CreateFromProvider(*source.Provider)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return nil, fmt.Errorf(&quot;couldn&apos;t create scheduler using provider %q: %v&quot;, *source.Provider, err)</span><br><span class="line">        &#125;</span><br><span class="line">        config = sc</span><br><span class="line">    case source.Policy != nil:</span><br><span class="line">        // 通过启动时指定的 policy source 加载 config</span><br><span class="line">	......</span><br><span class="line">        config = sc</span><br><span class="line">    default:</span><br><span class="line">        return nil, fmt.Errorf(&quot;unsupported algorithm source: %v&quot;, source)</span><br><span class="line">    &#125;</span><br><span class="line">    // Additional tweaks to the config produced by the configurator.</span><br><span class="line">    config.Recorder = recorder</span><br><span class="line">    config.DisablePreemption = options.disablePreemption</span><br><span class="line">    config.StopEverything = stopCh</span><br><span class="line"></span><br><span class="line">    // 3.创建 scheduler 对象</span><br><span class="line">    sched := NewFromConfig(config)</span><br><span class="line">	......</span><br><span class="line">    return sched, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>下面是 pod informer 的启动逻辑，只监听 status.phase 不为 succeeded 以及 failed 状态的 pod，即非 terminating 的 pod。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/factory/factory.go:527</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer &#123;</span><br><span class="line">    selector := fields.ParseSelectorOrDie(</span><br><span class="line">        &quot;status.phase!=&quot; + string(v1.PodSucceeded) +</span><br><span class="line">            &quot;,status.phase!=&quot; + string(v1.PodFailed))</span><br><span class="line">    lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)</span><br><span class="line">    return &amp;podInformer&#123;</span><br><span class="line">        informer: cache.NewSharedIndexInformer(lw, &amp;v1.Pod&#123;&#125;, resyncPeriod, cache.Indexers&#123;cache.NamespaceIndex: cache.MetaNamespaceIndexFunc&#125;),</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>然后继续看 <code>Run()</code>  方法中最后执行的 <code>sched.Run()</code> 调度循环逻辑，若 informer 中的 cache 同步完成后会启动一个循环逻辑执行 <code>sched.scheduleOne</code> 方法。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:313</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (sched *Scheduler) Run() &#123;</span><br><span class="line">    if !sched.config.WaitForCacheSync() &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>scheduleOne()</code> 每次对一个 pod 进行调度，主要有以下步骤：</p>
+<ul>
+<li>从 scheduler 调度队列中取出一个 pod，如果该 pod 处于删除状态则跳过</li>
+<li>执行调度逻辑 <code>sched.schedule()</code> 返回通过预算及优选算法过滤后选出的最佳 node</li>
+<li>如果过滤算法没有选出合适的 node，则返回 core.FitError </li>
+<li>若没有合适的 node 会判断是否启用了抢占策略，若启用了则执行抢占机制</li>
+<li>判断是否需要 VolumeScheduling 特性</li>
+<li>执行 reserve plugin</li>
+<li>pod 对应的 spec.NodeName 写上 scheduler 最终选择的 node，更新 scheduler cache</li>
+<li>请求 apiserver 异步处理最终的绑定操作，写入到 etcd</li>
+<li>执行 permit plugin</li>
+<li>执行 prebind plugin</li>
+<li>执行 postbind plugin</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:515</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line">func (sched *Scheduler) scheduleOne() &#123;</span><br><span class="line">    fwk := sched.Framework</span><br><span class="line"></span><br><span class="line">    pod := sched.NextPod()</span><br><span class="line">    if pod == nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    // 1.判断 pod 是否处于删除状态</span><br><span class="line">    if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">    	......</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // 2.执行调度策略选择 node</span><br><span class="line">    start := time.Now()</span><br><span class="line">    pluginContext := framework.NewPluginContext()</span><br><span class="line">    scheduleResult, err := sched.schedule(pod, pluginContext)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if fitError, ok := err.(*core.FitError); ok &#123;</span><br><span class="line">            // 3.若启用抢占机制则执行</span><br><span class="line">            if sched.DisablePreemption &#123;</span><br><span class="line">            	......</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                preemptionStartTime := time.Now()</span><br><span class="line">                sched.preempt(pluginContext, fwk, pod, fitError)</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line">            metrics.PodScheduleFailures.Inc()</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            klog.Errorf(&quot;error selecting node for pod: %v&quot;, err)</span><br><span class="line">            metrics.PodScheduleErrors.Inc()</span><br><span class="line">        &#125;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    assumedPod := pod.DeepCopy()</span><br><span class="line"></span><br><span class="line">    // 4.判断是否需要 VolumeScheduling 特性</span><br><span class="line">    allBound, err := sched.assumeVolumes(assumedPod, scheduleResult.SuggestedHost)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        klog.Errorf(&quot;error assuming volumes: %v&quot;, err)</span><br><span class="line">        metrics.PodScheduleErrors.Inc()</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5.执行 &quot;reserve&quot; plugins</span><br><span class="line">    if sts := fwk.RunReservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() &#123;</span><br><span class="line">        .....</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6.为 pod 设置 NodeName 字段，更新 scheduler 缓存</span><br><span class="line">    err = sched.assume(assumedPod, scheduleResult.SuggestedHost)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 7.异步请求 apiserver</span><br><span class="line">    go func() &#123;</span><br><span class="line">        // Bind volumes first before Pod</span><br><span class="line">        if !allBound &#123;</span><br><span class="line">            err := sched.bindVolumes(assumedPod)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">				......</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 8.执行 &quot;permit&quot; plugins</span><br><span class="line">        permitStatus := fwk.RunPermitPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)</span><br><span class="line">        if !permitStatus.IsSuccess() &#123;</span><br><span class="line">			......</span><br><span class="line">        &#125;</span><br><span class="line">        // 9.执行 &quot;prebind&quot; plugins</span><br><span class="line">        preBindStatus := fwk.RunPreBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)</span><br><span class="line">        if !preBindStatus.IsSuccess() &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        err := sched.bind(assumedPod, scheduleResult.SuggestedHost, pluginContext)</span><br><span class="line">        ......</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            ......</span><br><span class="line">            // 10.执行 &quot;postbind&quot; plugins</span><br><span class="line">            fwk.RunPostBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>scheduleOne()</code>  中通过调用 <code>sched.schedule()</code> 来执行预选与优选算法处理：</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:337</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (core.ScheduleResult, error) &#123;</span><br><span class="line">    result, err := sched.Algorithm.Schedule(pod, pluginContext)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">	......</span><br><span class="line">    &#125;</span><br><span class="line">    return result, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>sched.Algorithm</code> 是一个 interface，主要包含四个方法，GenericScheduler 是其具体的实现：</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:131</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">type ScheduleAlgorithm interface &#123;</span><br><span class="line">    Schedule(*v1.Pod, *framework.PluginContext) (scheduleResult ScheduleResult, err error)</span><br><span class="line">    Preempt(*framework.PluginContext, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)</span><br><span class="line">    Predicates() map[string]predicates.FitPredicate</span><br><span class="line">    Prioritizers() []priorities.PriorityConfig</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<ul>
+<li><code>Schedule()</code>：正常调度逻辑，包含预算与优选算法的执行</li>
+<li><code>Preempt()</code>：抢占策略，在 pod 调度发生失败的时候尝试抢占低优先级的 pod，函数返回发生抢占的 node，被 抢占的 pods 列表，nominated node name 需要被移除的 pods 列表以及 error</li>
+<li><code>Predicates()</code>：predicates 算法列表</li>
+<li><code>Prioritizers()</code>：prioritizers 算法列表</li>
+</ul>
+<p>kube-scheduler 提供的默认调度为 DefaultProvider，DefaultProvider 配置的 predicates 和 priorities policies 在 <code>k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults/defaults.go</code> 中定义，算法具体实现是在 <code>k8s.io/kubernetes/pkg/scheduler/algorithm/predicates/</code> 和<code>k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/</code> 中，默认的算法如下所示：</p>
+<p><code>pkg/scheduler/algorithmprovider/defaults/defaults.go</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">func defaultPredicates() sets.String &#123;</span><br><span class="line">    return sets.NewString(</span><br><span class="line">        predicates.NoVolumeZoneConflictPred,</span><br><span class="line">        predicates.MaxEBSVolumeCountPred,</span><br><span class="line">        predicates.MaxGCEPDVolumeCountPred,</span><br><span class="line">        predicates.MaxAzureDiskVolumeCountPred,</span><br><span class="line">        predicates.MaxCSIVolumeCountPred,</span><br><span class="line">        predicates.MatchInterPodAffinityPred,</span><br><span class="line">        predicates.NoDiskConflictPred,</span><br><span class="line">        predicates.GeneralPred,</span><br><span class="line">        predicates.CheckNodeMemoryPressurePred,</span><br><span class="line">        predicates.CheckNodeDiskPressurePred,</span><br><span class="line">        predicates.CheckNodePIDPressurePred,</span><br><span class="line">        predicates.CheckNodeConditionPred,</span><br><span class="line">        predicates.PodToleratesNodeTaintsPred,</span><br><span class="line">        predicates.CheckVolumeBindingPred,</span><br><span class="line">    )</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func defaultPriorities() sets.String &#123;</span><br><span class="line">    return sets.NewString(</span><br><span class="line">        priorities.SelectorSpreadPriority,</span><br><span class="line">        priorities.InterPodAffinityPriority,</span><br><span class="line">        priorities.LeastRequestedPriority,</span><br><span class="line">        priorities.BalancedResourceAllocation,</span><br><span class="line">        priorities.NodePreferAvoidPodsPriority,</span><br><span class="line">        priorities.NodeAffinityPriority,</span><br><span class="line">        priorities.TaintTolerationPriority,</span><br><span class="line">        priorities.ImageLocalityPriority,</span><br><span class="line">    )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>下面继续看 <code>sched.Algorithm.Schedule()</code> 调用具体调度算法的过程：</p>
+<ul>
+<li>检查 pod pvc 信息</li>
+<li>执行 prefilter plugins</li>
+<li>获取 scheduler cache 的快照，每次调度 pod 时都会获取一次快照</li>
+<li>执行 <code>g.findNodesThatFit()</code> 预选算法</li>
+<li>执行 postfilter plugin</li>
+<li>若 node  为 0 直接返回失败的 error，若 node 数为1 直接返回该 node</li>
+<li>执行 <code>g.priorityMetaProducer()</code> 获取 metaPrioritiesInterface，计算 pod 的metadata，检查该 node 上是否有相同 meta 的 pod</li>
+<li>执行 <code>PrioritizeNodes()</code> 算法</li>
+<li>执行 <code>g.selectHost()</code> 通过得分选择一个最佳的 node</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:186</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (result ScheduleResult, err error) &#123;</span><br><span class="line">    ......</span><br><span class="line">    // 1.检查 pod pvc </span><br><span class="line">    if err := podPassesBasicChecks(pod, g.pvcLister); err != nil &#123;</span><br><span class="line">        return result, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2.执行 &quot;prefilter&quot; plugins</span><br><span class="line">    preFilterStatus := g.framework.RunPreFilterPlugins(pluginContext, pod)</span><br><span class="line">    if !preFilterStatus.IsSuccess() &#123;</span><br><span class="line">        return result, preFilterStatus.AsError()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3.获取 node 数量</span><br><span class="line">    numNodes := g.cache.NodeTree().NumNodes()</span><br><span class="line">    if numNodes == 0 &#123;</span><br><span class="line">        return result, ErrNoNodesAvailable</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4.快照 node 信息</span><br><span class="line">    if err := g.snapshot(); err != nil &#123;</span><br><span class="line">        return result, err</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // 5.执行预选算法</span><br><span class="line">    startPredicateEvalTime := time.Now()</span><br><span class="line">    filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return result, err</span><br><span class="line">    &#125;</span><br><span class="line">    // 6.执行 &quot;postfilter&quot; plugins</span><br><span class="line">    postfilterStatus := g.framework.RunPostFilterPlugins(pluginContext, pod, filteredNodes, filteredNodesStatuses)</span><br><span class="line">    if !postfilterStatus.IsSuccess() &#123;</span><br><span class="line">        return result, postfilterStatus.AsError()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 7.预选后没有合适的 node 直接返回</span><br><span class="line">    if len(filteredNodes) == 0 &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    startPriorityEvalTime := time.Now()</span><br><span class="line">    // 8.若只有一个 node 则直接返回该 node</span><br><span class="line">    if len(filteredNodes) == 1 &#123;</span><br><span class="line">        return ScheduleResult&#123;</span><br><span class="line">            SuggestedHost:  filteredNodes[0].Name,</span><br><span class="line">            EvaluatedNodes: 1 + len(failedPredicateMap),</span><br><span class="line">            FeasibleNodes:  1,</span><br><span class="line">        &#125;, nil</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 9.获取 pod meta 信息，执行优选算法</span><br><span class="line">    metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)</span><br><span class="line">    priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework,      pluginContext)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return result, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 10.根据打分选择最佳的 node</span><br><span class="line">    host, err := g.selectHost(priorityList)</span><br><span class="line">    trace.Step(&quot;Selecting host done&quot;)</span><br><span class="line">    return ScheduleResult&#123;</span><br><span class="line">        SuggestedHost:  host,</span><br><span class="line">        EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap),</span><br><span class="line">        FeasibleNodes:  len(filteredNodes),</span><br><span class="line">    &#125;, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>至此，scheduler 的整个过程分析完毕。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要对于 kube-scheduler v1.16 的调度流程进行了分析，但其中有大量的细节都暂未提及，包括预选算法以及优选算法的具体实现、优先级与抢占调度的实现、framework 的使用及实现，因篇幅有限，部分内容会在后文继续说明。</p>
+<p>参考：</p>
+<p><a href="https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduler.md" target="_blank" rel="noopener">The Kubernetes Scheduler</a></p>
+<p><a href="https://github.com/kubernetes/community/tree/master/contributors/design-proposals/scheduling" target="_blank" rel="noopener">scheduling design proposals</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-scheduler/" rel="tag"># kube-scheduler</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/10/12/k8s_improvements/" rel="next" title="大规模场景下 kubernetes 集群的性能优化">
+                <i class="fa fa-chevron-left"></i> 大规模场景下 kubernetes 集群的性能优化
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">33</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kube-scheduler-的设计"><span class="nav-number">1.</span> <span class="nav-text">kube-scheduler 的设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kube-scheduler-源码分析"><span class="nav-number">2.</span> <span class="nav-text">kube-scheduler 源码分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
