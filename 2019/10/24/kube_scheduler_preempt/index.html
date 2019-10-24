@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-scheduler,preempt,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。  kube-schedul">
+<meta name="keywords" content="kube-scheduler,preempt">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-scheduler 优先级与抢占机制源码分析">
+<meta property="og:url" content="http://yoursite.com/2019/10/24/kube_scheduler_preempt/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。  kube-schedul">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-10-24T06:55:47.931Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-scheduler 优先级与抢占机制源码分析">
+<meta name="twitter:description" content="前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。  kube-schedul">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/10/24/kube_scheduler_preempt/">
+
+
+
+
+
+  <title>kube-scheduler 优先级与抢占机制源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/24/kube_scheduler_preempt/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-scheduler 优先级与抢占机制源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-24T14:35:30+08:00">
+                2019-10-24
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/10/24/kube_scheduler_preempt/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/24/kube_scheduler_preempt/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。</p>
+<ul>
+<li><a href="http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/" target="_blank" rel="noopener">kube-scheduler 源码分析</a></li>
+<li><a href="http://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/" target="_blank" rel="noopener">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li>
+</ul>
+<h3 id="为什么要有优先级与抢占机制"><a href="#为什么要有优先级与抢占机制" class="headerlink" title="为什么要有优先级与抢占机制"></a>为什么要有优先级与抢占机制</h3><p>正常情况下，当一个 pod 调度失败后，就会被暂时 “搁置” 处于 <code>pending</code> 状态，直到 pod 被更新或者集群状态发生变化，调度器才会对这个 pod 进行重新调度。但在实际的业务场景中会存在在线与离线业务之分，若在线业务的 pod 因资源不足而调度失败时，此时就需要离线业务下掉一部分为在线业务提供资源，即在线业务要抢占离线业务的资源，此时就需要 scheduler 的优先级和抢占机制了，该机制解决的是 pod 调度失败时该怎么办的问题，若该 pod 的优先级比较高此时并不会被”搁置”，而是会”挤走”某个 node 上的一些低优先级的 pod，这样就可以保证高优先级的 pod 调度成功。</p>
+<h3 id="优先级与抢占机制源码分析"><a href="#优先级与抢占机制源码分析" class="headerlink" title="优先级与抢占机制源码分析"></a>优先级与抢占机制源码分析</h3><blockquote>
+<p>kubernetes 版本: v1.16</p>
+</blockquote>
+<p>抢占发生的原因，一定是一个高优先级的 pod 调度失败，我们称这个 pod 为“抢占者”，称被抢占的 pod 为“牺牲者”(victims)。而 kubernetes 调度器实现抢占算法的一个最重要的设计，就是在调度队列的实现里，使用了两个不同的队列。</p>
+<p>第一个队列叫作 activeQ，凡是在 activeQ 里的 pod，都是下一个调度周期需要调度的对象。所以，当你在 kubernetes 集群里新创建一个 pod 的时候，调度器会将这个 pod 入队到 activeQ 里面，调度器不断从队列里出队(pop)一个 pod 进行调度，实际上都是从 activeQ 里出队的。</p>
+<p>第二个队列叫作 unschedulableQ，专门用来存放调度失败的 pod，当一个 unschedulableQ 里的 pod 被更新之后，调度器会自动把这个 pod 移动到 activeQ 里，从而给这些调度失败的 pod “重新做人”的机会。</p>
+<p>当 pod 拥有了优先级之后，高优先级的 pod 就可能会比低优先级的 pod 提前出队，从而尽早完成调度过程。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/internal/queue/scheduling_queue.go</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">// NewSchedulingQueue initializes a priority queue as a new scheduling queue.</span><br><span class="line">func NewSchedulingQueue(stop &lt;-chan struct&#123;&#125;, fwk framework.Framework) SchedulingQueue &#123;</span><br><span class="line">    return NewPriorityQueue(stop, fwk)</span><br><span class="line">&#125;</span><br><span class="line">// NewPriorityQueue creates a PriorityQueue object.</span><br><span class="line">func NewPriorityQueue(stop &lt;-chan struct&#123;&#125;, fwk framework.Framework) *PriorityQueue &#123;</span><br><span class="line">    return NewPriorityQueueWithClock(stop, util.RealClock&#123;&#125;, fwk)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.</span><br><span class="line">func NewPriorityQueueWithClock(stop &lt;-chan struct&#123;&#125;, clock util.Clock, fwk framework.Framework) *PriorityQueue &#123;</span><br><span class="line">    comp := activeQComp</span><br><span class="line">    if fwk != nil &#123;</span><br><span class="line">        if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil &#123;</span><br><span class="line">            comp = func(podInfo1, podInfo2 interface&#123;&#125;) bool &#123;</span><br><span class="line">                pInfo1 := podInfo1.(*framework.PodInfo)</span><br><span class="line">                pInfo2 := podInfo2.(*framework.PodInfo)</span><br><span class="line"></span><br><span class="line">                return queueSortFunc(pInfo1, pInfo2)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    pq := &amp;PriorityQueue&#123;</span><br><span class="line">        clock:            clock,</span><br><span class="line">        stop:             stop,</span><br><span class="line">        podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),</span><br><span class="line">        activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),</span><br><span class="line">        unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),</span><br><span class="line">        nominatedPods:    newNominatedPodMap(),</span><br><span class="line">        moveRequestCycle: -1,</span><br><span class="line">    &#125;</span><br><span class="line">    pq.cond.L = &amp;pq.lock</span><br><span class="line">    pq.podBackoffQ = util.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())</span><br><span class="line"></span><br><span class="line">    pq.run()</span><br><span class="line"></span><br><span class="line">    return pq</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>前面的文章已经说了 <code>scheduleOne()</code> 是执行调度算法的主逻辑，其主要功能有：</p>
+<ul>
+<li>调用 <code>sched.schedule()</code>，即执行 predicates 算法和 priorities 算法</li>
+<li>若执行失败，会返回 <code>core.FitError</code></li>
+<li>若开启了抢占机制，则执行抢占机制</li>
+<li>……</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:516</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">func (sched *Scheduler) scheduleOne() &#123;</span><br><span class="line">    ......</span><br><span class="line">    scheduleResult, err := sched.schedule(pod, pluginContext)</span><br><span class="line">    // predicates 算法和 priorities 算法执行失败</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if fitError, ok := err.(*core.FitError); ok &#123;</span><br><span class="line">            // 是否开启抢占机制</span><br><span class="line">            if sched.DisablePreemption &#123;</span><br><span class="line">                .......</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">            	// 执行抢占机制</span><br><span class="line">                preemptionStartTime := time.Now()</span><br><span class="line">                sched.preempt(pluginContext, fwk, pod, fitError)</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们主要来看其中的抢占机制，<code>sched.preempt()</code> 是执行抢占机制的主逻辑，主要功能有：</p>
+<ul>
+<li>从 apiserver 获取 pod info</li>
+<li>调用 <code>sched.Algorithm.Preempt()</code>执行抢占逻辑，该函数会返回抢占成功的 node、被抢占的 pods(victims) 以及需要被移除已提名的 pods</li>
+<li>更新 scheduler 缓存，为抢占者绑定 nodeName，即设定 pod.Status.NominatedNodeName</li>
+<li>将 pod info 提交到 apiserver</li>
+<li>删除被抢占的 pods</li>
+<li>删除被抢占 pods 的 NominatedNodeName 字段</li>
+</ul>
+<p>可以看到当上述抢占过程发生时，抢占者并不会立刻被调度到被抢占的 node 上，调度器只会将抢占者的 status.nominatedNodeName 字段设置为被抢占的 node 的名字。然后，抢占者会重新进入下一个调度周期，在新的调度周期里来决定是不是要运行在被抢占的节点上，当然，即使在下一个调度周期，调度器也不会保证抢占者一定会运行在被抢占的节点上。</p>
+<p>这样设计的一个重要原因是调度器只会通过标准的 DELETE API 来删除被抢占的 pod，所以，这些 pod 必然是有一定的“优雅退出”时间（默认是 30s）的。而在这段时间里，其他的节点也是有可能变成可调度的，或者直接有新的节点被添加到这个集群中来。所以，鉴于优雅退出期间集群的可调度性可能会发生的变化，把抢占者交给下一个调度周期再处理，是一个非常合理的选择。而在抢占者等待被调度的过程中，如果有其他更高优先级的 pod 也要抢占同一个节点，那么调度器就会清空原抢占者的 status.nominatedNodeName 字段，从而允许更高优先级的抢占者执行抢占，并且，这也使得原抢占者本身也有机会去重新抢占其他节点。以上这些都是设置 <code>nominatedNodeName</code> 字段的主要目的。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/scheduler.go:352</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">func (sched *Scheduler) preempt(pluginContext *framework.PluginContext, fwk framework.Framework, preemptor *v1.Pod, scheduleErr error) (string, error) &#123;</span><br><span class="line">    // 获取 pod info</span><br><span class="line">    preemptor, err := sched.PodPreemptor.GetUpdatedPod(preemptor)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        klog.Errorf(&quot;Error getting the updated preemptor pod object: %v&quot;, err)</span><br><span class="line">        return &quot;&quot;, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 执行抢占算法</span><br><span class="line">    node, victims, nominatedPodsToClear, err := sched.Algorithm.Preempt(pluginContext, preemptor, scheduleErr)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    var nodeName = &quot;&quot;</span><br><span class="line">    if node != nil &#123;</span><br><span class="line">        nodeName = node.Name</span><br><span class="line">        // 更新 scheduler 缓存，为抢占者绑定 nodename，即设定 pod.Status.NominatedNodeName</span><br><span class="line">        sched.SchedulingQueue.UpdateNominatedPodForNode(preemptor, nodeName)</span><br><span class="line"></span><br><span class="line">        // 将 pod info 提交到 apiserver</span><br><span class="line">        err = sched.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            sched.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)</span><br><span class="line">            return &quot;&quot;, err</span><br><span class="line">        &#125;</span><br><span class="line">        // 删除被抢占的 pods</span><br><span class="line">        for _, victim := range victims &#123;</span><br><span class="line">            if err := sched.PodPreemptor.DeletePod(victim); err != nil &#123;</span><br><span class="line">                return &quot;&quot;, err</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 删除被抢占 pods 的 NominatedNodeName 字段</span><br><span class="line">    for _, p := range nominatedPodsToClear &#123;</span><br><span class="line">        rErr := sched.PodPreemptor.RemoveNominatedNodeName(p)</span><br><span class="line">        if rErr != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nodeName, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>preempt()</code>中会调用 <code>sched.Algorithm.Preempt()</code>来执行实际抢占的算法，其主要功能有：</p>
+<ul>
+<li>判断 err 是否为 <code>FitError</code></li>
+<li>调用<code>podEligibleToPreemptOthers()</code>确认 pod 是否有抢占其他 pod 的资格，若 pod 已经抢占了低优先级的 pod，被抢占的 pod 处于 terminating 状态中，则不会继续进行抢占</li>
+<li>如果确定抢占可以发生，调度器会把自己缓存的所有节点信息复制一份，然后使用这个副本来模拟抢占过程</li>
+<li>过滤预选失败的 node 列表，此处会检查 predicates 失败的原因，若存在 NodeSelectorNotMatch、PodNotMatchHostName 这些 error 则不能成为抢占者，如果过滤出的候选 node 为空则返回抢占者作为 nominatedPodsToClear</li>
+<li>获取 <code>PodDisruptionBudget</code> 对象</li>
+<li>从预选失败的 node 列表中并发计算可以被抢占的 nodes，得到 <code>nodeToVictims</code></li>
+<li>若声明了 extenders 则调用 extenders 再次过滤 <code>nodeToVictims</code></li>
+<li>调用  <code>pickOneNodeForPreemption()</code> 从 <code>nodeToVictims</code> 中选出一个节点作为最佳候选人</li>
+<li>移除低优先级 pod 的 <code>Nominated</code>，更新这些 pod，移动到 activeQ 队列中，让调度器为这些 pod 重新 bind node</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:320</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) Preempt(pluginContext *framework.PluginContext, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) &#123;</span><br><span class="line">    fitError, ok := scheduleErr.(*FitError)</span><br><span class="line">    if !ok || fitError == nil &#123;</span><br><span class="line">        return nil, nil, nil, nil</span><br><span class="line">    &#125;</span><br><span class="line">    // 判断 pod 是否支持抢占，若 pod 已经抢占了低优先级的 pod，被抢占的 pod 处于 terminating 状态中，则不会继续进行抢占</span><br><span class="line">    if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfoMap, g.enableNonPreempting) &#123;</span><br><span class="line">        return nil, nil, nil, nil</span><br><span class="line">    &#125;</span><br><span class="line">    // 从缓存中获取 node list</span><br><span class="line">    allNodes := g.cache.ListNodes()</span><br><span class="line">    if len(allNodes) == 0 &#123;</span><br><span class="line">        return nil, nil, nil, ErrNoNodesAvailable</span><br><span class="line">    &#125;</span><br><span class="line">    // 过滤 predicates 算法执行失败的 node 作为抢占的候选 node</span><br><span class="line">    potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError)</span><br><span class="line">    // 如果过滤出的候选 node 为空则返回抢占者作为 nominatedPodsToClear</span><br><span class="line">    if len(potentialNodes) == 0 &#123;</span><br><span class="line">        return nil, nil, []*v1.Pod&#123;pod&#125;, nil</span><br><span class="line">    &#125;</span><br><span class="line">    // 获取 PodDisruptionBudget objects</span><br><span class="line">    pdbs, err := g.pdbLister.List(labels.Everything())</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    // 过滤出可以抢占的 node 列表</span><br><span class="line">    nodeToVictims, err := g.selectNodesForPreemption(pluginContext, pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,</span><br><span class="line">        g.predicateMetaProducer, g.schedulingQueue, pdbs)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 若有 extender 则执行</span><br><span class="line">    nodeToVictims, err = g.processPreemptionWithExtenders(pod, nodeToVictims)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 选出最佳的 node</span><br><span class="line">    candidateNode := pickOneNodeForPreemption(nodeToVictims)</span><br><span class="line">    if candidateNode == nil &#123;</span><br><span class="line">        return nil, nil, nil, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 移除低优先级 pod 的 Nominated，更新这些 pod，移动到 activeQ 队列中，让调度器</span><br><span class="line">    // 为这些 pod 重新 bind node</span><br><span class="line">    nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)</span><br><span class="line">    if nodeInfo, ok := g.nodeInfoSnapshot.NodeInfoMap[candidateNode.Name]; ok &#123;</span><br><span class="line">        return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil, nil, nil, fmt.Errorf(</span><br><span class="line">        &quot;preemption failed: the target node %s has been deleted from scheduler cache&quot;,</span><br><span class="line">        candidateNode.Name)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>该函数中调用了多个函数：<br><code>nodesWherePreemptionMightHelp()</code>：过滤 predicates 算法执行失败的 node<br><code>selectNodesForPreemption()</code>：过滤出可以抢占的 node 列表<br><code>pickOneNodeForPreemption()</code>：选出最佳的 node<br><code>getLowerPriorityNominatedPods()</code>：移除低优先级 pod 的 Nominated</p>
+<p><code>selectNodesForPreemption()</code> 从 prediacates 算法执行失败的 node 列表中来寻找可以被抢占的 node，通过<code>workqueue.ParallelizeUntil()</code>并发执行<code>checkNode()</code>函数检查 node。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:996</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) selectNodesForPreemption(</span><br><span class="line">   ......</span><br><span class="line">   ) (map[*v1.Node]*schedulerapi.Victims, error) &#123;</span><br><span class="line">    nodeToVictims := map[*v1.Node]*schedulerapi.Victims&#123;&#125;</span><br><span class="line">    var resultLock sync.Mutex</span><br><span class="line"></span><br><span class="line">    meta := metadataProducer(pod, nodeNameToInfo)</span><br><span class="line">    // checkNode 函数</span><br><span class="line">    checkNode := func(i int) &#123;</span><br><span class="line">        nodeName := potentialNodes[i].Name</span><br><span class="line">        var metaCopy predicates.PredicateMetadata</span><br><span class="line">        if meta != nil &#123;</span><br><span class="line">            metaCopy = meta.ShallowCopy()</span><br><span class="line">        &#125;</span><br><span class="line">        // 调用 selectVictimsOnNode 函数进行检查</span><br><span class="line">        pods, numPDBViolations, fits := g.selectVictimsOnNode(pluginContext, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)</span><br><span class="line">        if fits &#123;</span><br><span class="line">            resultLock.Lock()</span><br><span class="line">            victims := schedulerapi.Victims&#123;</span><br><span class="line">                Pods:             pods,</span><br><span class="line">                NumPDBViolations: numPDBViolations,</span><br><span class="line">            &#125;</span><br><span class="line">            nodeToVictims[potentialNodes[i]] = &amp;victims</span><br><span class="line">            resultLock.Unlock()</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 启动 16 个 goroutine 并发执行</span><br><span class="line">    workqueue.ParallelizeUntil(context.TODO(), 16, len(potentialNodes), checkNode)</span><br><span class="line">    return nodeToVictims, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>其中调用的<code>selectVictimsOnNode()</code>是来获取每个 node 上 victims pod 的，首先移除所有低优先级的 pod 尝试抢占者是否可以调度成功，如果能够调度成功，然后基于 pod 是否有 PDB 被分为两组 <code>violatingVictims</code> 和 <code>nonViolatingVictims</code>，再对每一组的  pod 按优先级进行排序。PDB(pod 中断预算)是 kubernetes 保证副本高可用的一个对象。</p>
+<p>然后开始逐一”删除“ pod 即要删掉最少的 pod 数来完成这次抢占即可，先从 <code>violatingVictims</code>(有PDB)的一组中进行”删除“ pod，并且记录删除有 PDB  pod 的数量，然后再“删除” <code>nonViolatingVictims</code> 组中的 pod，每次”删除“一个 pod 都要检查一下抢占者是否能够运行在该 node 上即执行一次预选策略，若执行预选策略失败则该 node 当前不满足抢占需要继续”删除“ pod 并将该 pod 加入到 victims 中，直到”删除“足够多的 pod 可以满足抢占，最后返回 victims 以及删除有 PDB  pod 的数量。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:1086</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) selectVictimsOnNode(</span><br><span class="line">		......</span><br><span class="line">) ([]*v1.Pod, int, bool) &#123;</span><br><span class="line">    if nodeInfo == nil &#123;</span><br><span class="line">        return nil, 0, false</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    potentialVictims := util.SortableList&#123;CompFunc: util.MoreImportantPod&#125;</span><br><span class="line">    nodeInfoCopy := nodeInfo.Clone()</span><br><span class="line"></span><br><span class="line">    removePod := func(rp *v1.Pod) &#123;</span><br><span class="line">        nodeInfoCopy.RemovePod(rp)</span><br><span class="line">        if meta != nil &#123;</span><br><span class="line">            meta.RemovePod(rp, nodeInfoCopy.Node())</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    addPod := func(ap *v1.Pod) &#123;</span><br><span class="line">        nodeInfoCopy.AddPod(ap)</span><br><span class="line">        if meta != nil &#123;</span><br><span class="line">            meta.AddPod(ap, nodeInfoCopy)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 先删除所有的低优先级 pod 检查是否能满足抢占 pod 的调度需求</span><br><span class="line">    podPriority := util.GetPodPriority(pod)</span><br><span class="line">    for _, p := range nodeInfoCopy.Pods() &#123;</span><br><span class="line">        if util.GetPodPriority(p) &lt; podPriority &#123;</span><br><span class="line">            potentialVictims.Items = append(potentialVictims.Items, p)</span><br><span class="line">            removePod(p)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 如果删除所有低优先级的 pod 不符合要求则直接过滤掉该 node</span><br><span class="line">    // podFitsOnNode 就是前文讲过用来执行预选函数的</span><br><span class="line">    if fits, _, _, err := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false); !fits &#123;</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">						......</span><br><span class="line">        &#125;</span><br><span class="line">        return nil, 0, false</span><br><span class="line">    &#125;</span><br><span class="line">    var victims []*v1.Pod</span><br><span class="line">    numViolatingVictim := 0</span><br><span class="line">    potentialVictims.Sort()</span><br><span class="line"></span><br><span class="line">    // 尝试尽量多地“删除”这些 pods，先从 PDB violating victims 中“删除”，再从 PDB non-violating victims 中“删除”</span><br><span class="line">    violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)</span><br><span class="line"></span><br><span class="line">    // reprievePod 是“删除” pods 的函数</span><br><span class="line">    reprievePod := func(p *v1.Pod) bool &#123;</span><br><span class="line">        addPod(p)</span><br><span class="line">        // 同样也会调用 podFitsOnNode 再次执行 predicates 算法</span><br><span class="line">        fits, _, _, _ := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false)</span><br><span class="line">        if !fits &#123;</span><br><span class="line">            removePod(p)</span><br><span class="line">            // 加入到 victims 中</span><br><span class="line">            victims = append(victims, p)</span><br><span class="line">        &#125;</span><br><span class="line">        return fits</span><br><span class="line">    &#125;</span><br><span class="line">     // 删除 violatingVictims 中的 pod，同时也记录删除了多少个</span><br><span class="line">    for _, p := range violatingVictims &#123;</span><br><span class="line">        if !reprievePod(p) &#123;</span><br><span class="line">            numViolatingVictim++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 删除 nonViolatingVictims 中的 pod</span><br><span class="line">    for _, p := range nonViolatingVictims &#123;</span><br><span class="line">        reprievePod(p)</span><br><span class="line">    &#125;</span><br><span class="line">    return victims, numViolatingVictim, true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>pickOneNodeForPreemption()</code> 用来选出最佳的 node 作为抢占者的 node，该函数主要基于 6 个原则：</p>
+<ul>
+<li>PDB violations 值最小的 node</li>
+<li>挑选具有高优先级较少的 node</li>
+<li>对每个 node 上所有 victims 的优先级进项累加，选取最小的</li>
+<li>如果多个 node 优先级总和相等，选择具有最小 victims  数量的 node</li>
+<li>如果多个 node 优先级总和相等，选择具有高优先级且 pod 运行时间最短的</li>
+<li>如果依据以上策略仍然选出了多个 node 则直接返回第一个 node</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:867</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br></pre></td><td class="code"><pre><span class="line">func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims) *v1.Node &#123;</span><br><span class="line">    if len(nodesToVictims) == 0 &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line">    minNumPDBViolatingPods := math.MaxInt32</span><br><span class="line">    var minNodes1 []*v1.Node</span><br><span class="line">    lenNodes1 := 0</span><br><span class="line">    for node, victims := range nodesToVictims &#123;</span><br><span class="line">        if len(victims.Pods) == 0 &#123;</span><br><span class="line">	        // 若该 node 没有 victims 则返回</span><br><span class="line">            return node</span><br><span class="line">        &#125;</span><br><span class="line">        numPDBViolatingPods := victims.NumPDBViolations</span><br><span class="line">        if numPDBViolatingPods &lt; minNumPDBViolatingPods &#123;</span><br><span class="line">            minNumPDBViolatingPods = numPDBViolatingPods</span><br><span class="line">            minNodes1 = nil</span><br><span class="line">            lenNodes1 = 0</span><br><span class="line">        &#125;</span><br><span class="line">        if numPDBViolatingPods == minNumPDBViolatingPods &#123;</span><br><span class="line">            minNodes1 = append(minNodes1, node)</span><br><span class="line">            lenNodes1++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if lenNodes1 == 1 &#123;</span><br><span class="line">        return minNodes1[0]</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 选出 PDB violating pods 数量最少的或者高优先级 victim 数量少的</span><br><span class="line">    minHighestPriority := int32(math.MaxInt32)</span><br><span class="line">    var minNodes2 = make([]*v1.Node, lenNodes1)</span><br><span class="line">    lenNodes2 := 0</span><br><span class="line">    for i := 0; i &lt; lenNodes1; i++ &#123;</span><br><span class="line">        node := minNodes1[i]</span><br><span class="line">        victims := nodesToVictims[node]</span><br><span class="line">        highestPodPriority := util.GetPodPriority(victims.Pods[0])</span><br><span class="line">        if highestPodPriority &lt; minHighestPriority &#123;</span><br><span class="line">            minHighestPriority = highestPodPriority</span><br><span class="line">            lenNodes2 = 0</span><br><span class="line">        &#125;</span><br><span class="line">        if highestPodPriority == minHighestPriority &#123;</span><br><span class="line">            minNodes2[lenNodes2] = node</span><br><span class="line">            lenNodes2++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if lenNodes2 == 1 &#123;</span><br><span class="line">        return minNodes2[0]</span><br><span class="line">    &#125;</span><br><span class="line">    // 若多个 node 高优先级的 pod 同样少，则选出加权得分最小的</span><br><span class="line">    minSumPriorities := int64(math.MaxInt64)</span><br><span class="line">    lenNodes1 = 0</span><br><span class="line">    for i := 0; i &lt; lenNodes2; i++ &#123;</span><br><span class="line">        var sumPriorities int64</span><br><span class="line">        node := minNodes2[i]</span><br><span class="line">        for _, pod := range nodesToVictims[node].Pods &#123;</span><br><span class="line">            sumPriorities += int64(util.GetPodPriority(pod)) + int64(math.MaxInt32+1)</span><br><span class="line">        &#125;</span><br><span class="line">        if sumPriorities &lt; minSumPriorities &#123;</span><br><span class="line">            minSumPriorities = sumPriorities</span><br><span class="line">            lenNodes1 = 0</span><br><span class="line">        &#125;</span><br><span class="line">        if sumPriorities == minSumPriorities &#123;</span><br><span class="line">            minNodes1[lenNodes1] = node</span><br><span class="line">            lenNodes1++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if lenNodes1 == 1 &#123;</span><br><span class="line">        return minNodes1[0]</span><br><span class="line">    &#125;</span><br><span class="line">    // 若多个 node 高优先级的 pod 数量同等且加权分数相等，则选出 pod 数量最少的</span><br><span class="line">    minNumPods := math.MaxInt32</span><br><span class="line">    lenNodes2 = 0</span><br><span class="line">    for i := 0; i &lt; lenNodes1; i++ &#123;</span><br><span class="line">        node := minNodes1[i]</span><br><span class="line">        numPods := len(nodesToVictims[node].Pods)</span><br><span class="line">        if numPods &lt; minNumPods &#123;</span><br><span class="line">            minNumPods = numPods</span><br><span class="line">            lenNodes2 = 0</span><br><span class="line">        &#125;</span><br><span class="line">        if numPods == minNumPods &#123;</span><br><span class="line">            minNodes2[lenNodes2] = node</span><br><span class="line">            lenNodes2++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if lenNodes2 == 1 &#123;</span><br><span class="line">        return minNodes2[0]</span><br><span class="line">    &#125;</span><br><span class="line">    // 若多个 node 的 pod 数量相等，则选出高优先级 pod 启动时间最短的</span><br><span class="line">    latestStartTime := util.GetEarliestPodStartTime(nodesToVictims[minNodes2[0]])</span><br><span class="line">    if latestStartTime == nil &#123;</span><br><span class="line">        return minNodes2[0]</span><br><span class="line">    &#125;</span><br><span class="line">    nodeToReturn := minNodes2[0]</span><br><span class="line">    for i := 1; i &lt; lenNodes2; i++ &#123;</span><br><span class="line">        node := minNodes2[i]</span><br><span class="line">        earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])</span><br><span class="line">        if earliestStartTimeOnNode == nil &#123;</span><br><span class="line">            klog.Errorf(&quot;earliestStartTime is nil for node %s. Should not reach here.&quot;, node)</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        if earliestStartTimeOnNode.After(latestStartTime.Time) &#123;</span><br><span class="line">            latestStartTime = earliestStartTimeOnNode</span><br><span class="line">            nodeToReturn = node</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nodeToReturn</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>以上就是对抢占机制代码的一个通读。</p>
+<h3 id="优先级与抢占机制的使用"><a href="#优先级与抢占机制的使用" class="headerlink" title="优先级与抢占机制的使用"></a>优先级与抢占机制的使用</h3><p>1、创建 PriorityClass 对象：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: v1</span><br><span class="line">kind: Pod</span><br><span class="line">metadata:</span><br><span class="line">  name: nginx</span><br><span class="line">  labels:</span><br><span class="line">    env: test</span><br><span class="line">spec:</span><br><span class="line">  containers:</span><br><span class="line">  - name: nginx</span><br><span class="line">    image: nginx</span><br><span class="line">    imagePullPolicy: IfNotPresent</span><br><span class="line">  priorityClassName: high-priority</span><br></pre></td></tr></table></figure>
+<p>2、在 deployment、statefulset 或者 pod 中声明使用已有的 priorityClass 对象即可</p>
+<p>在 pod 中使用：</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: v1</span><br><span class="line">kind: Pod</span><br><span class="line">metadata:</span><br><span class="line">  labels:</span><br><span class="line">    app: nginx-a</span><br><span class="line">  name: nginx-a</span><br><span class="line">spec:</span><br><span class="line">  containers:</span><br><span class="line">  - image: nginx:1.7.9</span><br><span class="line">    imagePullPolicy: IfNotPresent</span><br><span class="line">    name: nginx-a</span><br><span class="line">    ports:</span><br><span class="line">    - containerPort: 80</span><br><span class="line">      protocol: TCP</span><br><span class="line">    resources:</span><br><span class="line">      requests:</span><br><span class="line">        memory: &quot;64Mi&quot;</span><br><span class="line">        cpu: 5</span><br><span class="line">      limits:</span><br><span class="line">        memory: &quot;128Mi&quot;</span><br><span class="line">        cpu: 5</span><br><span class="line">  priorityClassName: high-priority</span><br></pre></td></tr></table></figure>
+<p>在 deployment 中使用：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">template:</span><br><span class="line">  spec:</span><br><span class="line">    containers:</span><br><span class="line">    - image: nginx</span><br><span class="line">      name: nginx-deployment</span><br><span class="line">      priorityClassName: high-priority</span><br></pre></td></tr></table></figure>
+<p>3、测试过程中可以看到高优先级的 nginx-a 会抢占 nginx-5754944d6c 的资源：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get pod -o  wide -w</span><br><span class="line">NAME                     READY   STATUS    RESTARTS   AGE   IP           NODE          NOMINATED NODE   READINESS GATES</span><br><span class="line">nginx-5754944d6c-9mnxa   1/1     Running   0          37s   10.244.1.4   test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-a                  0/1     Pending   0          0s    &lt;none&gt;       &lt;none&gt;        &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-a                  0/1     Pending   0          0s    &lt;none&gt;       &lt;none&gt;        &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-a                  0/1     Pending   0          0s    &lt;none&gt;       &lt;none&gt;        test-worker      &lt;none&gt;</span><br><span class="line">nginx-5754944d6c-9mnxa   1/1     Terminating   0          45s   10.244.1.4   test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-5754944d6c-9mnxa   0/1     Terminating   0          46s   10.244.1.4   test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-5754944d6c-9mnxa   0/1     Terminating   0          47s   10.244.1.4   test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-5754944d6c-9mnxa   0/1     Terminating   0          47s   10.244.1.4   test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-a                  0/1     Pending       0          2s    &lt;none&gt;       test-worker   test-worker      &lt;none&gt;</span><br><span class="line">nginx-a                  0/1     ContainerCreating   0          2s    &lt;none&gt;       test-worker   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">nginx-a                  1/1     Running             0          4s    10.244.1.5   test-worker   &lt;none&gt;           &lt;none&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>这篇文章主要讲述 kube-scheduler 中的优先级与抢占机制，可以看到抢占机制比 predicates 与 priorities 算法都要复杂，其中的许多细节仍然没有提到，本文只是通读了大部分代码，某些代码的实现需要精读，限于笔者时间的关系，对于 kube-scheduler 的代码暂时分享到此处。</p>
+<p>参考：</p>
+<p><a href="https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/</a></p>
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/10/22/kube_scheduler_algorithm/">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li><li><a href="http://yoursite.com/2019/10/21/kube_scheduler_process/">kube-scheduler 源码分析</a></li></ul></div>
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-scheduler/" rel="tag"># kube-scheduler</a>
+          
+            <a href="/tags/preempt/" rel="tag"># preempt</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/10/22/kube_scheduler_algorithm/" rel="next" title="kube-scheduler predicates 与 priorities 调度算法源码分析">
+                <i class="fa fa-chevron-left"></i> kube-scheduler predicates 与 priorities 调度算法源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">35</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">38</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么要有优先级与抢占机制"><span class="nav-number">1.</span> <span class="nav-text">为什么要有优先级与抢占机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#优先级与抢占机制源码分析"><span class="nav-number">2.</span> <span class="nav-text">优先级与抢占机制源码分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#优先级与抢占机制的使用"><span class="nav-number">3.</span> <span class="nav-text">优先级与抢占机制的使用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐</span></a></li></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
