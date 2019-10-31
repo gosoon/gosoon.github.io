@@ -83,7 +83,7 @@
 <meta name="keywords" content="kube-scheduler,preempt">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kube-scheduler 优先级与抢占机制源码分析">
-<meta property="og:url" content="http://yoursite.com/2019/10/24/kube_scheduler_preempt/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。  kube-schedul">
 <meta property="og:locale" content="zh-Hans">
@@ -120,7 +120,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/10/24/kube_scheduler_preempt/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/">
 
 
 
@@ -295,7 +295,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/24/kube_scheduler_preempt/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -374,8 +374,8 @@
       
         <p>前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该功能为 beta 版本且默认启用了，v1.14 为 stable 版本。</p>
 <ul>
-<li><a href="http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/" target="_blank" rel="noopener">kube-scheduler 源码分析</a></li>
-<li><a href="http://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/" target="_blank" rel="noopener">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li>
+<li><a href="http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/">kube-scheduler 源码分析</a></li>
+<li><a href="http://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li>
 </ul>
 <h3 id="为什么要有优先级与抢占机制"><a href="#为什么要有优先级与抢占机制" class="headerlink" title="为什么要有优先级与抢占机制"></a>为什么要有优先级与抢占机制</h3><p>正常情况下，当一个 pod 调度失败后，就会被暂时 “搁置” 处于 <code>pending</code> 状态，直到 pod 被更新或者集群状态发生变化，调度器才会对这个 pod 进行重新调度。但在实际的业务场景中会存在在线与离线业务之分，若在线业务的 pod 因资源不足而调度失败时，此时就需要离线业务下掉一部分为在线业务提供资源，即在线业务要抢占离线业务的资源，此时就需要 scheduler 的优先级和抢占机制了，该机制解决的是 pod 调度失败时该怎么办的问题，若该 pod 的优先级比较高此时并不会被”搁置”，而是会”挤走”某个 node 上的一些低优先级的 pod，这样就可以保证高优先级的 pod 调度成功。</p>
 <h3 id="优先级与抢占机制源码分析"><a href="#优先级与抢占机制源码分析" class="headerlink" title="优先级与抢占机制源码分析"></a>优先级与抢占机制源码分析</h3><blockquote>
@@ -449,7 +449,7 @@
 <h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>这篇文章主要讲述 kube-scheduler 中的优先级与抢占机制，可以看到抢占机制比 predicates 与 priorities 算法都要复杂，其中的许多细节仍然没有提到，本文只是通读了大部分代码，某些代码的实现需要精读，限于笔者时间的关系，对于 kube-scheduler 的代码暂时分享到此处。</p>
 <p>参考：</p>
 <p><a href="https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/</a></p>
-<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/10/22/kube_scheduler_algorithm/">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li><li><a href="http://yoursite.com/2019/10/21/kube_scheduler_process/">kube-scheduler 源码分析</a></li></ul></div>
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">kube-scheduler predicates 与 priorities 调度算法源码分析</a></li><li><a href="http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/">kube-scheduler 源码分析</a></li><li><a href="http://yoursite.com/2019/10/24/kube_scheduler_preempt/">kube-scheduler 优先级与抢占机制源码分析</a></li></ul></div>
       
     </div>
     

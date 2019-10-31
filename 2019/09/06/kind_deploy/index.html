@@ -83,7 +83,7 @@
 <meta name="keywords" content="kind,deploy">
 <meta property="og:type" content="article">
 <meta property="og:title" content="使用 kind 部署单机版 kubernetes 集群">
-<meta property="og:url" content="http://yoursite.com/2019/09/06/kind_deploy/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/09/06/kind_deploy/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：  https://github.com/bsycorp/kind https://github.com/ub">
 <meta property="og:locale" content="zh-Hans">
@@ -120,7 +120,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/09/06/kind_deploy/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/09/06/kind_deploy/">
 
 
 
@@ -295,7 +295,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/09/06/kind_deploy/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/09/06/kind_deploy/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -411,7 +411,7 @@
 <p>kind 还支持自定义映射的端口号、支持使用自定义镜像仓库、支持启用 Feature Gates 等多个功能，详细的使用请参考官方文档 <a href="https://kind.sigs.k8s.io/docs/user/quick-start/" target="_blank" rel="noopener">quick-start</a>。</p>
 <h3 id="二、本地测试"><a href="#二、本地测试" class="headerlink" title="二、本地测试"></a>二、本地测试</h3><p>既然 kind 不能用作生产环境，那怎么在本地测试时使用呢？由于 k8s 的新版已经全面启用了 TLS，不再支持非安全端口，访问 APIServer 的接口都需要认证，但是本地测试不需要那么麻烦，如下所示，为匿名用户设置访问权限即可。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">// 为匿名用户关联 RBAC 规则</span><br><span class="line">$ kubectl create clusterrolebinding system:anonymous --clusterrole=cluster-admin --user=system:anonymous</span><br><span class="line"></span><br><span class="line">// 请求相关的 API</span><br><span class="line">$ curl -k https://127.0.0.1:55387/api/v1/nodes</span><br><span class="line">&#123;</span><br><span class="line">  &quot;kind&quot;: &quot;NodeList&quot;,</span><br><span class="line">  &quot;apiVersion&quot;: &quot;v1&quot;,</span><br><span class="line">  &quot;metadata&quot;: &#123;</span><br><span class="line">    &quot;selfLink&quot;: &quot;/api/v1/nodes&quot;,</span><br><span class="line">    &quot;resourceVersion&quot;: &quot;11844&quot;</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;items&quot;: [</span><br><span class="line">  ...</span><br></pre></td></tr></table></figure>
-
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/09/06/kind_deploy/">使用 kind 部署单机版 kubernetes 集群</a></li></ul></div>
       
     </div>
     
@@ -582,7 +582,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、使用-kind-部署-k8s-集群"><span class="nav-number">1.</span> <span class="nav-text">一、使用 kind 部署 k8s 集群</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二、本地测试"><span class="nav-number">2.</span> <span class="nav-text">二、本地测试</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、使用-kind-部署-k8s-集群"><span class="nav-number">1.</span> <span class="nav-text">一、使用 kind 部署 k8s 集群</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二、本地测试"><span class="nav-number">2.</span> <span class="nav-text">二、本地测试</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐</span></a></li></div>
             
 
           </div>

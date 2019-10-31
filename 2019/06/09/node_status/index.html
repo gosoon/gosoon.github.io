@@ -83,7 +83,7 @@
 <meta name="keywords" content="kubelet,node status">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kubelet 状态上报的方式">
-<meta property="og:url" content="http://yoursite.com/2019/06/09/node_status/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/06/09/node_status/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 状态。kubelet 自身会定期更新状态到 apiserver，通过参数 --node-status">
 <meta property="og:locale" content="zh-Hans">
@@ -123,7 +123,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/06/09/node_status/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/06/09/node_status/">
 
 
 
@@ -298,7 +298,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/06/09/node_status/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/06/09/node_status/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -434,7 +434,7 @@
 <p>在 PatchNodeStatus 会调用已注册的那些方法将状态把状态发给 APIServer。</p>
 <h3 id="四、总结"><a href="#四、总结" class="headerlink" title="四、总结"></a>四、总结</h3><p>本文主要讲述了 kubelet 上报状态的方式及其实现，node 状态上报的方式目前有两种，本文仅分析了第一种状态上报的方式。在大规模集群中由于节点数量比较多，所有 node 都频繁报状态对 etcd 会有一定的压力，当 node 与 master 通信时由于网络导致心跳上报失败也会影响 node 的状态，为了避免类似问题的出现才有 NodeLease 方式，对于该功能的实现后文会继续进行分析。</p>
 <p>参考：<br><a href="https://www.qikqiak.com/post/kubelet-sync-node-status/" target="_blank" rel="noopener">https://www.qikqiak.com/post/kubelet-sync-node-status/</a><br><a href="https://www.jianshu.com/p/054450557818" target="_blank" rel="noopener">https://www.jianshu.com/p/054450557818</a><br><a href="https://blog.csdn.net/shida_csdn/article/details/84286058" target="_blank" rel="noopener">https://blog.csdn.net/shida_csdn/article/details/84286058</a><br><a href="https://kubernetes.io/docs/concepts/architecture/nodes/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/architecture/nodes/</a></p>
-<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/02/26/k8s_events/">kubernets 中事件处理机制</a></li><li><a href="http://yoursite.com/2019/01/03/kubelet_create_pod/">kubelet 创建 pod 的流程</a></li><li><a href="http://yoursite.com/2018/12/23/kubelet_init/">kubelet 启动流程分析</a></li></ul></div>
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://blog.tianfeiyu.com/2019/02/26/k8s_events/">kubernets 中事件处理机制</a></li><li><a href="http://blog.tianfeiyu.com/2019/01/03/kubelet_create_pod/">kubelet 创建 pod 的流程</a></li><li><a href="http://blog.tianfeiyu.com/2018/12/23/kubelet_init/">kubelet 启动流程分析</a></li><li><a href="http://yoursite.com/2019/06/09/node_status/">kubelet 状态上报的方式</a></li></ul></div>
       
     </div>
     

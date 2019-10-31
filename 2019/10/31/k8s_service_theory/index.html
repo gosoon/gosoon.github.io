@@ -83,7 +83,7 @@
 <meta name="keywords" content="kubernetes service">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kubernetes service 原理解析">
-<meta property="og:url" content="http://yoursite.com/2019/10/31/k8s_service_theory/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="为什么需要 service在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 service 的作用，service 是一组具有相同 label pod 集合的抽象，集群内外的各个">
 <meta property="og:locale" content="zh-Hans">
@@ -128,7 +128,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/10/31/k8s_service_theory/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/">
 
 
 
@@ -303,7 +303,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/31/k8s_service_theory/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -442,7 +442,7 @@
 <p>参考：</p>
 <p><a href="https://www.cnblogs.com/xzkzzz/p/9559362.html" target="_blank" rel="noopener">https://www.cnblogs.com/xzkzzz/p/9559362.html</a></p>
 <p><a href="https://xigang.github.io/2019/07/21/kubernetes-service/" target="_blank" rel="noopener">https://xigang.github.io/2019/07/21/kubernetes-service/</a></p>
-
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/10/31/k8s_service_theory/">kubernetes service 原理解析</a></li></ul></div>
       
     </div>
     
@@ -607,7 +607,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么需要-service"><span class="nav-number">1.</span> <span class="nav-text">为什么需要 service</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的工作原理"><span class="nav-number">2.</span> <span class="nav-text">service 的工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的负载均衡"><span class="nav-number">3.</span> <span class="nav-text">service 的负载均衡</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#userspace-模式"><span class="nav-number">3.1.</span> <span class="nav-text">userspace 模式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#iptables-模式"><span class="nav-number">3.2.</span> <span class="nav-text">iptables 模式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ipvs-模式"><span class="nav-number">3.3.</span> <span class="nav-text">ipvs 模式</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的类型"><span class="nav-number">4.</span> <span class="nav-text">service 的类型</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ClusterIP"><span class="nav-number">4.0.1.</span> <span class="nav-text">ClusterIP</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#NodePort"><span class="nav-number">4.0.2.</span> <span class="nav-text">NodePort</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#LoadBalancer"><span class="nav-number">4.0.3.</span> <span class="nav-text">LoadBalancer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ExternelName"><span class="nav-number">4.0.4.</span> <span class="nav-text">ExternelName</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Ingress"><span class="nav-number">4.0.5.</span> <span class="nav-text">Ingress</span></a></li></ol></li></ol><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的服务发现"><span class="nav-number">5.</span> <span class="nav-text">service 的服务发现</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#环境变量"><span class="nav-number">5.0.1.</span> <span class="nav-text">环境变量</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#DNS"><span class="nav-number">5.0.2.</span> <span class="nav-text">DNS</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Service-的使用"><span class="nav-number">6.</span> <span class="nav-text">Service 的使用</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ClusterIP-方式"><span class="nav-number">6.0.1.</span> <span class="nav-text">ClusterIP 方式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#NodePort-方式"><span class="nav-number">6.0.2.</span> <span class="nav-text">NodePort 方式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Headless-service-就是没有-Cluster-IP-的-service"><span class="nav-number">6.0.3.</span> <span class="nav-text">Headless service(就是没有 Cluster IP 的 service )</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">7.</span> <span class="nav-text">总结</span></a></li></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么需要-service"><span class="nav-number">1.</span> <span class="nav-text">为什么需要 service</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的工作原理"><span class="nav-number">2.</span> <span class="nav-text">service 的工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的负载均衡"><span class="nav-number">3.</span> <span class="nav-text">service 的负载均衡</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#userspace-模式"><span class="nav-number">3.1.</span> <span class="nav-text">userspace 模式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#iptables-模式"><span class="nav-number">3.2.</span> <span class="nav-text">iptables 模式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ipvs-模式"><span class="nav-number">3.3.</span> <span class="nav-text">ipvs 模式</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的类型"><span class="nav-number">4.</span> <span class="nav-text">service 的类型</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ClusterIP"><span class="nav-number">4.0.1.</span> <span class="nav-text">ClusterIP</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#NodePort"><span class="nav-number">4.0.2.</span> <span class="nav-text">NodePort</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#LoadBalancer"><span class="nav-number">4.0.3.</span> <span class="nav-text">LoadBalancer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ExternelName"><span class="nav-number">4.0.4.</span> <span class="nav-text">ExternelName</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Ingress"><span class="nav-number">4.0.5.</span> <span class="nav-text">Ingress</span></a></li></ol></li></ol><li class="nav-item nav-level-3"><a class="nav-link" href="#service-的服务发现"><span class="nav-number">5.</span> <span class="nav-text">service 的服务发现</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#环境变量"><span class="nav-number">5.0.1.</span> <span class="nav-text">环境变量</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#DNS"><span class="nav-number">5.0.2.</span> <span class="nav-text">DNS</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Service-的使用"><span class="nav-number">6.</span> <span class="nav-text">Service 的使用</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ClusterIP-方式"><span class="nav-number">6.0.1.</span> <span class="nav-text">ClusterIP 方式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#NodePort-方式"><span class="nav-number">6.0.2.</span> <span class="nav-text">NodePort 方式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Headless-service-就是没有-Cluster-IP-的-service"><span class="nav-number">6.0.3.</span> <span class="nav-text">Headless service(就是没有 Cluster IP 的 service )</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">7.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐</span></a></li></div>
             
 
           </div>

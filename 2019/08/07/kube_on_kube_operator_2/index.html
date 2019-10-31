@@ -83,7 +83,7 @@
 <meta name="keywords" content="operator,kube-on-kube">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kube-on-kube-operator 开发(二)">
-<meta property="og:url" content="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望指正。 kubernetes-operator 组件介绍kubernetes-operator 中主要包含一个自定义的 cont">
 <meta property="og:locale" content="zh-Hans">
@@ -123,7 +123,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/">
 
 
 
@@ -298,7 +298,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -389,7 +389,7 @@
 <h4 id="定义-CRD"><a href="#定义-CRD" class="headerlink" title="定义 CRD"></a>定义 CRD</h4><p>下面是 CRD 的定义，kubernetes-operator 中的自定义资源为 <code>KubernetesCluster</code>，项目中简称为 <code>ecs</code>。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  names:</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  subresources:</span><br><span class="line">    status: &#123;&#125;</span><br><span class="line">  version: v1</span><br><span class="line">  versions:</span><br><span class="line">  - name: v1</span><br><span class="line">    served: true</span><br><span class="line">    storage: true</span><br></pre></td></tr></table></figure>
 <p>将 CRD 部署到 kubernetes 集群中，CRD 中的自定义资源<code>KubernetesCluster</code>(CR) 就成为了 kubernetes 中的一种资源，和 pod、deployment 等类似。</p>
-<h4 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h4><p>生成代码可以参考上一篇文章<a href="http://blog.tianfeiyu.com/2019/08/06/code_generator/" target="_blank" rel="noopener">使用 code-generator 为 CustomResources 生成代码</a>，此处不再详解。</p>
+<h4 id="生成代码"><a href="#生成代码" class="headerlink" title="生成代码"></a>生成代码</h4><p>生成代码可以参考上一篇文章<a href="http://blog.tianfeiyu.com/2019/08/06/code_generator/">使用 code-generator 为 CustomResources 生成代码</a>，此处不再详解。</p>
 <h4 id="开发-controller"><a href="#开发-controller" class="headerlink" title="开发 controller"></a>开发 controller</h4><p>如下所示是 controller 最简单的一个声明：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">for &#123;</span><br><span class="line">  desired := getDesiredState()</span><br><span class="line">  current := getCurrentState()</span><br><span class="line">  makeChanges(desired, current)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>所有 controller 也都是以此进行演变的，controller 的代码模式或者套路可以参考<a href="https://github.com/kubernetes/sample-controller" target="_blank" rel="noopener">sample-controller</a> 或者 kube-controller-manager 中所有 <a href="https://github.com/kubernetes/kubernetes/tree/master/pkg/controller" target="_blank" rel="noopener">controller</a> 的实现。</p>
@@ -405,7 +405,7 @@
 <p><a href="https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html" target="_blank" rel="noopener">https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html</a>  </p>
 <p><a href="https://www.cnblogs.com/gaorong/p/8854934.html" target="_blank" rel="noopener">https://www.cnblogs.com/gaorong/p/8854934.html</a></p>
 <p><a href="https://yucs.github.io/2017/12/21/2017-12-21-operator/" target="_blank" rel="noopener">https://yucs.github.io/2017/12/21/2017-12-21-operator/</a></p>
-<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">kube-on-kube-operator 开发(三)</a></li><li><a href="http://yoursite.com/2019/08/05/kube_on_kube_operator_1/">kube-on-kube-operator 开发(一)</a></li></ul></div>
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://blog.tianfeiyu.com/2019/09/01/kube_on_kube_operator_3/">kube-on-kube-operator 开发(三)</a></li><li><a href="http://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/">kube-on-kube-operator 开发(一)</a></li><li><a href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">kube-on-kube-operator 开发(三)</a></li></ul></div>
       
     </div>
     

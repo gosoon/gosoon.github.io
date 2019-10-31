@@ -83,7 +83,7 @@
 <meta name="keywords" content="Authentication,Authorization,RBAC">
 <meta property="og:type" content="article">
 <meta property="og:title" content="浅析 kubernetes 的认证与鉴权机制">
-<meta property="og:url" content="http://yoursite.com/2019/08/18/k8s_auth_rbac/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="笔者最初接触 kubernetes 时使用的是 v1.4 版本，集群间的通信仅使用 8080 端口，认证与鉴权机制还未得到完善，到后来开始使用 static token 作为认证机制，直到 v1.6 时才开始使用 TLS 认证。随着社区的发展，kubernetes 的认证与鉴权机制已经越来越完善，新版本已经全面趋于 TLS + RBAC 配置，但其认证与鉴权机制也极其复杂，本文将会带你一步步了解。">
 <meta property="og:locale" content="zh-Hans">
@@ -124,7 +124,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/08/18/k8s_auth_rbac/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/">
 
 
 
@@ -299,7 +299,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/18/k8s_auth_rbac/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -433,7 +433,7 @@
 <p>准入控制是在 apiserver 中进行配置的：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KUBE_ADMISSION_CONTROL=&quot;--enable-admission-plugins=NamespaceLifecycle,LimitRanger,...MutatingAdmissionWebhook,ValidatingAdmissionWebhook,NodeRestriction...&quot;</span><br></pre></td></tr></table></figure>
 <p>准入控制的配置是有序的，不同的顺序会影响 kubernetes 的性能，建议使用官方的配置。</p>
-<p>若需要对 kubernetes 中的对象做一些扩展，可以使用准入控制，比如：创建 pod 时添加 initContainer 或者校验字段等。准入控制最常使用的扩展方式就是 <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks" target="_blank" rel="noopener">admission webhooks</a>，以前写过一篇类似的文章，可以参考：<a href="http://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/" target="_blank" rel="noopener">http://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/</a>。</p>
+<p>若需要对 kubernetes 中的对象做一些扩展，可以使用准入控制，比如：创建 pod 时添加 initContainer 或者校验字段等。准入控制最常使用的扩展方式就是 <a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks" target="_blank" rel="noopener">admission webhooks</a>，以前写过一篇类似的文章，可以参考：<a href="http://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/">http://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/</a>。</p>
 <blockquote>
 <p> 准入控制更详细的文档，请参考：<a href="https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/</a></p>
 </blockquote>
@@ -472,7 +472,7 @@
 <p>kubelet 配置权限认证：<a href="https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/</a>  </p>
 <p>master-node communication：<a href="https://kubernetes.io/docs/concepts/architecture/master-node-communication/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/architecture/master-node-communication/</a></p>
 <p>kubernetes 数字证书体系浅析：<a href="https://mp.weixin.qq.com/s/iXuDbPKjSc65t_9Y1--bog" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/iXuDbPKjSc65t_9Y1--bog</a></p>
-
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/08/18/k8s_auth_rbac/">浅析 kubernetes 的认证与鉴权机制</a></li></ul></div>
       
     </div>
     
@@ -645,7 +645,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-的认证机制-Authentication"><span class="nav-number">1.</span> <span class="nav-text">kubernetes 的认证机制(Authentication)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#X509-client-certs"><span class="nav-number">1.1.</span> <span class="nav-text">X509 client certs</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Service-Account-Tokens"><span class="nav-number">1.2.</span> <span class="nav-text">Service Account Tokens</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#小结："><span class="nav-number">1.2.1.</span> <span class="nav-text">小结：</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-的鉴权机制-Authorization"><span class="nav-number">2.</span> <span class="nav-text">kubernetes 的鉴权机制(Authorization)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Node"><span class="nav-number">2.1.</span> <span class="nav-text">Node</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#RBAC"><span class="nav-number">2.2.</span> <span class="nav-text">RBAC</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#准入控制-Admission-Control"><span class="nav-number">3.</span> <span class="nav-text">准入控制(Admission Control)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#小结：-1"><span class="nav-number">3.1.</span> <span class="nav-text">小结：</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的证书链"><span class="nav-number">4.</span> <span class="nav-text">kubernetes 中的证书链</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#证书中的内嵌用户如何与-RBAC-配置进行结合"><span class="nav-number">4.1.</span> <span class="nav-text">证书中的内嵌用户如何与 RBAC 配置进行结合</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#证书中的内嵌用户"><span class="nav-number">4.1.1.</span> <span class="nav-text">证书中的内嵌用户</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#访问-apiserver-的几种方式"><span class="nav-number">5.</span> <span class="nav-text">访问 apiserver 的几种方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">6.</span> <span class="nav-text">总结</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-的认证机制-Authentication"><span class="nav-number">1.</span> <span class="nav-text">kubernetes 的认证机制(Authentication)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#X509-client-certs"><span class="nav-number">1.1.</span> <span class="nav-text">X509 client certs</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Service-Account-Tokens"><span class="nav-number">1.2.</span> <span class="nav-text">Service Account Tokens</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#小结："><span class="nav-number">1.2.1.</span> <span class="nav-text">小结：</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-的鉴权机制-Authorization"><span class="nav-number">2.</span> <span class="nav-text">kubernetes 的鉴权机制(Authorization)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Node"><span class="nav-number">2.1.</span> <span class="nav-text">Node</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#RBAC"><span class="nav-number">2.2.</span> <span class="nav-text">RBAC</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#准入控制-Admission-Control"><span class="nav-number">3.</span> <span class="nav-text">准入控制(Admission Control)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#小结：-1"><span class="nav-number">3.1.</span> <span class="nav-text">小结：</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的证书链"><span class="nav-number">4.</span> <span class="nav-text">kubernetes 中的证书链</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#证书中的内嵌用户如何与-RBAC-配置进行结合"><span class="nav-number">4.1.</span> <span class="nav-text">证书中的内嵌用户如何与 RBAC 配置进行结合</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#证书中的内嵌用户"><span class="nav-number">4.1.1.</span> <span class="nav-text">证书中的内嵌用户</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#访问-apiserver-的几种方式"><span class="nav-number">5.</span> <span class="nav-text">访问 apiserver 的几种方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">6.</span> <span class="nav-text">总结</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐</span></a></li></div>
             
 
           </div>

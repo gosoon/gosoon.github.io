@@ -83,7 +83,7 @@
 <meta name="keywords" content="operator,kube-on-kube">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kube-on-kube-operator 开发(三)">
-<meta property="og:url" content="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/09/01/kube_on_kube_operator_3/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="kube-on-kube-operator 开发(一)  kube-on-kube-operator 开发(二)   本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：  kube-on-kube kube-to-kube kube-to-cloud-kube  目前笔者主要在开发">
 <meta property="og:locale" content="zh-Hans">
@@ -120,7 +120,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/09/01/kube_on_kube_operator_3/">
 
 
 
@@ -295,7 +295,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/09/01/kube_on_kube_operator_3/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -373,9 +373,9 @@
 
       
         <ul>
-<li><p><a href="http://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/" target="_blank" rel="noopener">kube-on-kube-operator 开发(一)</a></p>
+<li><p><a href="http://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/">kube-on-kube-operator 开发(一)</a></p>
 </li>
-<li><p><a href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/" target="_blank" rel="noopener">kube-on-kube-operator 开发(二)</a></p>
+<li><p><a href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/">kube-on-kube-operator 开发(二)</a></p>
 </li>
 </ul>
 <p>本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：</p>
@@ -385,7 +385,7 @@
 <li>kube-to-cloud-kube</li>
 </ul>
 <p>目前笔者主要在开发 kube-to-kube，这一节会介绍 kube-to-kube 中如何使用二进制方式部署一个集群，问什么要先支持部署二进制集群呢，可以参考之前的文章。目前 kubernetes-operator 中部署集群是通过 ansible 调用笔者写的一些脚本部署的，由于 kubernetes 二进制文件比较大，暂时仅支持离线部署，部署前请下载好所需的二进制文件，笔者也提供了部署 v1.14 需要的所有二进制文件、镜像、yaml 等。</p>
-<p>二进制安装 kubernetes 最困难的地方就在于其复杂的认证(Authentication)及鉴权(Authorization)机制，上篇文章已经介绍了 kubernetes 中的认证与鉴权机制以及其中的证书链，若安装过程中有疑问请参考  <a href="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/" target="_blank" rel="noopener">浅析 kubernetes 的认证与鉴权机制</a>。</p>
+<p>二进制安装 kubernetes 最困难的地方就在于其复杂的认证(Authentication)及鉴权(Authorization)机制，上篇文章已经介绍了 kubernetes 中的认证与鉴权机制以及其中的证书链，若安装过程中有疑问请参考  <a href="http://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/">浅析 kubernetes 的认证与鉴权机制</a>。</p>
 <p>使用 kubernetes-operator 管理集群时首选需要有一个元集群，元集群可以使用 minkube 或者 kind 部署一个单机版集群，然后将 kubernetes-operator 部署到该集群中再通过创建 CR 来部署一个业务集群，最后使用该业务集群作为元集群即可，或者也可以使用 kubernetes-operator 中部署业务集群的方式来部署元集群。</p>
 <blockquote>
 <p>部署集群前请先克隆 <a href="https://github.com/gosoon/kubernetes-operator" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-operator</a> 和 <a href="https://github.com/gosoon/kubernetes-utils" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-utils</a> 项目，部署集群所需要的一些工具、配置以及 bin 文件都存放在这两个项目中，你也可以使用自己的配置。</p>
@@ -431,7 +431,7 @@
 <h3 id="启动服务"><a href="#启动服务" class="headerlink" title="启动服务"></a>启动服务</h3><p>首先启动 etcd 服务，etcd 所部署的几个节点需要同时启动，否则服务会启动失败。</p>
 <p>然后依次启动 master 上的组件和 node 上的组件。</p>
 <h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲述了 kubernetes-operator 中 kube-to-kube 部署集群的方式，介绍了主要的部署步骤，文中部署集群所有的操作都提供了脚本的方式：<a href="https://github.com/gosoon/kubernetes-operator/tree/master/scripts。" target="_blank" rel="noopener">https://github.com/gosoon/kubernetes-operator/tree/master/scripts。</a> kube-to-kube 的部署方式暂时是以 ansible + 自定义脚本的方式部署，部署方式也在持续更新与完善中。接下来会继续开发 kube-on-kube 的部署方式，kube-on-kube 会将业务集群的 master 组件部署在元集群中，kube-on-kube 方式暂时会采用对 kubeadm 封装的形式进行部署。</p>
-<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/08/07/kube_on_kube_operator_2/">kube-on-kube-operator 开发(二)</a></li><li><a href="http://yoursite.com/2019/08/05/kube_on_kube_operator_1/">kube-on-kube-operator 开发(一)</a></li></ul></div>
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/">kube-on-kube-operator 开发(二)</a></li><li><a href="http://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/">kube-on-kube-operator 开发(一)</a></li><li><a href="http://yoursite.com/2019/09/01/kube_on_kube_operator_3/">kube-on-kube-operator 开发(三)</a></li></ul></div>
       
     </div>
     

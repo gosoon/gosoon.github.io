@@ -83,7 +83,7 @@
 <meta name="keywords" content="client-go,informer">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kubernetes 中 informer 的使用">
-<meta property="og:url" content="http://yoursite.com/2019/05/17/client-go_informer/index.html">
+<meta property="og:url" content="http://blog.tianfeiyu.com/2019/05/17/client-go_informer/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式访问 k8s 集群获取资源。在笔者的开发过程中，最初都是直接调用 k8s 的 REST API 来获">
 <meta property="og:locale" content="zh-Hans">
@@ -123,7 +123,7 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/05/17/client-go_informer/">
+  <link rel="canonical" href="http://blog.tianfeiyu.com/2019/05/17/client-go_informer/">
 
 
 
@@ -298,7 +298,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/05/17/client-go_informer/">
+    <link itemprop="mainEntityOfPage" href="http://blog.tianfeiyu.com/2019/05/17/client-go_informer/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -467,7 +467,7 @@
 <p><a href="https://zhuanlan.zhihu.com/p/59660536" target="_blank" rel="noopener">理解 K8S 的设计精髓之 List-Watch机制和Informer模块</a></p>
 <p><a href="https://ranler.org/notes/file/528" target="_blank" rel="noopener">https://ranler.org/notes/file/528</a></p>
 <p><a href="https://yq.aliyun.com/articles/688485" target="_blank" rel="noopener">Kubernetes Client-go Informer 源码分析</a></p>
-
+<div><br><h1>相关推荐<span style="font-size:0.45em; color:gray"></span></h1><ul><li><a href="http://yoursite.com/2019/05/17/client-go_informer/">kubernetes 中 informer 的使用</a></li></ul></div>
       
     </div>
     
@@ -638,7 +638,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、kubernetes-集群的几种访问方式"><span class="nav-number">1.</span> <span class="nav-text">一、kubernetes 集群的几种访问方式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Informer-的机制"><span class="nav-number">2.</span> <span class="nav-text">二、Informer 的机制</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-中几个组件的作用"><span class="nav-number">2.1.</span> <span class="nav-text">1、Informer 中几个组件的作用</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、Informer-的工作流程"><span class="nav-number">2.2.</span> <span class="nav-text">2、Informer 的工作流程</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、Informer-使用示例"><span class="nav-number">3.</span> <span class="nav-text">三、Informer 使用示例</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1、下面是一个作为-client-的使用示例："><span class="nav-number">4.</span> <span class="nav-text">1、下面是一个作为 client 的使用示例：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2、以下是作为-controller-使用的一个整体工作流程"><span class="nav-number">5.</span> <span class="nav-text">2、以下是作为 controller 使用的一个整体工作流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、使用中的一些问题"><span class="nav-number">6.</span> <span class="nav-text">四、使用中的一些问题</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-二级缓存中的同步问题"><span class="nav-number">6.1.</span> <span class="nav-text">1、Informer 二级缓存中的同步问题</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、使用-Informer-如何监听所有资源对象？"><span class="nav-number">6.2.</span> <span class="nav-text">2、使用 Informer 如何监听所有资源对象？</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3、为什么不是使用-workqueue？"><span class="nav-number">6.3.</span> <span class="nav-text">3、为什么不是使用 workqueue？</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、总结"><span class="nav-number">7.</span> <span class="nav-text">五、总结</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、kubernetes-集群的几种访问方式"><span class="nav-number">1.</span> <span class="nav-text">一、kubernetes 集群的几种访问方式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Informer-的机制"><span class="nav-number">2.</span> <span class="nav-text">二、Informer 的机制</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-中几个组件的作用"><span class="nav-number">2.1.</span> <span class="nav-text">1、Informer 中几个组件的作用</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、Informer-的工作流程"><span class="nav-number">2.2.</span> <span class="nav-text">2、Informer 的工作流程</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、Informer-使用示例"><span class="nav-number">3.</span> <span class="nav-text">三、Informer 使用示例</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#1、下面是一个作为-client-的使用示例："><span class="nav-number">4.</span> <span class="nav-text">1、下面是一个作为 client 的使用示例：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2、以下是作为-controller-使用的一个整体工作流程"><span class="nav-number">5.</span> <span class="nav-text">2、以下是作为 controller 使用的一个整体工作流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、使用中的一些问题"><span class="nav-number">6.</span> <span class="nav-text">四、使用中的一些问题</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、Informer-二级缓存中的同步问题"><span class="nav-number">6.1.</span> <span class="nav-text">1、Informer 二级缓存中的同步问题</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、使用-Informer-如何监听所有资源对象？"><span class="nav-number">6.2.</span> <span class="nav-text">2、使用 Informer 如何监听所有资源对象？</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3、为什么不是使用-workqueue？"><span class="nav-number">6.3.</span> <span class="nav-text">3、为什么不是使用 workqueue？</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、总结"><span class="nav-number">7.</span> <span class="nav-text">五、总结</span></a></li></ol><li class="nav-item nav-level-1"><a class="nav-link" href="#undefined"><span class="nav-number"></span> <span class="nav-text">相关推荐</span></a></li></div>
             
 
           </div>
