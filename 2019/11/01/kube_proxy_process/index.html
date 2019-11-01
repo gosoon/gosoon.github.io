@@ -79,18 +79,18 @@
 
 
 
-<meta name="description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。 kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行解析命令行参数、添加默认值等。下面就直接看 k">
+<meta name="description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。  kubernetes 版本: v1.16  kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行">
 <meta name="keywords" content="kube-proxy">
 <meta property="og:type" content="article">
 <meta property="og:title" content="kube-proxy 源码分析">
 <meta property="og:url" content="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。 kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行解析命令行参数、添加默认值等。下面就直接看 k">
+<meta property="og:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。  kubernetes 版本: v1.16  kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-11-01T10:02:33.588Z">
+<meta property="og:updated_time" content="2019-11-01T12:26:39.823Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kube-proxy 源码分析">
-<meta name="twitter:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。 kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行解析命令行参数、添加默认值等。下面就直接看 k">
+<meta name="twitter:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。  kubernetes 版本: v1.16  kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行">
 
 
 
@@ -373,6 +373,9 @@
 
       
         <p>上篇文章 <a href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/">kubernetes service 原理解析</a> 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。</p>
+<blockquote>
+<p>kubernetes 版本: v1.16</p>
+</blockquote>
 <h2 id="kube-proxy-启动流程"><a href="#kube-proxy-启动流程" class="headerlink" title="kube-proxy 启动流程"></a>kube-proxy 启动流程</h2><p>前面的文章已经说过 kubernetes 中所有组件都是通过其  <code>run()</code> 方法启动主逻辑的，<code>run()</code> 方法调用之前会进行解析命令行参数、添加默认值等。下面就直接看 kube-proxy 的 <code>run()</code> 方法：</p>
 <ul>
 <li>若启动时指定了 <code>--write-config-to</code> 参数，kube-proxy 只将启动的默认参数写到指定的配置文件中，然后退出</li>
