@@ -92,7 +92,7 @@
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106154640930.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106150202161.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/Center.png">
-<meta property="og:updated_time" content="2019-11-06T12:12:03.267Z">
+<meta property="og:updated_time" content="2019-11-06T12:32:49.935Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kube-proxy iptables 模式源码分析">
 <meta name="twitter:description" content="iptables 的功能在前面的文章中已经介绍过  iptable 的一些基本信息，本文会深入介绍 kube-proxy iptables 模式下的工作原理，本文中多处会与 iptables 的知识相关联，若没有 iptables 基础，请先自行补充。 iptables 的功能：  流量转发：DNAT 实现 IP 地址和端口的映射； 负载均衡：statistic 模块为每个后端设置权重； 会话保持">
@@ -488,7 +488,7 @@
 <p>写入负载均衡和 DNAT 规则，对于 endpoints 中的 pod 使用随机访问负载均衡策略。</p>
 <ul>
 <li>在 iptables 规则中加入该 service 对应的自定义链“KUBE-SVC-xxx”，如果该服务对应的 endpoints 大于等于2，则添加负载均衡规则；</li>
-<li>针对非本地 Node 上的 pod，需进行 DNAT，将请求的目标地址设置成后选的 pod 的 IP 后进行路由，KUBE-MARK-MASQ 将重设(伪装)源地址；</li>
+<li>针对非本地 Node 上的 pod，需进行 DNAT，将请求的目标地址设置成候选的 pod 的 IP 后进行路由，KUBE-MARK-MASQ 将重设(伪装)源地址；</li>
 </ul>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">for i, endpointChain := range endpointChains &#123;</span><br><span class="line">    ......</span><br><span class="line">    if svcInfo.OnlyNodeLocalEndpoints() &amp;&amp; endpoints[i].IsLocal &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    epIP := endpoints[i].IP()</span><br><span class="line">    if epIP == &quot;&quot; &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    args = append(args, &quot;-j&quot;, string(endpointChain))</span><br><span class="line">    writeLine(proxier.natRules, args...)</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    writeLine(proxier.natRules, args...)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>若启用了 clusterCIDR 则生成对应的规则链：</p>
@@ -506,7 +506,7 @@
 <p>使用 iptables-restore 同步规则：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">proxier.iptablesData.Reset()</span><br><span class="line">proxier.iptablesData.Write(proxier.filterChains.Bytes())</span><br><span class="line">proxier.iptablesData.Write(proxier.filterRules.Bytes())</span><br><span class="line">proxier.iptablesData.Write(proxier.natChains.Bytes())</span><br><span class="line">proxier.iptablesData.Write(proxier.natRules.Bytes())</span><br><span class="line"></span><br><span class="line">err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)</span><br><span class="line">if err != nil &#123;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>以上就是对 kube-proxy iptables 代理模式核心源码的一个走读。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲了 kube-proxy  iptables 模式的实现，可以看到其中的 iptables 规则是相当复杂的，在实际环境中尽量根据已有服务再来梳理整个 iptables 规则链就比较清楚了，笔者对于 iptables 的只是也是现学的，文中如有不当之处望指正。上面分析完了整个 iptables 模式的功能，但是 iptable 存在一些性能问题，比如有规则线性匹配时延、规则更新时延、可扩展性差等，为了解决这些问题于是有了 ipvs 模式，在下篇文章中会继续介绍 ipvs 模式的实现。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲了 kube-proxy  iptables 模式的实现，可以看到其中的 iptables 规则是相当复杂的，在实际环境中尽量根据已有服务再来梳理整个 iptables 规则链就比较清楚了，笔者对于 iptables 的知识也是现学的，文中如有不当之处望指正。上面分析完了整个 iptables 模式的功能，但是 iptable 存在一些性能问题，比如有规则线性匹配时延、规则更新时延、可扩展性差等，为了解决这些问题于是有了 ipvs 模式，在下篇文章中会继续介绍 ipvs 模式的实现。</p>
 <p>参考：</p>
 <p><a href="https://www.jianshu.com/p/a978af8e5dd8" target="_blank" rel="noopener">https://www.jianshu.com/p/a978af8e5dd8</a></p>
 <p><a href="https://blog.csdn.net/ebay/article/details/52798074" target="_blank" rel="noopener">https://blog.csdn.net/ebay/article/details/52798074</a></p>
