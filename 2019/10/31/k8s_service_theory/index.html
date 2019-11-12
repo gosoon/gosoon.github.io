@@ -94,7 +94,7 @@
 <meta property="og:image" content="http://cdn.tianfeiyu.com/nodeport.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/loadbalancer.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/ingress.png">
-<meta property="og:updated_time" content="2019-11-01T09:46:24.625Z">
+<meta property="og:updated_time" content="2019-11-12T03:17:09.229Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubernetes service 原理解析">
 <meta name="twitter:description" content="为什么需要 service在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 service 的作用，service 是一组具有相同 label pod 集合的抽象，集群内外的各个">
@@ -380,7 +380,7 @@
       
 
       
-        <h3 id="为什么需要-service"><a href="#为什么需要-service" class="headerlink" title="为什么需要 service"></a>为什么需要 service</h3><p>在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 service 的作用，service 是一组具有相同 label pod 集合的抽象，集群内外的各个服务可以通过 service 进行互相通信，当创建一个 service 对象时也会对应创建一个 endpoint 对象，endpoint 是用来做容器发现的，service 只是将多个 pod 进行关联，实际的路由转发都是由 kubernetes  中的 kube-proxy 组件来实现，因此，service 必须 kube-proxy 使用，kube-proxy 组件可以运行在 kubernetes 集群中的每一个节点上也可以只运行在单独的几个节点上，其会根据 service 和 endpoints 的变动来改变节点上 iptables 或者 ipvs 中保存的路由规则。</p>
+        <h3 id="为什么需要-service"><a href="#为什么需要-service" class="headerlink" title="为什么需要 service"></a>为什么需要 service</h3><p>在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 service 的作用，service 是一组具有相同 label pod 集合的抽象，集群内外的各个服务可以通过 service 进行互相通信，当创建一个 service 对象时也会对应创建一个 endpoint 对象，endpoint 是用来做容器发现的，service 只是将多个 pod 进行关联，实际的路由转发都是由 kubernetes  中的 kube-proxy 组件来实现，因此，service 必须结合 kube-proxy 使用，kube-proxy 组件可以运行在 kubernetes 集群中的每一个节点上也可以只运行在单独的几个节点上，其会根据 service 和 endpoints 的变动来改变节点上 iptables 或者 ipvs 中保存的路由规则。</p>
 <h3 id="service-的工作原理"><a href="#service-的工作原理" class="headerlink" title="service 的工作原理"></a>service 的工作原理</h3><p><img src="http://cdn.tianfeiyu.com/service%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86.png" alt="service 原理"></p>
 <p>endpoints controller 是负责生成和维护所有 endpoints 对象的控制器，监听 service 和对应 pod 的变化，更新对应 service 的 endpoints 对象。当用户创建 service 后 endpoints controller 会监听 pod 的状态，当 pod 处于 running 且准备就绪时，endpoints controller 会将 pod ip 记录到 endpoints 对象中，因此，service 的容器发现是通过 endpoints 来实现的。而 kube-proxy 会监听 service 和 endpoints 的更新并调用其代理模块在主机上刷新路由转发规则。</p>
 <h3 id="service-的负载均衡"><a href="#service-的负载均衡" class="headerlink" title="service 的负载均衡"></a>service 的负载均衡</h3><p>上文已经提到 service 实际的路由转发都是由 kube-proxy 组件来实现的，service 仅以一种 VIP（ClusterIP） 的形式存在，kube-proxy 主要实现了集群内部从 pod 到 service 和集群外部从 nodePort 到 service 的访问，kube-proxy 的路由转发规则是通过其后端的代理模块实现的，kube-proxy 的代理模块目前有四种实现方案，userspace、iptables、ipvs、kernelspace，其发展历程如下所示：</p>

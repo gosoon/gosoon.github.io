@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。  kubernetes 版本: v1.16  kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-11-05T07:15:51.043Z">
+<meta property="og:updated_time" content="2019-11-12T06:13:24.550Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kube-proxy 源码分析">
 <meta name="twitter:description" content="上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。  kubernetes 版本: v1.16  kube-proxy 启动流程前面的文章已经说过 kubernetes 中所有组件都是通过其  run() 方法启动主逻辑的，run() 方法调用之前会进行">
@@ -411,7 +411,7 @@
 <p><code>o.Run()</code> 中调用了 <code>NewProxyServer()</code> 来初始化 proxyServer 对象，其中包括初始化每种模式对应的 proxier，该方法最终会调用 <code>s.Proxier.SyncLoop()</code> 执行 proxier 的主循环。</p>
 <h2 id="proxier-的初始化"><a href="#proxier-的初始化" class="headerlink" title="proxier 的初始化"></a>proxier 的初始化</h2><p>看完了启动流程的逻辑代码，接着再看一下各代理模式的初始化，上文已经提到每种模式都是一个 proxier，即要实现 <code>proxy.Provider</code> 对应的 interface，如下所示：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">type Provider interface &#123;</span><br><span class="line">    config.EndpointsHandler</span><br><span class="line">    config.EndpointSliceHandler</span><br><span class="line">    config.ServiceHandler</span><br><span class="line"></span><br><span class="line">    Sync()</span><br><span class="line">    SyncLoop()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>首先要实现 service、endpoints 和 endpointSlice 对应的 handler，也就是对 <code>OnAdd</code>、<code>OnUpdate</code>、<code>OnDelete</code> 、<code>OnSynced</code> 四种方法的处理，详细的代码在下文进行讲解。EndpointSlice 是在 v1.6 中新加入的一个 API。<code>Sync()</code> 和 <code>SyncLoop()</code> 是主要用来处理路由规则的方法。</p>
+<p>首先要实现 service、endpoints 和 endpointSlice 对应的 handler，也就是对 <code>OnAdd</code>、<code>OnUpdate</code>、<code>OnDelete</code> 、<code>OnSynced</code> 四种方法的处理，详细的代码在下文进行讲解。EndpointSlice 是在 v1.16 中新加入的一个 API。<code>Sync()</code> 和 <code>SyncLoop()</code> 是主要用来处理路由规则的方法。</p>
 <h3 id="iptables-proxier-初始化"><a href="#iptables-proxier-初始化" class="headerlink" title="iptables proxier 初始化"></a>iptables proxier 初始化</h3><p>首先看 iptables 模式的 <code>NewProxier()</code>方法，其函数的具体执行逻辑为：</p>
 <ul>
 <li>设置相关的内核参数<code>route_localnet</code>、<code>bridge-nf-call-iptables</code></li>
