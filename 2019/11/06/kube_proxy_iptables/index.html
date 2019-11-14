@@ -92,7 +92,7 @@
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106154640930.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106150202161.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/Center.png">
-<meta property="og:updated_time" content="2019-11-06T14:01:02.755Z">
+<meta property="og:updated_time" content="2019-11-14T09:36:51.391Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kube-proxy iptables 模式源码分析">
 <meta name="twitter:description" content="iptables 的功能在前面的文章中已经介绍过  iptable 的一些基本信息，本文会深入介绍 kube-proxy iptables 模式下的工作原理，本文中多处会与 iptables 的知识相关联，若没有 iptables 基础，请先自行补充。 iptables 的功能：  流量转发：DNAT 实现 IP 地址和端口的映射； 负载均衡：statistic 模块为每个后端设置权重； 会话保持">
@@ -420,7 +420,7 @@
 <p>1、非本机访问</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">PREROUTING --&gt; KUBE-SERVICE --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
 <p>2、本机访问</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">INPUT --&gt; KUBE-SERVICE --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OUTPUT --&gt; KUBE-SERVICE --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
 <p>访问流程如下所示：</p>
 <ul>
 <li>1、对于进入 PREROUTING 链的都转到 KUBE-SERVICES 链进行处理；</li>
@@ -434,7 +434,7 @@
 <p>1、非本机访问</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">PREROUTING --&gt; KUBE-SERVICE --&gt; KUBE-NODEPORTS --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
 <p>2、本机访问</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">INPUT --&gt; KUBE-SERVICE --&gt; KUBE-NODEPORTS --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OUTPUT --&gt; KUBE-SERVICE --&gt; KUBE-NODEPORTS --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
 <p>该服务的 nodePort 端口为 30070，其 iptables 访问规则和使用 clusterIP 方式访问有点类似，不过 nodePort 方式会比 clusterIP 的方式多走一条链 KUBE-NODEPORTS，其会在 KUBE-NODEPORTS 链设置 mark 标记并转发到 KUBE-SVC-5SB6FTEHND4GTL2W，nodeport 与 clusterIP 访问方式最后都是转发到了 KUBE-SVC-xxx 链。</p>
 <ul>
 <li>1、经过 PREROUTING 转到 KUBE-SERVICES</li>
