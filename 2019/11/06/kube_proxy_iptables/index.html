@@ -92,7 +92,7 @@
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106154640930.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/image-20191106150202161.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/Center.png">
-<meta property="og:updated_time" content="2019-11-14T09:36:51.391Z">
+<meta property="og:updated_time" content="2019-11-17T09:05:37.361Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kube-proxy iptables 模式源码分析">
 <meta name="twitter:description" content="iptables 的功能在前面的文章中已经介绍过  iptable 的一些基本信息，本文会深入介绍 kube-proxy iptables 模式下的工作原理，本文中多处会与 iptables 的知识相关联，若没有 iptables 基础，请先自行补充。 iptables 的功能：  流量转发：DNAT 实现 IP 地址和端口的映射； 负载均衡：statistic 模块为每个后端设置权重； 会话保持">
@@ -417,13 +417,10 @@
 <p>kubernetes 自定义链中数据包的详细流转可以参考：</p>
 <p><img src="http://cdn.tianfeiyu.com/Center.png" alt=""></p>
 <h3 id="iptables-规则分析"><a href="#iptables-规则分析" class="headerlink" title="iptables 规则分析"></a>iptables 规则分析</h3><h4 id="clusterIP-访问方式"><a href="#clusterIP-访问方式" class="headerlink" title="clusterIP 访问方式"></a>clusterIP 访问方式</h4><p>创建一个 clusterIP 访问方式的 service 以及带有两个副本，从 pod 中访问 clusterIP 的 iptables 规则流向为：</p>
-<p>1、非本机访问</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">PREROUTING --&gt; KUBE-SERVICE --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
-<p>2、本机访问</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">OUTPUT --&gt; KUBE-SERVICE --&gt; KUBE-SVC-XXX --&gt; KUBE-SEP-XXX</span><br></pre></td></tr></table></figure>
 <p>访问流程如下所示：</p>
 <ul>
-<li>1、对于进入 PREROUTING 链的都转到 KUBE-SERVICES 链进行处理；</li>
+<li>1、对于进入 OUTPUT 链的都转到 KUBE-SERVICES 链进行处理；</li>
 <li>2、在 KUBE-SERVICES 链，对于访问 clusterIP 为 10.110.243.155 的转发到 KUBE-SVC-5SB6FTEHND4GTL2W； </li>
 <li>3、访问 KUBE-SVC-5SB6FTEHND4GTL2W 的使用随机数负载均衡，并转发到 KUBE-SEP-CI5ZO3FTK7KBNRMG 和 KUBE-SEP-OVNLTDWFHTHII4SC 上；</li>
 <li>4、KUBE-SEP-CI5ZO3FTK7KBNRMG 和 KUBE-SEP-OVNLTDWFHTHII4SC 对应 endpoint 中的 pod 192.168.137.147 和 192.168.98.213，设置 mark 标记，进行 DNAT 并转发到具体的 pod 上，如果某个 service 的 endpoints 中没有 pod，那么针对此 service 的请求将会被 drop 掉；</li>
