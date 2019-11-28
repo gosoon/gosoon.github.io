@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,deployment controller,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。 deployment 的功能deployment 是 kubernetes 中用来部署无状态应用的一个对象，也">
+<meta name="keywords" content="kube-controller-manager,deployment controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="deployment controller 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。 deployment 的功能deployment 是 kubernetes 中用来部署无状态应用的一个对象，也">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/deployment.png">
+<meta property="og:updated_time" content="2019-11-28T08:17:45.749Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="deployment controller 源码分析">
+<meta name="twitter:description" content="在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。 deployment 的功能deployment 是 kubernetes 中用来部署无状态应用的一个对象，也">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/deployment.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/">
+
+
+
+
+
+  <title>deployment controller 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-deployment controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">deployment controller 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-28T14:30:30+08:00">
+                2019-11-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/11/28/deployment_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/28/deployment_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。</p>
+<h3 id="deployment-的功能"><a href="#deployment-的功能" class="headerlink" title="deployment 的功能"></a>deployment 的功能</h3><p>deployment 是 kubernetes 中用来部署无状态应用的一个对象，也是最常用的一种对象。</p>
+<h4 id="deployment、replicaSet-和-pod-之间的关系"><a href="#deployment、replicaSet-和-pod-之间的关系" class="headerlink" title="deployment、replicaSet 和 pod 之间的关系"></a>deployment、replicaSet 和 pod 之间的关系</h4><p>deployment 的本质是控制 replicaSet，replicaSet 会控制 pod，然后由 controller 驱动各个对象达到期望状态。</p>
+<p><img src="http://cdn.tianfeiyu.com/deployment.png" alt=""></p>
+<p>DeploymentController 是 Deployment 资源的控制器，其通过 DeploymentInformer、ReplicaSetInformer、PodInformer 监听三种资源，当三种资源变化时会触发 DeploymentController 中的 syncLoop 操作。</p>
+<h4 id="deployment-的基本功能"><a href="#deployment-的基本功能" class="headerlink" title="deployment 的基本功能"></a>deployment 的基本功能</h4><p>下面通过命令行操作展示一下 deployment 的基本功能。</p>
+<p>以下是 deployment 的一个示例文件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apps/v1</span><br><span class="line">kind: Deployment</span><br><span class="line">metadata:</span><br><span class="line">  name: nginx-deployment</span><br><span class="line">spec:</span><br><span class="line">  progressDeadlineSeconds: 600    // 执行操作的超时时间</span><br><span class="line">  replicas: 20</span><br><span class="line">  revisionHistoryLimit: 10    // 保存的历史版本数量</span><br><span class="line">  selector:</span><br><span class="line">    matchLabels:</span><br><span class="line">      app: nginx-deployment</span><br><span class="line">  strategy:</span><br><span class="line">    rollingUpdate:</span><br><span class="line">      maxSurge: 25%         // 升级过程中最多可以比原先设置多出的 pod 数量</span><br><span class="line">      maxUnavailable: 25%   // 升级过程中最多有多少个 pod 处于无法提供服务的状态</span><br><span class="line">    type: RollingUpdate     // 更新策略</span><br><span class="line">  template:</span><br><span class="line">    metadata:</span><br><span class="line">      labels:</span><br><span class="line">        app: nginx-deployment</span><br><span class="line">    spec:</span><br><span class="line">      containers:</span><br><span class="line">      - name: nginx-deployment</span><br><span class="line">        image: nginx:1.9</span><br><span class="line">        imagePullPolicy: IfNotPresent</span><br><span class="line">        ports:</span><br><span class="line">        - containerPort: 80</span><br></pre></td></tr></table></figure>
+<h5 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl create -f nginx-dep.yaml --record</span><br><span class="line"></span><br><span class="line">$ kubectl get deployment</span><br><span class="line">NAME               READY   UP-TO-DATE   AVAILABLE   AGE</span><br><span class="line">nginx-deployment   20/20   20           20          22h</span><br><span class="line"></span><br><span class="line">$ kubectl get rs</span><br><span class="line">NAME                          DESIRED   CURRENT   READY   AGE</span><br><span class="line">nginx-deployment-68b649bd8b   20        20        20      22h</span><br></pre></td></tr></table></figure>
+<h5 id="滚动更新"><a href="#滚动更新" class="headerlink" title="滚动更新"></a>滚动更新</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl set image deploy/nginx-deployment nginx-deployment=nginx:1.9.3</span><br><span class="line"></span><br><span class="line">$ kubectl rollout status deployment/nginx-deployment</span><br></pre></td></tr></table></figure>
+<h5 id="回滚"><a href="#回滚" class="headerlink" title="回滚"></a>回滚</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">// 查看历史版本</span><br><span class="line">$ kubectl rollout history deployment/nginx-deployment</span><br><span class="line">deployment.extensions/nginx-deployment</span><br><span class="line">REVISION  CHANGE-CAUSE</span><br><span class="line">4         &lt;none&gt;</span><br><span class="line">5         &lt;none&gt;</span><br><span class="line"></span><br><span class="line">// 指定版本回滚</span><br><span class="line">$ kubectl rollout undo deployment/nginx-deployment --to-revision=2</span><br></pre></td></tr></table></figure>
+<h5 id="扩缩容"><a href="#扩缩容" class="headerlink" title="扩缩容"></a>扩缩容</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl scale deployment nginx-deployment --replicas 10</span><br><span class="line">deployment.extensions/nginx-deployment scaled</span><br></pre></td></tr></table></figure>
+<h5 id="暂停与恢复"><a href="#暂停与恢复" class="headerlink" title="暂停与恢复"></a>暂停与恢复</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl rollout pause deployment/nginx-deployment</span><br><span class="line">$ kubectl rollout resume deploy nginx-deployment</span><br></pre></td></tr></table></figure>
+<h5 id="删除"><a href="#删除" class="headerlink" title="删除"></a>删除</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl delete deployment nginx-deployment</span><br></pre></td></tr></table></figure>
+<p>以上是 deployment 的几个常用操作，下面会结合源码分析这几个操作都是如何实现的。</p>
+<h3 id="deployment-controller-源码分析"><a href="#deployment-controller-源码分析" class="headerlink" title="deployment controller 源码分析"></a>deployment controller 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>在控制器模式下，每次操作对象都会触发一次事件，然后 controller 会进行一次 syncLoop 操作，controller 是通过 informer 监听事件以及进行 ListWatch 操作的，关于 informer 的基础知识可以参考以前写的文章。</p>
+<h4 id="deployment-controller-启动流程"><a href="#deployment-controller-启动流程" class="headerlink" title="deployment controller 启动流程"></a>deployment controller 启动流程</h4><p>kube-controller-manager 中所有 controller 的启动都是在 <code>Run</code> 方法中完成初始化并启动的。在 <code>Run</code> 中会调用 run 函数，run 函数的主要流程有：</p>
+<ul>
+<li>1、调用 <code>NewControllerInitializers</code> 初始化所有 controller</li>
+<li>2、调用 <code>StartControllers</code> 启动所有 controller</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/controllermanager.go:158</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">func Run(c *config.CompletedConfig, stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    run := func(ctx context.Context) &#123;</span><br><span class="line">        ......</span><br><span class="line">        // 1.调用 NewControllerInitializers 初始化所有 controller</span><br><span class="line">        // 2.调用 StartControllers 启动所有 controller</span><br><span class="line">        if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil &#123;</span><br><span class="line">            klog.Fatalf(&quot;error starting controllers: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">        ......</span><br><span class="line">        select &#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>NewControllerInitializers</code>  中定义了所有的 controller 以及 start controller 对应的方法。deployment controller 对应的启动方法是 <code>startDeploymentController</code>。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/controllermanager.go:373</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc &#123;</span><br><span class="line">    controllers := map[string]InitFunc&#123;&#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    controllers[&quot;deployment&quot;] = startDeploymentController</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在<code>startDeploymentController</code> 中对 deploymentController 进行了初始化，并执行 <code>dc.Run()</code> 方法启动了 controller。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/apps.go:82</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 初始化 controller</span><br><span class="line">    dc, err := deployment.NewDeploymentController(</span><br><span class="line">        ctx.InformerFactory.Apps().V1().Deployments(),</span><br><span class="line">        ctx.InformerFactory.Apps().V1().ReplicaSets(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;deployment-controller&quot;),</span><br><span class="line">    )</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 启动 controller</span><br><span class="line">    go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs</code> 指定了 deployment controller 中工作的 goroutine 数量，默认值为 5，即会启动五个 goroutine 从 workqueue 中取出 object 并进行 sync 操作，该参数的默认值定义在 <code>k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1/defaults.go</code>  中。</p>
+<p><code>dc.Run</code> 方法会执行 ListWatch 操作并根据对应的事件执行 syncLoop。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/deployment_controller.go:148</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) Run(workers int, stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、等待 informer cache 同步完成</span><br><span class="line">    if !cache.WaitForNamedCacheSync(&quot;deployment&quot;, stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、启动 5 个 goroutine</span><br><span class="line">    for i := 0; i &lt; workers; i++ &#123;</span><br><span class="line">        // 3、在每个 goroutine 中每秒执行一次 dc.worker 方法</span><br><span class="line">        go wait.Until(dc.worker, time.Second, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &lt;-stopCh</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>dc.worker</code> 会调用 <code>syncHandler</code> 进行 sync 操作。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) worker() &#123;</span><br><span class="line">    for dc.processNextWorkItem() &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (dc *DeploymentController) processNextWorkItem() bool &#123;</span><br><span class="line">    key, quit := dc.queue.Get()</span><br><span class="line">    if quit &#123;</span><br><span class="line">        return false</span><br><span class="line">    &#125;</span><br><span class="line">    defer dc.queue.Done(key)</span><br><span class="line"></span><br><span class="line">    // 若 workQueue 中有任务则进行处理</span><br><span class="line">    err := dc.syncHandler(key.(string))</span><br><span class="line">    dc.handleErr(err, key)</span><br><span class="line"></span><br><span class="line">    return true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>syncHandler</code> 是 controller 的核心逻辑，下面会进行详细说明。至此，对于 deployment controller 的启动流程已经分析完，再来看一下 deployment controller 启动过程中的整个调用链，如下所示：</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Run() --&gt; run() --&gt; NewControllerInitializers() --&gt; StartControllers() --&gt; startDeploymentController() --&gt; deployment.NewDeploymentController() --&gt; deployment.Run()</span><br><span class="line">--&gt; deployment.syncDeployment()</span><br></pre></td></tr></table></figure>
+<p>deployment controller 在初始化时指定了 <code>dc.syncHandler = dc.syncDeployment</code>，所以该函数名为 <code>syncDeployment</code>，本文开头介绍 deployment 中的基本操作都是在 <code>syncDeployment</code> 中完成的。</p>
+<p> <code>syncDeployment</code> 的主要流程如下所示：</p>
+<ul>
+<li>1、调用 <code>getReplicaSetsForDeployment</code> 获取集群中与 Deployment 相关的 ReplicaSet，若发现匹配但没有关联 deployment 的 rs 则通过设置 ownerReferences 字段与 deployment 关联，已关联但不匹配的则删除对应的 ownerReferences；</li>
+<li>2、调用 <code>getPodMapForDeployment</code> 获取当前 Deployment 对象关联的 pod，并根据 rs.UID 对上述 pod 进行分类；</li>
+<li>3、通过判断 deployment 的 DeletionTimestamp 字段确认是否为删除操作；</li>
+<li>4、执行 <code>checkPausedConditions</code>检查 deployment 是否为<code>pause</code>状态并添加合适的<code>condition</code>；</li>
+<li>5、调用 <code>getRollbackTo</code> 函数检查 Deployment 是否有<code>Annotations：&quot;deprecated.deployment.rollback.to&quot;</code>字段，如果有，调用 <code>dc.rollback</code> 方法执行 rollback 操作；</li>
+<li>6、调用 <code>dc.isScalingEvent</code> 方法检查是否处于 scaling 状态中；</li>
+<li>7、最后检查是否为更新操作，并根据更新策略 <code>Recreate</code> 或 <code>RollingUpdate</code> 来执行对应的操作；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/deployment_controller.go:562</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    namespace, name, err := cache.SplitMetaNamespaceKey(key)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 1、从 informer cache 中获取 deployment 对象</span><br><span class="line">    deployment, err := dc.dLister.Deployments(namespace).Get(name)</span><br><span class="line">    if errors.IsNotFound(err) &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    d := deployment.DeepCopy()</span><br><span class="line"></span><br><span class="line">    // 2、判断 selecor 是否为空</span><br><span class="line">    everything := metav1.LabelSelector&#123;&#125;</span><br><span class="line">    if reflect.DeepEqual(d.Spec.Selector, &amp;everything) &#123;</span><br><span class="line">        ......</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    // 3、获取 deployment 对应的所有 rs，通过 LabelSelector 进行匹配</span><br><span class="line">    rsList, err := dc.getReplicaSetsForDeployment(d)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、获取当前 Deployment 对象关联的 pod，并根据 rs.UID 对 pod 进行分类</span><br><span class="line">    podMap, err := dc.getPodMapForDeployment(d, rsList)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、如果该 deployment 处于删除状态，则更新其 status</span><br><span class="line">    if d.DeletionTimestamp != nil &#123;</span><br><span class="line">        return dc.syncStatusOnly(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、检查是否处于 pause 状态</span><br><span class="line">    if err = dc.checkPausedConditions(d); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if d.Spec.Paused &#123;</span><br><span class="line">        return dc.sync(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 7、检查是否为回滚操作</span><br><span class="line">    if getRollbackTo(d) != nil &#123;</span><br><span class="line">        return dc.rollback(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 8、检查 deployment 是否处于 scale 状态</span><br><span class="line">    scalingEvent, err := dc.isScalingEvent(d, rsList)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scalingEvent &#123;</span><br><span class="line">        return dc.sync(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 9、更新操作</span><br><span class="line">    switch d.Spec.Strategy.Type &#123;</span><br><span class="line">    case apps.RecreateDeploymentStrategyType:</span><br><span class="line">        return dc.rolloutRecreate(d, rsList, podMap)</span><br><span class="line">    case apps.RollingUpdateDeploymentStrategyType:</span><br><span class="line">        return dc.rolloutRolling(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    return fmt.Errorf(&quot;unexpected deployment strategy type: %s&quot;, d.Spec.Strategy.Type)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>可以看出对于 deployment 的删除、暂停恢复、扩缩容以及更新操作都是在 syncDeployment 方法中进行处理的，最终是通过调用 syncStatusOnly、sync、rollback、rolloutRecreate、rolloutRolling 这几个方法来处理的，其中 syncStatusOnly 和 sync 都是更新 Deployment 的 Status，rollback 是用来回滚的，rolloutRecreate 和 rolloutRolling 是根据不同的更新策略来更新 Deployment 的，下面就来看看这些操作的具体实现。</p>
+<p>从 <code>syncDeployment</code> 中也可知以上几个操作的优先级为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">delete &gt; pause &gt; rollback &gt; scale &gt; rollout</span><br></pre></td></tr></table></figure>
+<p>举个例子，当在 rollout 操作时可以执行 pause 操作，在 pause 状态时也可直接执行删除操作。</p>
+<h4 id="删除-1"><a href="#删除-1" class="headerlink" title="删除"></a>删除</h4><p><code>syncDeployment</code> 中首先处理的是删除操作，删除操作是由客户端发起的，首先会在对象的 metadata 中设置 DeletionTimestamp 字段。</p>
+<pre><code>func (dc *DeploymentController) syncDeployment(key string) error {
+    ......
+    if d.DeletionTimestamp != nil {
+        return dc.syncStatusOnly(d, rsList)
+    }
+    ......
+}
+</code></pre><p>当 controller 检查到该对象有了 DeletionTimestamp 字段时会调用 <code>dc.syncStatusOnly</code> 执行对应的删除逻辑，该方法首先获取 newRS 以及所有的 oldRSs，然后会调用 <code>syncDeploymentStatus</code> 方法。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/sync.go:48</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncStatusOnly(d *apps.Deployment, rsList []*apps.ReplicaSet) error &#123;</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line">    return dc.syncDeploymentStatus(allRSs, newRS, d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>syncDeploymentStatus</code> 首先通过 newRS 和 allRSs 计算 deployment 当前的 status，然后和 deployment 中的 status 进行比较，若二者有差异则更新 deployment 使用最新的 status，<code>syncDeploymentStatus</code> 在后面的多种操作中都会被用到。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/sync.go:469</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error &#123;</span><br><span class="line">    newStatus := calculateStatus(allRSs, newRS, d)</span><br><span class="line"></span><br><span class="line">    if reflect.DeepEqual(d.Status, newStatus) &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    newDeployment := d</span><br><span class="line">    newDeployment.Status = newStatus</span><br><span class="line">    _, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)</span><br><span class="line">    return err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>calculateStatus</code> 如下所示，主要是通过 allRSs 以及 deployment 的状态计算出最新的 status。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/sync.go:483</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) apps.DeploymentStatus &#123;</span><br><span class="line">    availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)</span><br><span class="line">    totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)</span><br><span class="line">    unavailableReplicas := totalReplicas - availableReplicas</span><br><span class="line"></span><br><span class="line">    if unavailableReplicas &lt; 0 &#123;</span><br><span class="line">        unavailableReplicas = 0</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    status := apps.DeploymentStatus&#123;</span><br><span class="line">        ObservedGeneration:  deployment.Generation,</span><br><span class="line">        Replicas:            deploymentutil.GetActualReplicaCountForReplicaSets(allRSs),</span><br><span class="line">        UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*apps.ReplicaSet&#123;newRS&#125;),</span><br><span class="line">        ReadyReplicas:       deploymentutil.GetReadyReplicaCountForReplicaSets(allRSs),</span><br><span class="line">        AvailableReplicas:   availableReplicas,</span><br><span class="line">        UnavailableReplicas: unavailableReplicas,</span><br><span class="line">        CollisionCount:      deployment.Status.CollisionCount,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    conditions := deployment.Status.Conditions</span><br><span class="line">    for i := range conditions &#123;</span><br><span class="line">        status.Conditions = append(status.Conditions, conditions[i])</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    conditions := deployment.Status.Conditions</span><br><span class="line">    for i := range conditions &#123;</span><br><span class="line">        status.Conditions = append(status.Conditions, conditions[i])</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    return status</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是 controller 中处理删除逻辑的主要流程，通过上述代码可知，当删除 deployment 对象时，仅仅是判断该对象中是否存在 metadata.DeletionTimestamp 字段，然后进行一次状态同步，并没有看到删除 deployment、rs、pod 对象的操作，其实删除对象并不是在此处进行而是在 kube-controller-manager 的垃圾回收器(garbagecollector controller)中完成的，对于 garbagecollector controller 会在后面的文章中进行说明，此外在删除对象时还需要指定一个删除选项(orphan、background 或者 foreground)来说明该对象如何删除。</p>
+<h4 id="暂停和恢复"><a href="#暂停和恢复" class="headerlink" title="暂停和恢复"></a>暂停和恢复</h4><p>暂停以及恢复两个操作都是通过更新 deployment <code>spec.paused</code> 字段实现的，下面直接看它的具体实现。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    // pause 操作</span><br><span class="line">    if d.Spec.Paused &#123;</span><br><span class="line">        return dc.sync(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if getRollbackTo(d) != nil &#123;</span><br><span class="line">        return dc.rollback(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // scale 操作</span><br><span class="line">    scalingEvent, err := dc.isScalingEvent(d, rsList)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scalingEvent &#123;</span><br><span class="line">        return dc.sync(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当触发暂停操作时，会调用 <code>sync</code> 方法进行操作，<code>sync</code> 方法的主要逻辑如下所示：</p>
+<ul>
+<li>1、获取 newRS 和 oldRSs；</li>
+<li>2、根据 newRS 和 oldRSs 判断是否需要 scale 操作；</li>
+<li>3、若处于暂停状态且没有执行回滚操作，则根据 deployment 的 <code>.spec.revisionHistoryLimit</code> 中的值清理多余的 rs；</li>
+<li>4、最后执行 <code>syncDeploymentStatus</code> 更新 status；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error &#123;</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if err := dc.scale(d, newRS, oldRSs); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if d.Spec.Paused &amp;&amp; getRollbackTo(d) == nil &#123;</span><br><span class="line">        if err := dc.cleanupDeployment(oldRSs, d); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line">    return dc.syncDeploymentStatus(allRSs, newRS, d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上文已经提到过 deployment controller 在一个 syncLoop 中各种操作是有优先级，而 pause &gt; rollback &gt; scale &gt; rollout，通过文章开头的命令行参数也可以看出，暂停和恢复操作只有在 rollout 时才会生效，再结合源码分析，虽然暂停操作下不会执行到 scale 相关的操作，但是 pause 与 scale 都是调用 <code>sync</code> 方法完成的，且在 <code>sync</code> 方法中会首先检查 scale 操作是否完成，也就是说在 pause 操作后并不是立即暂停所有操作，例如，当执行滚动更新操作后立即执行暂停操作，此时滚动更新的第一个周期并不会立刻停止而是会等到滚动更新的第一个周期完成后才会处于暂停状态，在下文的滚动更新一节会有例子进行详细的分析，至于 scale 操作在下文也会进行详细分析。</p>
+<p><code>syncDeploymentStatus</code> 方法以及相关的代码在上文的<strong>删除操作</strong>中已经解释过了，此处不再进行分析。</p>
+<h4 id="回滚-1"><a href="#回滚-1" class="headerlink" title="回滚"></a>回滚</h4><p>kubernetes 中的每一个 Deployment 资源都包含有 <code>revision</code> 这个概念，并且其 <code>.spec.revisionHistoryLimit</code> 字段指定了需要保留的历史版本数，默认为10，每个版本都会对应一个 rs，若发现集群中有大量 0/0 rs 时请不要删除它，这些 rs 对应的都是 deployment 的历史版本，否则会导致无法回滚。当一个 deployment 的历史 rs 数超过指定数时，deployment controller 会自动清理。</p>
+<p>当在客户端触发回滚操作时，controller 会调用 <code>getRollbackTo</code> 进行判断并调用 <code>rollback</code> 执行对应的回滚操作。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">	if getRollbackTo(d) != nil &#123;</span><br><span class="line">        return dc.rollback(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>getRollbackTo</code> 通过判断 deployment 是否存在 rollback 对应的注解然后获取其值作为目标版本。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">getRollbackTo</span><span class="params">(d *apps.Deployment)</span> *<span class="title">extensions</span>.<span class="title">RollbackConfig</span></span> &#123;</span><br><span class="line">    <span class="comment">// annotations 为 "deprecated.deployment.rollback.to"</span></span><br><span class="line">    revision := d.Annotations[apps.DeprecatedRollbackTo]</span><br><span class="line">    <span class="keyword">if</span> revision == <span class="string">""</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">    &#125;</span><br><span class="line">    revision64, err := strconv.ParseInt(revision, <span class="number">10</span>, <span class="number">64</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> &amp;extensions.RollbackConfig&#123;</span><br><span class="line">        Revision: revision64,</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>rollback</code> 方法的主要逻辑如下：</p>
+<ul>
+<li>1、获取 newRS 和 oldRSs；</li>
+<li>2、调用 <code>getRollbackTo</code> 获取 rollback 的 revision；</li>
+<li>3、判断 revision 以及对应的 rs 是否存在，若 revision 为 0，则表示回滚到上一个版本；</li>
+<li>4、若存在对应的 rs，则调用 <code>rollbackToTemplate</code> 方法将 <code>rs.Spec.Template</code> 赋值给 <code>d.Spec.Template</code>，否则放弃回滚操作；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/rollback.go:32</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.ReplicaSet) error &#123;</span><br><span class="line">    // 1、获取 newRS 和 oldRSs</span><br><span class="line">    newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    allRSs := append(allOldRSs, newRS)</span><br><span class="line">    // 2、调用 getRollbackTo 获取 rollback 的 revision</span><br><span class="line">    rollbackTo := getRollbackTo(d)</span><br><span class="line"></span><br><span class="line">    // 3、判断 revision 以及对应的 rs 是否存在，若 revision 为 0，则表示回滚到最新的版本</span><br><span class="line">    if rollbackTo.Revision == 0 &#123;</span><br><span class="line">        if rollbackTo.Revision = deploymentutil.LastRevision(allRSs); rollbackTo.Revision == 0 &#123;</span><br><span class="line">            // 4、清除回滚标志放弃回滚操作</span><br><span class="line">            return dc.updateDeploymentAndClearRollbackTo(d)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    for _, rs := range allRSs &#123;</span><br><span class="line">        v, err := deploymentutil.Revision(rs)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if v == rollbackTo.Revision &#123;</span><br><span class="line">            // 5、调用 rollbackToTemplate 进行回滚操作</span><br><span class="line">            performedRollback, err := dc.rollbackToTemplate(d, rs)</span><br><span class="line">            if performedRollback &amp;&amp; err == nil &#123;</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return dc.updateDeploymentAndClearRollbackTo(d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>rollbackToTemplate</code> 会判断 <code>deployment.Spec.Template</code> 和 <code>rs.Spec.Template</code> 是否相等，若相等则无需回滚，否则使用 <code>rs.Spec.Template</code> 替换 <code>deployment.Spec.Template</code>，然后更新 deployment 的 spec 并清除回滚标志。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/rollback.go:75</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.ReplicaSet) (bool, error) &#123;</span><br><span class="line">    performedRollback := false</span><br><span class="line">    // 1、比较 d.Spec.Template 和 rs.Spec.Template 是否相等</span><br><span class="line">    if !deploymentutil.EqualIgnoreHash(&amp;d.Spec.Template, &amp;rs.Spec.Template) &#123;</span><br><span class="line">        // 2、替换 d.Spec.Template</span><br><span class="line">        deploymentutil.SetFromReplicaSetTemplate(d, rs.Spec.Template)</span><br><span class="line">        </span><br><span class="line">        // 3、设置 annotation</span><br><span class="line">        deploymentutil.SetDeploymentAnnotationsTo(d, rs)</span><br><span class="line">        performedRollback = true</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        dc.emitRollbackWarningEvent(d, deploymentutil.RollbackTemplateUnchanged, eventMsg)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、更新 deployment 并清除回滚标志</span><br><span class="line">    return performedRollback, dc.updateDeploymentAndClearRollbackTo(d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>回滚操作其实就是通过 revision 找到对应的 rs，然后使用 rs.Spec.Template 替换 deployment.Spec.Template 最后驱动 replicaSet 和 pod 达到期望状态即完成了回滚操作，在最新版中，这种使用注解方式指定回滚版本的方法即将被废弃。</p>
+<h4 id="扩缩容-1"><a href="#扩缩容-1" class="headerlink" title="扩缩容"></a>扩缩容</h4><p>当执行 scale 操作时，首先会通过 <code>isScalingEvent</code> 方法判断是否为扩缩容操作，然后通过 <code>dc.sync</code> 方法来执行实际的扩缩容动作。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    // scale 操作</span><br><span class="line">    scalingEvent, err := dc.isScalingEvent(d, rsList)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scalingEvent &#123;</span><br><span class="line">        return dc.sync(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>isScalingEvent</code> 的主要逻辑如下所示：</p>
+<ul>
+<li>1、获取所有的 rs；</li>
+<li>2、过滤出 activeRS，rs.Spec.Replicas &gt; 0 的为 activeRS；</li>
+<li>3、判断 rs 的 desired 值是否等于 deployment.Spec.Replicas，若不等于则需要为 rs 进行 scale 操作；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/sync.go:526</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) isScalingEvent(......) (bool, error) &#123;</span><br><span class="line">    // 1、获取所有 rs</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, err</span><br><span class="line">    &#125;</span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line"></span><br><span class="line">    // 2、过滤出 activeRS 并进行比较</span><br><span class="line">    for _, rs := range controller.FilterActiveReplicaSets(allRSs) &#123;</span><br><span class="line">        // 3、获取 rs annotation 中 deployment.kubernetes.io/desired-replicas 的值</span><br><span class="line">        desired, ok := deploymentutil.GetDesiredReplicasAnnotation(rs)</span><br><span class="line">        if !ok &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        // 4、判断是否需要 scale 操作</span><br><span class="line">        if desired != *(d.Spec.Replicas) &#123;</span><br><span class="line">            return true, nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return false, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>在通过 <code>isScalingEvent</code> 判断为 scale 操作时会调用 <code>sync</code>  方法执行，主要逻辑如下：</p>
+<ul>
+<li>1、获取 newRS 和 oldRSs；</li>
+<li>2、调用 <code>scale</code>  方法进行扩缩容操作；</li>
+<li>3、同步 deployment 的状态；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error &#123;</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if err := dc.scale(d, newRS, oldRSs); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">	......</span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line">    return dc.syncDeploymentStatus(allRSs, newRS, d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>sync</code> 方法中会调用 <code>scale</code> 方法执行扩容操作，其主要逻辑为：</p>
+<ul>
+<li>1、通过 <code>FindActiveOrLatest</code> 获取 activeRS 或者最新的  rs，此时若只有一个 rs 说明本次操作仅为 scale 操作，则调用 <code>scaleReplicaSetAndRecordEvent</code> 对 rs 进行 scale 操作，否则此时存在多个 activeRS；</li>
+<li>2、判断 newRS 是否已达到期望副本数，若达到则将所有的 oldRS 缩容到 0；</li>
+<li>3、若 newRS 还未达到期望副本数，且存在多个 activeRS，说明此时的操作有可能是升级与扩缩容操作同时进行，若 deployment 的更新操作为 RollingUpdate 那么 scale 操作也需要按比例进行：<ul>
+<li>通过 <code>FilterActiveReplicaSets</code> 获取所有活跃的 ReplicaSet 对象；</li>
+<li>调用 <code>GetReplicaCountForReplicaSets</code> 计算当前 Deployment 对应 ReplicaSet 持有的全部 Pod 副本个数；</li>
+<li>计算 Deployment 允许创建的最大 Pod 数量；</li>
+<li>判断是扩容还是缩容并对 allRSs 按时间戳进行正向或者反向排序；</li>
+<li>计算每个 rs 需要增加或者删除的副本数；</li>
+<li>更新 rs 对象；</li>
+</ul>
+</li>
+<li>4、若为 recreat 则需要等待更新完成后再进行 scale 操作；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/sync.go:294</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) scale(......) error &#123;</span><br><span class="line">    // 1、在滚动更新过程中 第一个 rs 的 replicas 数量= maxSuger + dep.spec.Replicas ，</span><br><span class="line">    // 更新完成后 pod 数量会多出 maxSurge 个，此处若检测到则应缩减回去</span><br><span class="line">    if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil &#123;</span><br><span class="line">        if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) &#123;</span><br><span class="line">            return nil</span><br><span class="line">        &#125;</span><br><span class="line">        // 2、只更新 rs annotation 以及为 deployment 设置 events</span><br><span class="line">        _, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、当调用 IsSaturated 方法发现当前的 Deployment 对应的副本数量已经达到期望状态时就</span><br><span class="line">    // 将所有历史版本 rs 持有的副本缩容为 0</span><br><span class="line">    if deploymentutil.IsSaturated(deployment, newRS) &#123;</span><br><span class="line">        for _, old := range controller.FilterActiveReplicaSets(oldRSs) &#123;</span><br><span class="line">            if _, _, err := dc.scaleReplicaSetAndRecordEvent(old, 0, deployment); err != nil &#123;</span><br><span class="line">                return err</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、此时说明 当前的 rs 副本并没有达到期望状态并且存在多个活跃的 rs 对象，</span><br><span class="line">    // 若 deployment 的更新策略为滚动更新，需要按照比例分别对各个活跃的 rs 进行扩容或者缩容</span><br><span class="line">    if deploymentutil.IsRollingUpdate(deployment) &#123;</span><br><span class="line">        allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))</span><br><span class="line">        allRSsReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)</span><br><span class="line"></span><br><span class="line">        allowedSize := int32(0)</span><br><span class="line"></span><br><span class="line">        // 5、计算最大可以创建出的 pod 数</span><br><span class="line">        if *(deployment.Spec.Replicas) &gt; 0 &#123;</span><br><span class="line">            allowedSize = *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 6、计算需要扩容的 pod 数</span><br><span class="line">        deploymentReplicasToAdd := allowedSize - allRSsReplicas</span><br><span class="line"></span><br><span class="line">        // 7、如果 deploymentReplicasToAdd &gt; 0，ReplicaSet 将按照从新到旧的顺序依次进行扩容；</span><br><span class="line">        // 如果 deploymentReplicasToAdd &lt; 0，ReplicaSet 将按照从旧到新的顺序依次进行缩容；</span><br><span class="line">        // 若 &gt; 0，则需要先扩容 newRS，但当在先扩容然后立刻缩容时，若 &lt;0,则需要先删除 oldRS 的 pod</span><br><span class="line">        var scalingOperation string</span><br><span class="line">        switch &#123;</span><br><span class="line">        case deploymentReplicasToAdd &gt; 0:</span><br><span class="line">            sort.Sort(controller.ReplicaSetsBySizeNewer(allRSs))</span><br><span class="line">            scalingOperation = &quot;up&quot;</span><br><span class="line"></span><br><span class="line">        case deploymentReplicasToAdd &lt; 0:</span><br><span class="line">            sort.Sort(controller.ReplicaSetsBySizeOlder(allRSs))</span><br><span class="line">            scalingOperation = &quot;down&quot;</span><br><span class="line">        &#125;</span><br><span class="line">        deploymentReplicasAdded := int32(0)</span><br><span class="line">        nameToSize := make(map[string]int32)</span><br><span class="line"></span><br><span class="line">        // 8、遍历所有的 rs，计算每个 rs 需要扩容或者缩容到的期望副本数</span><br><span class="line">        for i := range allRSs &#123;</span><br><span class="line">            rs := allRSs[i]</span><br><span class="line"></span><br><span class="line">            if deploymentReplicasToAdd != 0 &#123;</span><br><span class="line">                // 9、调用 GetProportion 估算出 rs 需要扩容或者缩容的副本数</span><br><span class="line">                proportion := deploymentutil.GetProportion(rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)</span><br><span class="line"></span><br><span class="line">                nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion</span><br><span class="line">                deploymentReplicasAdded += proportion</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                nameToSize[rs.Name] = *(rs.Spec.Replicas)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 10、遍历所有的 rs，第一个最活跃的 rs.Spec.Replicas 加上上面循环中计算出</span><br><span class="line">        // 其他 rs 要加或者减的副本数，然后更新所有 rs 的 rs.Spec.Replicas</span><br><span class="line">        for i := range allRSs &#123;</span><br><span class="line">            rs := allRSs[i]</span><br><span class="line"></span><br><span class="line">            // 11、要扩容或者要删除的 rs 已经达到了期望状态</span><br><span class="line">            if i == 0 &amp;&amp; deploymentReplicasToAdd != 0 &#123;</span><br><span class="line">                leftover := deploymentReplicasToAdd - deploymentReplicasAdded</span><br><span class="line">                nameToSize[rs.Name] = nameToSize[rs.Name] + leftover</span><br><span class="line">                if nameToSize[rs.Name] &lt; 0 &#123;</span><br><span class="line">                    nameToSize[rs.Name] = 0</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            // 12、对 rs 进行 scale 操作</span><br><span class="line">            if _, _, err := dc.scaleReplicaSet(rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil &#123;</span><br><span class="line">                return err</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>上述方法中有一个重要的操作就是在第 9 步调用 <code>GetProportion</code> 方法估算出 rs 需要扩容或者缩容的副本数，该方法中计算副本数的逻辑如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/util/deployment_util.go:466</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">func GetProportion(rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 &#123;</span><br><span class="line">    if rs == nil || *(rs.Spec.Replicas) == 0 || deploymentReplicasToAdd == 0 || deploymentReplicasToAdd == deploymentReplicasAdded &#123;</span><br><span class="line">        return int32(0)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 调用 getReplicaSetFraction 方法</span><br><span class="line">    rsFraction := getReplicaSetFraction(*rs, d)</span><br><span class="line">    allowed := deploymentReplicasToAdd - deploymentReplicasAdded</span><br><span class="line"></span><br><span class="line">    if deploymentReplicasToAdd &gt; 0 &#123;</span><br><span class="line">        return integer.Int32Min(rsFraction, allowed)</span><br><span class="line">    &#125;</span><br><span class="line">    return integer.Int32Max(rsFraction, allowed)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func getReplicaSetFraction(rs apps.ReplicaSet, d apps.Deployment) int32 &#123;</span><br><span class="line">    if *(d.Spec.Replicas) == int32(0) &#123;</span><br><span class="line">        return -*(rs.Spec.Replicas)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    deploymentReplicas := *(d.Spec.Replicas) + MaxSurge(d)</span><br><span class="line">    annotatedReplicas, ok := getMaxReplicasAnnotation(&amp;rs)</span><br><span class="line">    if !ok &#123;</span><br><span class="line">        annotatedReplicas = d.Status.Replicas</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 计算 newRSSize 的公式</span><br><span class="line">    newRSsize := (float64(*(rs.Spec.Replicas) * deploymentReplicas)) / float64(annotatedReplicas)</span><br><span class="line"></span><br><span class="line">    // 返回最终计算出的结果</span><br><span class="line">    return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h4 id="滚动更新-1"><a href="#滚动更新-1" class="headerlink" title="滚动更新"></a>滚动更新</h4><p>deployment 的更新方式有两个中，其中滚动更新是最常用的，下面就看看其具体的实现。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    switch d.Spec.Strategy.Type &#123;</span><br><span class="line">    case apps.RecreateDeploymentStrategyType:</span><br><span class="line">        return dc.rolloutRecreate(d, rsList, podMap)</span><br><span class="line">    case apps.RollingUpdateDeploymentStrategyType:</span><br><span class="line">        // 调用 rolloutRolling 执行滚动更新</span><br><span class="line">        return dc.rolloutRolling(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过判断 <code>d.Spec.Strategy.Type</code> ，当更新操作为 <code>rolloutRolling</code> 时，会调用 <code>rolloutRolling</code> 方法进行操作，具体的逻辑如下所示：</p>
+<ul>
+<li>1、调用 <code>getAllReplicaSetsAndSyncRevision</code> 获取所有的 rs，若没有 newRS 则创建；</li>
+<li>2、调用 <code>reconcileNewReplicaSet</code> 判断是否需要对 newRS 进行 scaleUp 操作；</li>
+<li>3、如果需要 scaleUp，更新 Deployment 的 status，添加相关的 condition，直接返回；</li>
+<li>4、调用 <code>reconcileOldReplicaSets</code> 判断是否需要为 oldRS 进行 scaleDown 操作；</li>
+<li>5、如果两者都不是则滚动升级很可能已经完成，此时需要检查 deployment status 是否已经达到期望状态，并且根据 <code>deployment.Spec.RevisionHistoryLimit</code> 的值清理 oldRSs；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) rolloutRolling(......) error &#123;</span><br><span class="line">    // 1、获取所有的 rs，若没有 newRS 则创建</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line"></span><br><span class="line">    // 2、执行 scale up 操作</span><br><span class="line">    scaledUp, err := dc.reconcileNewReplicaSet(allRSs, newRS, d)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scaledUp &#123;</span><br><span class="line">        return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、执行 scale down 操作</span><br><span class="line">    scaledDown, err := dc.reconcileOldReplicaSets(allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, d)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scaledDown &#123;</span><br><span class="line">        return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、清理过期的 rs</span><br><span class="line">    if deploymentutil.DeploymentComplete(d, &amp;d.Status) &#123;</span><br><span class="line">        if err := dc.cleanupDeployment(oldRSs, d); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、同步 deployment status</span><br><span class="line">    return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>reconcileNewReplicaSet</code> 主要逻辑如下：</p>
+<ul>
+<li>1、判断 <code>newRS.Spec.Replicas</code> 和 <code>deployment.Spec.Replicas</code> 是否相等，如果相等则直接返回，说明已经达到期望状态；</li>
+<li>2、若 <code>newRS.Spec.Replicas</code> &gt;  <code>deployment.Spec.Replicas</code> ，则说明 newRS 副本数已经超过期望值，调用 <code>dc.scaleReplicaSetAndRecordEvent</code> 进行 scale down；</li>
+<li>3、此时 <code>newRS.Spec.Replicas</code> &lt;  <code>deployment.Spec.Replicas</code> ，调用 <code>NewRSNewReplicas</code> 为 newRS 计算所需要的副本数，计算原则遵守 <code>maxSurge</code> 和 <code>maxUnavailable</code> 的约束；</li>
+<li>4、调用 <code>scaleReplicaSetAndRecordEvent</code> 更新 newRS 对象，设置<br>  rs.Spec.Replicas、rs.Annotations[DesiredReplicasAnnotation] 以及 rs.Annotations[MaxReplicasAnnotation] ；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/rolling.go:69</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) reconcileNewReplicaSet(......) (bool, error) &#123;</span><br><span class="line">    // 1、判断副本数是否已达到了期望值</span><br><span class="line">    if *(newRS.Spec.Replicas) == *(deployment.Spec.Replicas) &#123;</span><br><span class="line">        return false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、判断是否需要 scale down 操作</span><br><span class="line">    if *(newRS.Spec.Replicas) &gt; *(deployment.Spec.Replicas) &#123;</span><br><span class="line">        scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, *(deployment.Spec.Replicas), deployment)</span><br><span class="line">        return scaled, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、计算 newRS 所需要的副本数</span><br><span class="line">    newReplicasCount, err := deploymentutil.NewRSNewReplicas(deployment, allRSs, newRS)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、如果需要 scale ，则更新 rs 的 annotation 以及 rs.Spec.Replicas</span><br><span class="line">    scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, newReplicasCount, deployment)</span><br><span class="line">    return scaled, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>NewRSNewReplicas</code> 是为 newRS 计算所需要的副本数，该方法主要逻辑为：</p>
+<ul>
+<li>1、判断更新策略；</li>
+<li>2、计算 maxSurge 值；</li>
+<li>3、通过 allRSs 计算 currentPodCount 的值；</li>
+<li>4、最后计算 scaleUpCount 值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/util/deployment_util.go:814</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">func NewRSNewReplicas(......) (int32, error) &#123;</span><br><span class="line">    switch deployment.Spec.Strategy.Type &#123;</span><br><span class="line">    case apps.RollingUpdateDeploymentStrategyType:</span><br><span class="line">        // 1、计算 maxSurge 值</span><br><span class="line">        maxSurge, err := intstrutil.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), true)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return 0, err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 2、累加 rs.Spec.Replicas 获取 currentPodCount</span><br><span class="line">        currentPodCount := GetReplicaCountForReplicaSets(allRSs)</span><br><span class="line">        maxTotalPods := *(deployment.Spec.Replicas) + int32(maxSurge)</span><br><span class="line">        if currentPodCount &gt;= maxTotalPods &#123;</span><br><span class="line">            return *(newRS.Spec.Replicas), nil</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 3、计算 scaleUpCount</span><br><span class="line">        scaleUpCount := maxTotalPods - currentPodCount</span><br><span class="line">        scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(*(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))))</span><br><span class="line"></span><br><span class="line">        return *(newRS.Spec.Replicas) + scaleUpCount, nil</span><br><span class="line">    case apps.RecreateDeploymentStrategyType:</span><br><span class="line">        return *(deployment.Spec.Replicas), nil</span><br><span class="line">    default:</span><br><span class="line">        return 0, fmt.Errorf(&quot;deployment type %v isn&apos;t supported&quot;, deployment.Spec.Strategy.Type)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>reconcileOldReplicaSets</code> 的主要逻辑如下：</p>
+<ul>
+<li>1、通过 oldRSs 和 allRSs 获取 oldPodsCount 和 allPodsCount；</li>
+<li>2、计算 deployment 的 maxUnavailable、minAvailable、newRSUnavailablePodCount、maxScaledDown 值，当 deployment 的 maxSurge 和 maxUnavailable 值为百分数时，计算  maxSurge 向上取整而 maxUnavailable 则向下取整；</li>
+<li>3、清理异常的 rs；</li>
+<li>4、计算 oldRS 的 scaleDownCount；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) reconcileOldReplicaSets(......)   (bool, error) &#123;</span><br><span class="line">    // 1、计算 oldPodsCount</span><br><span class="line">    oldPodsCount := deploymentutil.GetReplicaCountForReplicaSets(oldRSs)</span><br><span class="line">    if oldPodsCount == 0 &#123;</span><br><span class="line">        return false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、计算 allPodsCount</span><br><span class="line">    allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)</span><br><span class="line"></span><br><span class="line">    // 3、计算 maxScaledDown</span><br><span class="line">    maxUnavailable := deploymentutil.MaxUnavailable(*deployment)</span><br><span class="line">    minAvailable := *(deployment.Spec.Replicas) - maxUnavailable</span><br><span class="line">    newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas</span><br><span class="line">    maxScaledDown := allPodsCount - minAvailable - newRSUnavailablePodCount</span><br><span class="line">    if maxScaledDown &lt;= 0 &#123;</span><br><span class="line">        return false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、清理异常的 rs</span><br><span class="line">    oldRSs, cleanupCount, err := dc.cleanupUnhealthyReplicas(oldRSs, deployment, maxScaledDown)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    allRSs = append(oldRSs, newRS)</span><br><span class="line"></span><br><span class="line">    // 5、缩容 old rs</span><br><span class="line">    scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    totalScaledDown := cleanupCount + scaledDownCount</span><br><span class="line">    return totalScaledDown &gt; 0, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过上面的代码可以看出，滚动更新过程中主要是通过调用<code>reconcileNewReplicaSet</code>对 newRS 不断扩容，调用 <code>reconcileOldReplicaSets</code> 对 oldRS 不断缩容，最终达到期望状态，并且在整个升级过程中，都严格遵守 <code>maxSurge</code> 和 <code>maxUnavailable</code> 的约束。</p>
+<p>不论是在 scale up 或者 scale down 中都是调用 <code>scaleReplicaSetAndRecordEvent</code> 执行，而 <code>scaleReplicaSetAndRecordEvent</code> 又会调用 <code>scaleReplicaSet</code> 来执行，两个操作都是更新 rs 的 annotations 以及 rs.Spec.Replicas。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">scale down</span><br><span class="line"></span><br><span class="line">    or          --&gt; dc.scaleReplicaSetAndRecordEvent() --&gt; dc.scaleReplicaSet()</span><br><span class="line"></span><br><span class="line">scale up</span><br></pre></td></tr></table></figure>
+<h5 id="滚动更新示例"><a href="#滚动更新示例" class="headerlink" title="滚动更新示例"></a>滚动更新示例</h5><p>上面的代码看起来非常的枯燥，只看源码其实并不能完全理解整个滚动升级的流程，此处举个例子说明一下：</p>
+<p>创建一个 nginx-deployment 有10 个副本，等 10 个 pod 都启动完成后如下所示：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl create -f nginx-dep.yaml</span><br><span class="line"></span><br><span class="line">$ kubectl get rs</span><br><span class="line">NAME                          DESIRED   CURRENT   READY   AGE</span><br><span class="line">nginx-deployment-68b649bd8b   10        10        10      72m</span><br></pre></td></tr></table></figure></p>
+<p> 然后更新 nginx-deployment  的镜像，默认使用滚动更新的方式：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl set image deploy/nginx-deployment nginx-deployment=nginx:1.9.3</span><br></pre></td></tr></table></figure></p>
+<p>此时通过源码可知会计算该  deployment 的 maxSurge、maxUnavailable 和 maxAvailable 的值，分别为 3、2 和 13，计算方法如下所示：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">// 向上取整为 3</span><br><span class="line">maxSurge = replicas * deployment.spec.strategy.rollingUpdate.maxSurge(25%)= 2.5</span><br><span class="line"></span><br><span class="line">// 向下取整为 2</span><br><span class="line">maxUnavailable = replicas * deployment.spec.strategy.rollingUpdate.maxUnavailable(25%)= 2.5</span><br><span class="line"></span><br><span class="line">maxAvailable = replicas(10) + MaxSurge（3） = 13</span><br></pre></td></tr></table></figure></p>
+<p>如上面代码所说，更新时首先创建 newRS，然后为其设定 replicas，计算 newRS replicas 值的方法在<code>NewRSNewReplicas</code> 中，此时计算出 replicas 结果为 3，然后更新 deployment 的 annotation，创建 events，本次 syncLoop 完成。等到下一个 syncLoop 时，所有 rs 的 replicas 已经达到最大值 10 + 3 = 13，此时需要 scale down oldRSs 了，scale down 的数量是通过以下公式得到的：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">// 13 = 10 + 3</span><br><span class="line">allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)</span><br><span class="line"></span><br><span class="line">// 8 = 10 - 2</span><br><span class="line">minAvailable := *(deployment.Spec.Replicas) - maxUnavailable</span><br><span class="line"></span><br><span class="line">// ???</span><br><span class="line">newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas</span><br><span class="line"></span><br><span class="line">// 13 - 8 - ???</span><br><span class="line">maxScaledDown := allPodsCount - minAvailable - newRSUnavailablePodCount</span><br></pre></td></tr></table></figure></p>
+<p>allPodsCount 是 allRSs 的 replicas 之和此时为 13，minAvailable 为 8 ，newRSUnavailablePodCount 此时不确定，但是值在 [0,3] 中，此时假设 newRS 的三个 pod 还处于 containerCreating 状态，则newRSUnavailablePodCount 为 0，根据以上公式计算所知 maxScaledDown 为 2，则 oldRS 需要 scale down 2 个 pod，其 replicas 需要改为 8，此时该 syncLoop 完成。下一个 syncLoop 时在 scaleUp 处计算得知 scaleUpCount = maxTotalPods - currentPodCount，13-3-8=2， 此时 newRS 需要更新 replicase 增加 2。以此轮询直到 newRS replicas 扩容到 10，oldRSs replicas 缩容至 0。</p>
+<p>对于上面的示例，可以使用 <code>kubectl get rs -w</code> 进行观察，以下为输出：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get  rs -w</span><br><span class="line">NAME                          DESIRED   CURRENT   READY   AGE</span><br><span class="line">nginx-deployment-68b649bd8b   10        0         0       0s</span><br><span class="line">nginx-deployment-68b649bd8b   10        10        0       0s</span><br><span class="line">nginx-deployment-68b649bd8b   10        10        10      13s</span><br><span class="line"></span><br><span class="line">nginx-deployment-689bff574f   3         0         0       0s</span><br><span class="line"></span><br><span class="line">nginx-deployment-68b649bd8b   8         10        10      14s</span><br><span class="line"></span><br><span class="line">nginx-deployment-689bff574f   3         0         0       0s</span><br><span class="line">nginx-deployment-689bff574f   3         3         3       1s</span><br><span class="line"></span><br><span class="line">nginx-deployment-689bff574f   5         3         0       0s</span><br><span class="line"></span><br><span class="line">nginx-deployment-68b649bd8b   8         8         8       14s</span><br><span class="line"></span><br><span class="line">nginx-deployment-689bff574f   5         3         0       0s</span><br><span class="line">nginx-deployment-689bff574f   5         5         0       0s</span><br><span class="line"></span><br><span class="line">nginx-deployment-689bff574f   5         5         5       6s</span><br><span class="line">......</span><br></pre></td></tr></table></figure></p>
+<h4 id="重新创建"><a href="#重新创建" class="headerlink" title="重新创建"></a>重新创建</h4><p>deployment 的另一种更新策略<code>recreate</code> 就比较简单粗暴了，当更新策略为 <code>Recreate</code> 时，deployment 先将所有旧的 rs 缩容到 0，并等待所有 pod 都删除后，再创建新的 rs。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) syncDeployment(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    switch d.Spec.Strategy.Type &#123;</span><br><span class="line">    case apps.RecreateDeploymentStrategyType:</span><br><span class="line">        return dc.rolloutRecreate(d, rsList, podMap)</span><br><span class="line">    case apps.RollingUpdateDeploymentStrategyType:</span><br><span class="line">        return dc.rolloutRolling(d, rsList)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>rolloutRecreate</code> 方法主要逻辑为：</p>
+<ul>
+<li>1、获取 newRS 和 oldRSs；</li>
+<li>2、缩容 oldRS replicas 至 0；</li>
+<li>3、创建 newRS；</li>
+<li>4、扩容 newRS；</li>
+<li>5、同步 deployment 状态；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">func (dc *DeploymentController) rolloutRecreate(......) error &#123;</span><br><span class="line">    // 1、获取所有 rs</span><br><span class="line">    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    allRSs := append(oldRSs, newRS)</span><br><span class="line">    activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)</span><br><span class="line"></span><br><span class="line">    // 2、缩容 oldRS</span><br><span class="line">    scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(activeOldRSs, d)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if scaledDown &#123;</span><br><span class="line">        return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if oldPodsRunning(newRS, oldRSs, podMap) &#123;</span><br><span class="line">        return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、创建 newRS</span><br><span class="line">    if newRS == nil &#123;</span><br><span class="line">        newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">        allRSs = append(oldRSs, newRS)</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、扩容 newRS</span><br><span class="line">    if _, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、清理过期的 RS</span><br><span class="line">    if util.DeploymentComplete(d, &amp;d.Status) &#123;</span><br><span class="line">        if err := dc.cleanupDeployment(oldRSs, d); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、同步 deployment 状态</span><br><span class="line">    return dc.syncRolloutStatus(allRSs, newRS, d)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>判断 deployment 是否存在 newRS 是在 <code>deploymentutil.FindNewReplicaSet</code> 方法中进行判断的，对比 <code>rs.Spec.Template</code> 和 <code>deployment.Spec.Template</code> 中字段的 hash 值是否相等以此进行确定，在上面的几个操作中也多次用到了该方法，此处说明一下。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dc.getAllReplicaSetsAndSyncRevision() --&gt; dc.getNewReplicaSet() --&gt; deploymentutil.FindNewReplicaSet() --&gt; EqualIgnoreHash()</span><br></pre></td></tr></table></figure>
+<p><code>EqualIgnoreHash</code> 方法如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/controller/deployment/util/deployment_util.go:633</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool &#123;</span><br><span class="line">    t1Copy := template1.DeepCopy()</span><br><span class="line">    t2Copy := template2.DeepCopy()</span><br><span class="line">    // Remove hash labels from template.Labels before comparing</span><br><span class="line">    delete(t1Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)</span><br><span class="line">    delete(t2Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)</span><br><span class="line">    return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>以上就是对 deployment recreate 更新策略源码的分析，需要注意的是，该策略会导致服务一段时间不可用，当 oldRS 缩容为 0，newRS 才开始创建，此时无可用的 pod，所以在生产环境中请慎用该更新策略。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要介绍了 deployment 的基本功能以及从源码角度分析其实现，deployment 主要有更新、回滚、扩缩容、暂停与恢复几个主要的功能。从源码中可以看到 deployment 在升级过程中一直会修改 rs 的 replicas 以及 annotation 最终达到最终期望的状态，但是整个过程中并没有体现出 pod 的创建与删除，从开头三者的关系图中可知是 rs 控制 pod 的变化，在下篇文章中会继续介绍 rs 是如何控制 pod 的变化。</p>
+<p>参考：<br><a href="https://my.oschina.net/u/3797264/blog/2966086" target="_blank" rel="noopener">https://my.oschina.net/u/3797264/blog/2966086</a><br><a href="https://draveness.me/kubernetes-deployment" target="_blank" rel="noopener">https://draveness.me/kubernetes-deployment</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/deployment-controller/" rel="tag"># deployment controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/11/18/kube_proxy_ipvs/" rel="next" title="kube-proxy ipvs 模式源码分析">
+                <i class="fa fa-chevron-left"></i> kube-proxy ipvs 模式源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">40</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">44</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#deployment-的功能"><span class="nav-number">1.</span> <span class="nav-text">deployment 的功能</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#deployment、replicaSet-和-pod-之间的关系"><span class="nav-number">1.1.</span> <span class="nav-text">deployment、replicaSet 和 pod 之间的关系</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#deployment-的基本功能"><span class="nav-number">1.2.</span> <span class="nav-text">deployment 的基本功能</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#创建"><span class="nav-number">1.2.1.</span> <span class="nav-text">创建</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#滚动更新"><span class="nav-number">1.2.2.</span> <span class="nav-text">滚动更新</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#回滚"><span class="nav-number">1.2.3.</span> <span class="nav-text">回滚</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#扩缩容"><span class="nav-number">1.2.4.</span> <span class="nav-text">扩缩容</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#暂停与恢复"><span class="nav-number">1.2.5.</span> <span class="nav-text">暂停与恢复</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#删除"><span class="nav-number">1.2.6.</span> <span class="nav-text">删除</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#deployment-controller-源码分析"><span class="nav-number">2.</span> <span class="nav-text">deployment controller 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#deployment-controller-启动流程"><span class="nav-number">2.1.</span> <span class="nav-text">deployment controller 启动流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#删除-1"><span class="nav-number">2.2.</span> <span class="nav-text">删除</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#暂停和恢复"><span class="nav-number">2.3.</span> <span class="nav-text">暂停和恢复</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#回滚-1"><span class="nav-number">2.4.</span> <span class="nav-text">回滚</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#扩缩容-1"><span class="nav-number">2.5.</span> <span class="nav-text">扩缩容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#滚动更新-1"><span class="nav-number">2.6.</span> <span class="nav-text">滚动更新</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#滚动更新示例"><span class="nav-number">2.6.1.</span> <span class="nav-text">滚动更新示例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#重新创建"><span class="nav-number">2.7.</span> <span class="nav-text">重新创建</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
