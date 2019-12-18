@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,daemonset controller,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node 上，在实际场景中，一般会将日志采集或者网络插件采用 daemonset 的方式部署。 DaemonSet 的基本操作创建dae">
+<meta name="keywords" content="kube-controller-manager,daemonset controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="daemonset controller 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node 上，在实际场景中，一般会将日志采集或者网络插件采用 daemonset 的方式部署。 DaemonSet 的基本操作创建dae">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-12-18T03:00:40.766Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="daemonset controller 源码分析">
+<meta name="twitter:description" content="在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node 上，在实际场景中，一般会将日志采集或者网络插件采用 daemonset 的方式部署。 DaemonSet 的基本操作创建dae">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/">
+
+
+
+
+
+  <title>daemonset controller 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-daemonset controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">daemonset controller 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-18T10:50:30+08:00">
+                2019-12-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/12/18/daemonset_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/18/daemonset_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node 上，在实际场景中，一般会将日志采集或者网络插件采用 daemonset 的方式部署。</p>
+<h3 id="DaemonSet-的基本操作"><a href="#DaemonSet-的基本操作" class="headerlink" title="DaemonSet 的基本操作"></a>DaemonSet 的基本操作</h3><h4 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h4><p>daemonset 在创建后会在每个 node 上都启动一个 pod。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl create -f nginx-ds.yaml</span><br></pre></td></tr></table></figure>
+<h4 id="扩缩容"><a href="#扩缩容" class="headerlink" title="扩缩容"></a>扩缩容</h4><p>由于 daemonset 是在每个 node 上启动一个 pod，其不存在扩缩容操作，副本数量跟 node 数量保持一致。</p>
+<h4 id="更新"><a href="#更新" class="headerlink" title="更新"></a>更新</h4><p>daemonset 有两种更新策略 <code>OnDelete</code> 和 <code>RollingUpdate</code>，默认为 <code>RollingUpdate</code>。滚动更新时，需要指定 <code>.spec.updateStrategy.rollingUpdate.maxUnavailable</code>（默认为1）和 <code>.spec.minReadySeconds</code>（默认为 0）。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 更新镜像</span><br><span class="line">$ kubectl set image ds/nginx-ds nginx-ds=nginx:1.16</span><br><span class="line"></span><br><span class="line">// 查看更新状态</span><br><span class="line">$ kubectl rollout status ds/nginx-ds</span><br></pre></td></tr></table></figure>
+<h4 id="回滚"><a href="#回滚" class="headerlink" title="回滚"></a>回滚</h4><p>在 statefulset 源码分析一节已经提到过 <code>controllerRevision</code> 这个对象了，其主要用来保存历史版本信息，在更新以及回滚操作时使用，daemonset controller 也是使用 <code>controllerrevision</code> 保存历史版本信息，在回滚时会使用历史 <code>controllerrevision</code> 中的信息替换 daemonset 中 <code>Spec.Template</code>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">// 查看 ds 历史版本信息</span><br><span class="line">$ kubectl get controllerrevision</span><br><span class="line">NAME                  CONTROLLER                REVISION   AGE</span><br><span class="line">nginx-ds-5c4b75bdbb   daemonset.apps/nginx-ds   2          122m</span><br><span class="line">nginx-ds-7cd7798dcd   daemonset.apps/nginx-ds   1          133m</span><br><span class="line"></span><br><span class="line">// 回滚到版本 1</span><br><span class="line">$ kubectl rollout undo daemonset nginx-ds --to-revision=1</span><br><span class="line"></span><br><span class="line">// 查看回滚状态</span><br><span class="line">$ kubectl rollout status ds/nginx-ds</span><br></pre></td></tr></table></figure>
+<h4 id="暂停"><a href="#暂停" class="headerlink" title="暂停"></a>暂停</h4><p>daemonset 目前不支持暂停操作。</p>
+<h4 id="删除"><a href="#删除" class="headerlink" title="删除"></a>删除</h4><p>daemonset 也支持两种删除操作。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 非级联删除</span><br><span class="line">$ kubectl delete ds/nginx-ds --cascade=false</span><br><span class="line"></span><br><span class="line">// 级联删除</span><br><span class="line">$ kubectl delete ds/nginx-ds</span><br></pre></td></tr></table></figure>
+<h3 id="DaemonSetController-源码分析"><a href="#DaemonSetController-源码分析" class="headerlink" title="DaemonSetController 源码分析"></a>DaemonSetController 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>首先还是看 <code>startDaemonSetController</code> 方法，在此方法中会初始化 <code>DaemonSetsController</code> 对象并调用 <code>Run</code>方法启动 daemonset controller，从该方法中可以看出 daemonset controller 会监听 <code>daemonsets</code>、<code>controllerRevision</code>、<code>pod</code> 和 <code>node</code> 四种对象资源的变动。其中 <code>ConcurrentDaemonSetSyncs</code>的默认值为 2。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/apps.go:36</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    if !ctx.AvailableResources[schema.GroupVersionResource&#123;Group: &quot;apps&quot;, Version: &quot;v1&quot;, Resource: &quot;daemonsets&quot;&#125;] &#123;</span><br><span class="line">        return nil, false, nil</span><br><span class="line">    &#125;</span><br><span class="line">    dsc, err := daemon.NewDaemonSetsController(</span><br><span class="line">        ctx.InformerFactory.Apps().V1().DaemonSets(),</span><br><span class="line">        ctx.InformerFactory.Apps().V1().ControllerRevisions(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().Nodes(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;daemon-set-controller&quot;),</span><br><span class="line">        flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, true, fmt.Errorf(&quot;error creating DaemonSets controller: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    go dsc.Run(int(ctx.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs), ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>Run</code> 方法中会启动两个操作，一个就是 <code>dsc.runWorker</code> 执行的 sync 操作，另一个就是 <code>dsc.failedPodsBackoff.GC</code> 执行的 gc 操作，主要逻辑为：</p>
+<ul>
+<li>1、等待 informer 缓存同步完成；</li>
+<li>2、启动两个 goroutine 分别执行 <code>dsc.runWorker</code>；</li>
+<li>3、启动一个 goroutine 每分钟执行一次 <code>dsc.failedPodsBackoff.GC</code>，从 <code>startDaemonSetController</code> 方法中可以看到 <code>failedPodsBackoff</code> 的 duration为1s，max duration为15m，<code>failedPodsBackoff</code> 的主要作用是当发现 daemon pod 状态为 failed 时，会定时重启该 pod；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:263</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) Run(workers int, stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    defer utilruntime.HandleCrash()</span><br><span class="line">    defer dsc.queue.ShutDown()</span><br><span class="line"></span><br><span class="line">    defer klog.Infof(&quot;Shutting down daemon sets controller&quot;)</span><br><span class="line"></span><br><span class="line">    if !cache.WaitForNamedCacheSync(&quot;daemon sets&quot;, stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; workers; i++ &#123;</span><br><span class="line">        // sync 操作</span><br><span class="line">        go wait.Until(dsc.runWorker, time.Second, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // GC 操作</span><br><span class="line">    go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, stopCh)</span><br><span class="line"></span><br><span class="line">    &lt;-stopCh</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="syncDaemonSet"><a href="#syncDaemonSet" class="headerlink" title="syncDaemonSet"></a>syncDaemonSet</h4><p>daemonset 中 pod 的创建与删除是与 node 相关联的，所以每次执行 sync 操作时需要遍历所有的 node 进行判断。<code>syncDaemonSet</code> 的主要逻辑为：</p>
+<ul>
+<li>1、通过 key 获取 ns 和 name；</li>
+<li>2、从 dsLister 中获取 ds 对象；</li>
+<li>3、从 nodeLister 获取所有 node；</li>
+<li>4、获取 dsKey；</li>
+<li>5、判断 ds 是否处于删除状态；</li>
+<li>6、调用 <code>constructHistory</code> 获取 current 和 old <code>controllerRevision</code>；</li>
+<li>7、调用 <code>dsc.expectations.SatisfiedExpectations</code> 判断是否满足 <code>expectations</code> 机制，<code>expectations</code> 机制的目的就是减少不必要的 sync 操作，关于 <code>expectations</code> 机制的详细说明可以参考笔者以前写的 “replicaset controller 源码分析”一文；</li>
+<li>8、调用 <code>dsc.manage</code> 执行实际的 sync 操作；</li>
+<li>9、判断是否为更新操作，并执行对应的更新操作逻辑；</li>
+<li>10、调用 <code>dsc.cleanupHistory</code> 根据 <code>spec.revisionHistoryLimit</code>字段清理过期的 <code>controllerrevision</code>；</li>
+<li>11、调用 <code>dsc.updateDaemonSetStatus</code> 更新 ds 状态； </li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:1212</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) syncDaemonSet(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、通过 key 获取 ns 和 name</span><br><span class="line">    namespace, name, err := cache.SplitMetaNamespaceKey(key)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 2、从 dsLister 中获取 ds 对象</span><br><span class="line">    ds, err := dsc.dsLister.DaemonSets(namespace).Get(name)</span><br><span class="line">    if errors.IsNotFound(err) &#123;</span><br><span class="line">        dsc.expectations.DeleteExpectations(key)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 3、从 nodeLister 获取所有 node</span><br><span class="line">    nodeList, err := dsc.nodeLister.List(labels.Everything())</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    everything := metav1.LabelSelector&#123;&#125;</span><br><span class="line">    if reflect.DeepEqual(ds.Spec.Selector, &amp;everything) &#123;</span><br><span class="line">        dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, SelectingAllReason, &quot;This daemon set is selecting all pods. A non-empty selector is required. &quot;)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 4、获取 dsKey</span><br><span class="line">    dsKey, err := controller.KeyFunc(ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;couldn&apos;t get key for object %#v: %v&quot;, ds, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、判断 ds 是否处于删除状态</span><br><span class="line">    if ds.DeletionTimestamp != nil &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、获取 current 和 old controllerRevision</span><br><span class="line">    cur, old, err := dsc.constructHistory(ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;failed to construct revisions of DaemonSet: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]</span><br><span class="line">    </span><br><span class="line">    // 7、判断是否满足 expectations 机制</span><br><span class="line">    if !dsc.expectations.SatisfiedExpectations(dsKey) &#123;</span><br><span class="line">        return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 8、执行实际的 sync 操作</span><br><span class="line">    err = dsc.manage(ds, nodeList, hash)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 9、判断是否为更新操作，并执行对应的更新操作</span><br><span class="line">    if dsc.expectations.SatisfiedExpectations(dsKey) &#123;</span><br><span class="line">        switch ds.Spec.UpdateStrategy.Type &#123;</span><br><span class="line">        case apps.OnDeleteDaemonSetStrategyType:</span><br><span class="line">        case apps.RollingUpdateDaemonSetStrategyType:</span><br><span class="line">            err = dsc.rollingUpdate(ds, nodeList, hash)</span><br><span class="line">        &#125;</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 10、清理过期的 controllerrevision</span><br><span class="line">    err = dsc.cleanupHistory(ds, old)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;failed to clean up revisions of DaemonSet: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 11、更新 ds 状态</span><br><span class="line">    return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>syncDaemonSet</code> 中主要有 <code>manage</code>、<code>rollingUpdate</code>和<code>updateDaemonSetStatus</code> 三个方法，分别对应创建、更新与状态同步，下面主要来分析这三个方法。</p>
+<h4 id="manage"><a href="#manage" class="headerlink" title="manage"></a>manage</h4><p><code>manage</code> 主要是用来保证 ds 的 pod 数正常运行在每一个 node 上，其主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>dsc.getNodesToDaemonPods</code> 获取已存在 daemon pod 与 node 的映射关系；</li>
+<li>2、遍历所有 node，调用 <code>dsc.podsShouldBeOnNode</code> 方法来确定在给定的节点上需要创建还是删除 daemon pod；</li>
+<li>3、判断是否启动了 <code>ScheduleDaemonSetPods</code>feature-gates 特性，若启动了则需要删除通过默认调度器已经调度到不存在 node 上的 daemon pod；</li>
+<li>4、调用 <code>dsc.syncNodes</code> 为对应的 node 创建 daemon pod 以及删除多余的 pods；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:952</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error &#123;</span><br><span class="line">    // 1、获取已存在 daemon pod 与 node 的映射关系</span><br><span class="line">    nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 2、判断每一个 node 是否需要运行 daemon pod</span><br><span class="line">    var nodesNeedingDaemonPods, podsToDelete []string</span><br><span class="line">    for _, node := range nodeList &#123;</span><br><span class="line">        nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(</span><br><span class="line">            node, nodeToDaemonPods, ds)</span><br><span class="line"></span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)</span><br><span class="line">        podsToDelete = append(podsToDelete, podsToDeleteOnNode...)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、判断是否启动了 ScheduleDaemonSetPods feature-gates 特性，若启用了则对不存在 node 上的 </span><br><span class="line">    // daemon pod 进行删除 </span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) &#123;</span><br><span class="line">        podsToDelete = append(podsToDelete, getUnscheduledPodsWithoutNode(nodeList, nodeToDaemonPods)...)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、为对应的 node 创建 daemon pod 以及删除多余的 pods</span><br><span class="line">    if err = dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>manage</code> 方法中又调用了 <code>getNodesToDaemonPods</code>、<code>podsShouldBeOnNode</code> 和 <code>syncNodes</code> 三个方法，继续来看这几种方法的作用。</p>
+<h5 id="getNodesToDaemonPods"><a href="#getNodesToDaemonPods" class="headerlink" title="getNodesToDaemonPods"></a>getNodesToDaemonPods</h5><p><code>getNodesToDaemonPods</code> 是用来获取已存在 daemon pod 与 node 的映射关系，并且会通过 <code>adopt/orphan</code> 方法关联以及释放对应的 pod。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:820</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *apps.DaemonSet) (map[string][]*v1.Pod, error) &#123;</span><br><span class="line">    claimedPods, err := dsc.getDaemonPods(ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    nodeToDaemonPods := make(map[string][]*v1.Pod)</span><br><span class="line">    for _, pod := range claimedPods &#123;</span><br><span class="line">        nodeName, err := util.GetTargetNodeName(pod)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            klog.Warningf(&quot;Failed to get target node name of Pod %v/%v in DaemonSet %v/%v&quot;,</span><br><span class="line">                pod.Namespace, pod.Name, ds.Namespace, ds.Name)</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nodeToDaemonPods, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="podsShouldBeOnNode"><a href="#podsShouldBeOnNode" class="headerlink" title="podsShouldBeOnNode"></a>podsShouldBeOnNode</h5><p><code>podsShouldBeOnNode</code> 方法用来确定在给定的节点上需要创建还是删除 daemon pod，主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>dsc.nodeShouldRunDaemonPod</code> 判断该 node 是否需要运行 daemon pod 以及 pod 能不能调度成功，该方法返回三个值 <code>wantToRun</code>, <code>shouldSchedule</code>, <code>shouldContinueRunning</code>；</li>
+<li>2、通过判断 <code>wantToRun</code>, <code>shouldSchedule</code>, <code>shouldContinueRunning</code> 将需要创建 daemon pod  的 node 列表以及需要删除的 pod 列表获取到， <code>wantToRun</code>主要检查的是 selector、taints 等是否匹配，<code>shouldSchedule</code> 主要检查 node 上的资源是否充足，<code>shouldContinueRunning</code> 默认为 true；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:866</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) podsShouldBeOnNode(...) (nodesNeedingDaemonPods, podsToDelete []string, err error) &#123;</span><br><span class="line">    // 1、判断该 node 是否需要运行 daemon pod 以及能不能调度成功</span><br><span class="line">    wantToRun, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、获取该节点上的指定ds的pod列表</span><br><span class="line">    daemonPods, exists := nodeToDaemonPods[node.Name]</span><br><span class="line">    dsKey, err := cache.MetaNamespaceKeyFunc(ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        utilruntime.HandleError(err)</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // 3、从 suspended list 中移除在该节点上 ds 的 pod</span><br><span class="line">    dsc.removeSuspendedDaemonPods(node.Name, dsKey)</span><br><span class="line"></span><br><span class="line">    switch &#123;</span><br><span class="line">    // 4、对于需要创建 pod 但是不能调度 pod 的 node，先把 pod 放入到 suspended 队列中</span><br><span class="line">    case wantToRun &amp;&amp; !shouldSchedule:</span><br><span class="line">        dsc.addSuspendedDaemonPods(node.Name, dsKey)</span><br><span class="line">    // 5、需要创建 pod 且 pod 未运行，则创建 pod</span><br><span class="line">    case shouldSchedule &amp;&amp; !exists:</span><br><span class="line">        nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)</span><br><span class="line">    // 6、需要 pod 一直运行</span><br><span class="line">    case shouldContinueRunning:</span><br><span class="line">        var daemonPodsRunning []*v1.Pod</span><br><span class="line">        for _, pod := range daemonPods &#123;</span><br><span class="line">            if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            // 7、如果 pod 运行状态为 failed，则删除该 pod</span><br><span class="line">            if pod.Status.Phase == v1.PodFailed &#123;</span><br><span class="line">                backoffKey := failedPodsBackoffKey(ds, node.Name)</span><br><span class="line"></span><br><span class="line">                now := dsc.failedPodsBackoff.Clock.Now()</span><br><span class="line">                inBackoff := dsc.failedPodsBackoff.IsInBackOffSinceUpdate(backoffKey, now)</span><br><span class="line">                if inBackoff &#123;</span><br><span class="line">                    delay := dsc.failedPodsBackoff.Get(backoffKey)</span><br><span class="line">                    dsc.enqueueDaemonSetAfter(ds, delay)</span><br><span class="line">                    continue</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                dsc.failedPodsBackoff.Next(backoffKey, now)</span><br><span class="line">                podsToDelete = append(podsToDelete, pod.Name)</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                daemonPodsRunning = append(daemonPodsRunning, pod)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        // 8、如果节点上已经运行 daemon pod 数 &gt; 1，保留运行时间最长的 pod，其余的删除</span><br><span class="line">        if len(daemonPodsRunning) &gt; 1 &#123;</span><br><span class="line">            sort.Sort(podByCreationTimestampAndPhase(daemonPodsRunning))</span><br><span class="line">            for i := 1; i &lt; len(daemonPodsRunning); i++ &#123;</span><br><span class="line">                podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    // 9、如果 pod 不需要继续运行但 pod 已存在则需要删除 pod</span><br><span class="line">    case !shouldContinueRunning &amp;&amp; exists:</span><br><span class="line">        for _, pod := range daemonPods &#123;</span><br><span class="line">            if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            podsToDelete = append(podsToDelete, pod.Name)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nodesNeedingDaemonPods, podsToDelete, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后继续看 <code>nodeShouldRunDaemonPod</code> 方法的主要逻辑：</p>
+<ul>
+<li>1、调用 <code>NewPod</code> 为该 node 构建一个 daemon pod object；</li>
+<li>2、判断 ds 是否指定了 <code>.Spec.Template.Spec.NodeName</code> 字段；</li>
+<li>3、调用 <code>dsc.simulate</code> 执行 <code>GeneralPredicates</code> 预选算法检查该 node 是否能够调度成功；</li>
+<li>4、判断  <code>GeneralPredicates</code> 预选算法执行后的  <code>reasons</code> 确定 <code>wantToRun</code>, <code>shouldSchedule</code>, <code>shouldContinueRunning</code> 的值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:1337</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err   error) &#123;</span><br><span class="line">    // 1、构建 daemon pod object</span><br><span class="line">    newPod := NewPod(ds, node.Name)</span><br><span class="line"></span><br><span class="line">    wantToRun, shouldSchedule, shouldContinueRunning = true, true, true</span><br><span class="line">    // 2、判断 ds 是否指定了 node，若指定了且不为当前 node 直接返回 false</span><br><span class="line">    if !(ds.Spec.Template.Spec.NodeName == &quot;&quot; || ds.Spec.Template.Spec.NodeName == node.Name) &#123;</span><br><span class="line">        return false, false, false, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、执行 GeneralPredicates 预选算法</span><br><span class="line">    reasons, nodeInfo, err := dsc.simulate(newPod, node, ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、检查预选算法执行的结果</span><br><span class="line">    var insufficientResourceErr error</span><br><span class="line">    for _, r := range reasons &#123;</span><br><span class="line">        switch reason := r.(type) &#123;</span><br><span class="line">        case *predicates.InsufficientResourceError:</span><br><span class="line">            insufficientResourceErr = reason</span><br><span class="line">        case *predicates.PredicateFailureError:</span><br><span class="line">            var emitEvent bool</span><br><span class="line">            switch reason &#123;</span><br><span class="line">            case</span><br><span class="line">                predicates.ErrNodeSelectorNotMatch,</span><br><span class="line">                predicates.ErrPodNotMatchHostName,</span><br><span class="line">                predicates.ErrNodeLabelPresenceViolated,</span><br><span class="line"></span><br><span class="line">                predicates.ErrPodNotFitsHostPorts:</span><br><span class="line">                return false, false, false, nil</span><br><span class="line">            case predicates.ErrTaintsTolerationsNotMatch:</span><br><span class="line">                fitsNoExecute, _, err := predicates.PodToleratesNodeNoExecuteTaints(newPod, nil, nodeInfo)</span><br><span class="line">                if err != nil &#123;</span><br><span class="line">                    return false, false, false, err</span><br><span class="line">                &#125;</span><br><span class="line">                if !fitsNoExecute &#123;</span><br><span class="line">                    return false, false, false, nil</span><br><span class="line">                &#125;</span><br><span class="line">                wantToRun, shouldSchedule = false, false</span><br><span class="line">            case</span><br><span class="line">                predicates.ErrDiskConflict,</span><br><span class="line">                predicates.ErrVolumeZoneConflict,</span><br><span class="line">                predicates.ErrMaxVolumeCountExceeded,</span><br><span class="line">                predicates.ErrNodeUnderMemoryPressure,</span><br><span class="line">                predicates.ErrNodeUnderDiskPressure:</span><br><span class="line">                shouldSchedule = false</span><br><span class="line">                emitEvent = true</span><br><span class="line">            case</span><br><span class="line">                predicates.ErrPodAffinityNotMatch,</span><br><span class="line">                predicates.ErrServiceAffinityViolated:</span><br><span class="line">                </span><br><span class="line">                return false, false, false, fmt.Errorf(&quot;unexpected reason: DaemonSet Predicates should not return reason %s&quot;, reason.GetReason())</span><br><span class="line">            default:             </span><br><span class="line">                wantToRun, shouldSchedule, shouldContinueRunning = false, false, false</span><br><span class="line">                emitEvent = true</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if shouldSchedule &amp;&amp; insufficientResourceErr != nil &#123;</span><br><span class="line">        dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, &quot;failed to place pod on %q: %s&quot;, node.ObjectMeta.Name,                  insufficientResourceErr.Error())</span><br><span class="line">        shouldSchedule = false</span><br><span class="line">    &#125;</span><br><span class="line">    return</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="syncNodes"><a href="#syncNodes" class="headerlink" title="syncNodes"></a>syncNodes</h5><p><code>syncNodes</code> 方法主要是为需要 daemon pod 的 node 创建 pod 以及删除多余的 pod，其主要逻辑为：</p>
+<ul>
+<li>1、将 <code>createDiff</code> 和 <code>deleteDiff</code> 与 <code>burstReplicas</code> 进行比较，<code>burstReplicas</code> 默认值为 250 即每个 syncLoop 中创建或者删除的 pod 数最多为 250 个，若超过其值则剩余需要创建或者删除的 pod 在下一个 syncLoop 继续操作；</li>
+<li>2、将 <code>createDiff</code> 和 <code>deleteDiff</code> 写入到 <code>expectations</code> 中；</li>
+<li>3、并发创建 pod，创建 pod 有两种方法:（1）创建的 pod 不经过默认调度器，直接指定了 pod 的运行节点(即设定<code>pod.Spec.NodeName</code>)；（2）若启用了 <code>ScheduleDaemonSetPods</code> feature-gates 特性，则使用默认调度器进行创建 pod，通过 <code>nodeAffinity</code>来保证每个节点都运行一个 pod；</li>
+<li>4、并发删除 <code>deleteDiff</code> 中的所有 pod；</li>
+</ul>
+<p><code>ScheduleDaemonSetPods</code> 是一个 feature-gates 特性，其出现在 v1.11 中，在 v1.12 中处于 Beta 版本，v1.17 为 GA 版。最初 daemonset controller 只有一种创建 pod 的方法，即直接指定 pod 的 <code>spec.NodeName</code> 字段，但是目前这种方式已经暴露了许多问题，在以后的发展中社区还是希望能通过默认调度器进行调度，所以才出现了第二种方式，原因主要有以下五点：</p>
+<ul>
+<li>1、DaemonSet 无法感知 node 上资源的变化 (<a href="https://github.com/kubernetes/kubernetes/issues/46935" target="_blank" rel="noopener">#46935</a>, <a href="https://github.com/kubernetes/kubernetes/issues/58868" target="_blank" rel="noopener">#58868</a>)：当 pod 第一次因资源不够无法创建时，若其他 pod 退出后资源足够时 DaemonSet 无法感知到；</li>
+<li>2、Daemonset 无法支持 Pod Affinity 和 Pod AntiAffinity 的功能(<a href="https://github.com/kubernetes/kubernetes/issues/29276" target="_blank" rel="noopener">#29276</a>)；</li>
+<li>3、在某些功能上需要实现和 scheduler 重复的代码逻辑, 例如：critical pods (<a href="https://github.com/kubernetes/kubernetes/issues/42028" target="_blank" rel="noopener">#42028</a>), tolerant/taint；</li>
+<li>4、当 DaemonSet 的 Pod 创建失败时难以 debug，例如：资源不足时，对于 pending pod 最好能打一个 event 说明；</li>
+<li>5、多个组件同时调度时难以实现抢占机制：这也是无法通过横向扩展调度器提高调度吞吐量的一个原因； </li>
+</ul>
+<p>更详细的原因可以参考社区的文档：<a href="https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/schedule-DS-pod-by-scheduler.md" target="_blank" rel="noopener">schedule-DS-pod-by-scheduler.md</a>。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:990</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、设置 burstReplicas </span><br><span class="line">    createDiff := len(nodesNeedingDaemonPods)</span><br><span class="line">    deleteDiff := len(podsToDelete)</span><br><span class="line"></span><br><span class="line">    if createDiff &gt; dsc.burstReplicas &#123;</span><br><span class="line">        createDiff = dsc.burstReplicas</span><br><span class="line">    &#125;</span><br><span class="line">    if deleteDiff &gt; dsc.burstReplicas &#123;</span><br><span class="line">        deleteDiff = dsc.burstReplicas</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、写入到 expectations 中</span><br><span class="line">    dsc.expectations.SetExpectations(dsKey, createDiff, deleteDiff)</span><br><span class="line"></span><br><span class="line">    errCh := make(chan error, createDiff+deleteDiff)</span><br><span class="line">    createWait := sync.WaitGroup&#123;&#125;</span><br><span class="line">    generation, err := util.GetTemplateGeneration(ds)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        generation = nil</span><br><span class="line">    &#125;</span><br><span class="line">    template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)</span><br><span class="line"></span><br><span class="line">    // 3、并发创建 pod，创建的 pod 数依次为 1, 2, 4, 8, ...</span><br><span class="line">    batchSize := integer.IntMin(createDiff, controller.SlowStartInitialBatchSize)</span><br><span class="line">    for pos := 0; createDiff &gt; pos; batchSize, pos = integer.IntMin(2*batchSize, createDiff-(pos+batchSize)), pos+batchSize &#123;</span><br><span class="line">        errorCount := len(errCh)</span><br><span class="line">        createWait.Add(batchSize)</span><br><span class="line">        for i := pos; i &lt; pos+batchSize; i++ &#123;</span><br><span class="line">            go func(ix int) &#123;</span><br><span class="line">                defer createWait.Done()</span><br><span class="line">                var err error</span><br><span class="line"></span><br><span class="line">                podTemplate := template.DeepCopy()</span><br><span class="line">                </span><br><span class="line">                // 4、若启动了 ScheduleDaemonSetPods 功能，则通过 kube-scheduler 创建 pod</span><br><span class="line">                if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) &#123;</span><br><span class="line">                    podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(</span><br><span class="line">                        podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])</span><br><span class="line"></span><br><span class="line">                    err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,</span><br><span class="line">                        ds, metav1.NewControllerRef(ds, controllerKind))</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    // 5、否则直接设置 pod 的 .spec.NodeName 创建 pod</span><br><span class="line">                    err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,</span><br><span class="line">                        ds, metav1.NewControllerRef(ds, controllerKind))</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                // 6、创建 pod 时忽略 timeout err</span><br><span class="line">                if err != nil &amp;&amp; errors.IsTimeout(err) &#123;</span><br><span class="line">                    return</span><br><span class="line">                &#125;</span><br><span class="line">                if err != nil &#123;</span><br><span class="line">                    dsc.expectations.CreationObserved(dsKey)</span><br><span class="line">                    errCh &lt;- err</span><br><span class="line">                    utilruntime.HandleError(err)</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;(i)</span><br><span class="line">        &#125;</span><br><span class="line">        createWait.Wait()</span><br><span class="line"></span><br><span class="line">        // 7、将创建失败的 pod 数记录到 expectations 中</span><br><span class="line">        skippedPods := createDiff - (batchSize + pos)</span><br><span class="line">        if errorCount &lt; len(errCh) &amp;&amp; skippedPods &gt; 0 &#123;</span><br><span class="line">            dsc.expectations.LowerExpectations(dsKey, skippedPods, 0)</span><br><span class="line">            break</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 8、并发删除 deleteDiff 中的 pod</span><br><span class="line">    deleteWait := sync.WaitGroup&#123;&#125;</span><br><span class="line">    deleteWait.Add(deleteDiff)</span><br><span class="line">    for i := 0; i &lt; deleteDiff; i++ &#123;</span><br><span class="line">        go func(ix int) &#123;</span><br><span class="line">            defer deleteWait.Done()</span><br><span class="line">            if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[ix], ds); err != nil &#123;</span><br><span class="line">                dsc.expectations.DeletionObserved(dsKey)</span><br><span class="line">                errCh &lt;- err</span><br><span class="line">                utilruntime.HandleError(err)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;(i)</span><br><span class="line">    &#125;</span><br><span class="line">    deleteWait.Wait()</span><br><span class="line">    errors := []error&#123;&#125;</span><br><span class="line">    close(errCh)</span><br><span class="line">    for err := range errCh &#123;</span><br><span class="line">        errors = append(errors, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return utilerrors.NewAggregate(errors)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="RollingUpdate"><a href="#RollingUpdate" class="headerlink" title="RollingUpdate"></a>RollingUpdate</h4><p>daemonset update 的方式有两种 <code>OnDelete</code> 和 <code>RollingUpdate</code>，当为 <code>OnDelete</code> 时需要用户手动删除每一个 pod 后完成更新操作，当为 <code>RollingUpdate</code> 时，daemonset controller 会自动控制升级进度。 </p>
+<p>当为 <code>RollingUpdate</code> 时，主要逻辑为：</p>
+<ul>
+<li>1、获取 daemonset pod 与 node 的映射关系；</li>
+<li>2、根据 <code>controllerrevision</code> 的 hash 值获取所有未更新的 pods；</li>
+<li>3、获取 <code>maxUnavailable</code>, <code>numUnavailable</code> 的 pod 数值，<code>maxUnavailable</code> 是从 ds 的 <code>rollingUpdate</code> 字段中获取的默认值为 1，<code>numUnavailable</code> 的值是通过 daemonset pod 与 node 的映射关系计算每个 node 下是否有 available pod 得到的；</li>
+<li>4、通过 oldPods 获取 <code>oldAvailablePods</code>, <code>oldUnavailablePods</code> 的 pod 列表；</li>
+<li>5、遍历 <code>oldUnavailablePods</code> 列表将需要删除的 pod 追加到 <code>oldPodsToDelete</code> 数组中。<code>oldUnavailablePods</code> 列表中的 pod 分为两种，一种处于更新中，即删除状态，一种处于未更新且异常状态，处于异常状态的都需要被删除；</li>
+<li>6、遍历 <code>oldAvailablePods</code> 列表，此列表中的 pod 都处于正常运行状态，根据 <code>maxUnavailable</code> 值确定是否需要删除该 pod 并将需要删除的 pod 追加到 <code>oldPodsToDelete</code> 数组中；</li>
+<li>7、调用 <code>dsc.syncNodes</code> 删除 <code>oldPodsToDelete</code> 数组中的 pods，<code>syncNodes</code> 方法在 <code>manage</code> 阶段已经分析过，此处不再详述；</li>
+</ul>
+<p><code>rollingUpdate</code>  的结果是找出需要删除的 pods 并进行删除，被删除的 pod 在下一个 syncLoop 中会通过 <code>manage</code> 方法使用最新版本的 daemonset template 进行创建，整个滚动更新的过程是通过先删除再创建的方式一步步完成更新的，每次操作都是严格按照 <code>maxUnavailable</code> 的值确定需要删除的 pod 数。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/update.go:43</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) rollingUpdate(......) error &#123;</span><br><span class="line">    // 1、获取 daemonset pod 与 node 的映射关系</span><br><span class="line">    nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 2、获取所有未更新的 pods</span><br><span class="line">    _, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)</span><br><span class="line">    </span><br><span class="line">    // 3、计算 maxUnavailable, numUnavailable 的 pod 数值</span><br><span class="line">    maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeList, nodeToDaemonPods)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;couldn&apos;t get unavailable numbers: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    oldAvailablePods, oldUnavailablePods := util.SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)</span><br><span class="line"></span><br><span class="line">    // 4、将非 running 状态的 pods 加入到 oldPodsToDelete 中</span><br><span class="line">    var oldPodsToDelete []string</span><br><span class="line">    for _, pod := range oldUnavailablePods &#123;</span><br><span class="line">        if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        oldPodsToDelete = append(oldPodsToDelete, pod.Name)</span><br><span class="line">    &#125;</span><br><span class="line">    // 5、根据 maxUnavailable 值确定是否需要删除 pod</span><br><span class="line">    for _, pod := range oldAvailablePods &#123;</span><br><span class="line">        if numUnavailable &gt;= maxUnavailable &#123;</span><br><span class="line">            break</span><br><span class="line">        &#125;</span><br><span class="line">        oldPodsToDelete = append(oldPodsToDelete, pod.Name)</span><br><span class="line">        numUnavailable++</span><br><span class="line">    &#125;</span><br><span class="line">    // 6、调用 syncNodes 方法删除 oldPodsToDelete 数组中的 pods</span><br><span class="line">    return dsc.syncNodes(ds, oldPodsToDelete, []string&#123;&#125;, hash)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>总结一下，<code>manage</code> 方法中的主要流程为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">            |-&gt;  dsc.getNodesToDaemonPods</span><br><span class="line">            |</span><br><span class="line">            |</span><br><span class="line">manage ---- |-&gt;  dsc.podsShouldBeOnNode  ---&gt; dsc.nodeShouldRunDaemonPod</span><br><span class="line">            |</span><br><span class="line">            |</span><br><span class="line">            |-&gt;  dsc.syncNodes</span><br></pre></td></tr></table></figure>
+<h4 id="updateDaemonSetStatus"><a href="#updateDaemonSetStatus" class="headerlink" title="updateDaemonSetStatus"></a>updateDaemonSetStatus</h4><p><code>updateDaemonSetStatus</code> 是 <code>syncDaemonSet</code> 中最后执行的方法，主要是用来计算 ds status subresource 中的值并更新其 status。status 如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">status:</span><br><span class="line">  currentNumberScheduled: 1  // 已经运行了 DaemonSet Pod的节点数量</span><br><span class="line">  desiredNumberScheduled: 1  // 需要运行该DaemonSet Pod的节点数量</span><br><span class="line">  numberMisscheduled: 0      // 不需要运行 DeamonSet Pod 但是已经运行了的节点数量</span><br><span class="line">  numberReady: 0             // DaemonSet Pod状态为Ready的节点数量</span><br><span class="line">  numberAvailable: 1 		 // DaemonSet Pod状态为Ready且运行时间超过														 										     // Spec.MinReadySeconds 的节点数量</span><br><span class="line">  numberUnavailable: 0			 // desiredNumberScheduled - numberAvailable 的节点数量</span><br><span class="line">  observedGeneration: 3</span><br><span class="line">  updatedNumberScheduled: 1  // 已经完成DaemonSet Pod更新的节点数量</span><br></pre></td></tr></table></figure>
+<p><code>updateDaemonSetStatus</code> 主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>dsc.getNodesToDaemonPods</code> 获取已存在 daemon pod 与 node 的映射关系；</li>
+<li>2、遍历所有 node，调用 <code>dsc.nodeShouldRunDaemonPod</code> 判断该 node 是否需要运行 daemon pod，然后计算 status 中的部分字段值；</li>
+<li>3、调用 <code>storeDaemonSetStatus</code> 更新 ds status subresource；</li>
+<li>4、判断 ds 是否需要 resync；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/daemon/daemon_controller.go:1152</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) updateDaemonSetStatus(......) error &#123;</span><br><span class="line">    // 1、获取已存在 daemon pod 与 node 的映射关系</span><br><span class="line">    nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int</span><br><span class="line">    for _, node := range nodeList &#123;</span><br><span class="line">        // 2、判断该 node 是否需要运行 daemon pod</span><br><span class="line">        wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        scheduled := len(nodeToDaemonPods[node.Name]) &gt; 0</span><br><span class="line">        // 3、计算 status 中的字段值</span><br><span class="line">        if wantToRun &#123;</span><br><span class="line">            desiredNumberScheduled++</span><br><span class="line">            if scheduled &#123;</span><br><span class="line">                currentNumberScheduled++</span><br><span class="line">                daemonPods, _ := nodeToDaemonPods[node.Name]</span><br><span class="line">                sort.Sort(podByCreationTimestampAndPhase(daemonPods))</span><br><span class="line">                pod := daemonPods[0]</span><br><span class="line">                if podutil.IsPodReady(pod) &#123;</span><br><span class="line">                    numberReady++</span><br><span class="line">                    if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) &#123;</span><br><span class="line">                        numberAvailable++</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                generation, err := util.GetTemplateGeneration(ds)</span><br><span class="line">                if err != nil &#123;</span><br><span class="line">                    generation = nil</span><br><span class="line">                &#125;</span><br><span class="line">                if util.IsPodUpdated(pod, hash, generation) &#123;</span><br><span class="line">                    updatedNumberScheduled++</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            if scheduled &#123;</span><br><span class="line">                numberMisscheduled++</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    numberUnavailable := desiredNumberScheduled - numberAvailable</span><br><span class="line">    // 4、更新 daemonset status subresource</span><br><span class="line">    err = storeDaemonSetStatus(dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;error storing status for daemon set %#v: %v&quot;, ds, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、判断 ds 是否需要 resync</span><br><span class="line">    if ds.Spec.MinReadySeconds &gt; 0 &amp;&amp; numberReady != numberAvailable &#123;</span><br><span class="line">        dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>最后，再总结一下 <code>syncDaemonSet</code> 方法的主要流程：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">                                |-&gt; dsc.getNodesToDaemonPods</span><br><span class="line">                                |</span><br><span class="line">                                |</span><br><span class="line">                  |-&gt; manage --&gt;|-&gt; dsc.podsShouldBeOnNode  ---&gt; dsc.nodeShouldRunDaemonPod</span><br><span class="line">                  |             |</span><br><span class="line">                  |             |</span><br><span class="line">syncDaemonSet --&gt; |             |-&gt; dsc.syncNodes</span><br><span class="line">                  |</span><br><span class="line">                  |-&gt; rollingUpdate</span><br><span class="line">                  |</span><br><span class="line">                  |</span><br><span class="line">                  |-&gt; updateDaemonSetStatus</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>在 daemonset controller 中可以看到许多功能都是 deployment 和 statefulset 已有的。在创建 pod 的流程与 replicaset controller 创建 pod 的流程是相似的，都使用了 <code>expectations</code> 机制并且限制了在一个 syncLoop 中最多创建或删除的 pod 数。更新方式与 statefulset 一样都有 <code>OnDelete</code> 和 <code>RollingUpdate</code> 两种， <code>OnDelete</code>  方式与 statefulset 相似，都需要手动删除对应的 pod，而  <code>RollingUpdate</code>  方式与 statefulset 和 deployment 都有点区别， <code>RollingUpdate</code>方式更新时不支持暂停操作并且 pod 是先删除再创建的顺序进行。版本控制方式与 statefulset 的一样都是使用 <code>controllerRevision</code>。最后要说的一点是在 v1.12 及以后的版本中，使用 daemonset 创建的 pod 已不再使用直接指定 <code>.spec.nodeName</code>的方式绕过调度器进行调度，而是走默认调度器通过 <code>nodeAffinity</code> 的方式调度到每一个节点上。 </p>
+<p>参考：</p>
+<p><a href="https://yq.aliyun.com/articles/702305" target="_blank" rel="noopener">https://yq.aliyun.com/articles/702305</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/daemonset-controller/" rel="tag"># daemonset controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/11/statefulset_controller/" rel="next" title="statefulset controller 源码分析">
+                <i class="fa fa-chevron-left"></i> statefulset controller 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">43</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">47</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#DaemonSet-的基本操作"><span class="nav-number">1.</span> <span class="nav-text">DaemonSet 的基本操作</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#创建"><span class="nav-number">1.1.</span> <span class="nav-text">创建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#扩缩容"><span class="nav-number">1.2.</span> <span class="nav-text">扩缩容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#更新"><span class="nav-number">1.3.</span> <span class="nav-text">更新</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#回滚"><span class="nav-number">1.4.</span> <span class="nav-text">回滚</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#暂停"><span class="nav-number">1.5.</span> <span class="nav-text">暂停</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#删除"><span class="nav-number">1.6.</span> <span class="nav-text">删除</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DaemonSetController-源码分析"><span class="nav-number">2.</span> <span class="nav-text">DaemonSetController 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#syncDaemonSet"><span class="nav-number">2.1.</span> <span class="nav-text">syncDaemonSet</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#manage"><span class="nav-number">2.2.</span> <span class="nav-text">manage</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#getNodesToDaemonPods"><span class="nav-number">2.2.1.</span> <span class="nav-text">getNodesToDaemonPods</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#podsShouldBeOnNode"><span class="nav-number">2.2.2.</span> <span class="nav-text">podsShouldBeOnNode</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#syncNodes"><span class="nav-number">2.2.3.</span> <span class="nav-text">syncNodes</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#RollingUpdate"><span class="nav-number">2.3.</span> <span class="nav-text">RollingUpdate</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#updateDaemonSetStatus"><span class="nav-number">2.4.</span> <span class="nav-text">updateDaemonSetStatus</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
