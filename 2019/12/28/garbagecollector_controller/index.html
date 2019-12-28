@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,garbage collector controller,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
+<meta name="keywords" content="kube-controller-manager,garbage collector controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="garbage collector controller 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/graph.png">
+<meta property="og:updated_time" content="2019-12-28T12:39:09.259Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="garbage collector controller 源码分析">
+<meta name="twitter:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/graph.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/">
+
+
+
+
+
+  <title>garbage collector controller 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-garbage collector controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">garbage collector controller 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-28T20:23:30+08:00">
+                2019-12-28
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/12/28/garbagecollector_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/28/garbagecollector_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。</p>
+<h3 id="kubernetes-中的删除策略"><a href="#kubernetes-中的删除策略" class="headerlink" title="kubernetes 中的删除策略"></a>kubernetes 中的删除策略</h3><p>kubernetes 中有三种删除策略：<code>Orphan</code>、<code>Foreground</code> 和 <code>Background</code>，三种删除策略的意义分别为：</p>
+<ul>
+<li><code>Orphan</code> 策略：非级联删除，删除对象时，不会自动删除它的依赖或者是子对象，这些依赖被称作是原对象的孤儿对象，例如当执行以下命令时会使用 <code>Orphan</code> 策略进行删除，此时 ds 的依赖对象 <code>ontrollerrevision</code> 不会被删除；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl delete ds/nginx-ds --cascade=false</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p><code>Background</code> 策略：在该模式下，kubernetes 会立即删除该对象，然后垃圾收集器会在后台删除这些该对象的依赖对象；</p>
+</li>
+<li><p><code>Foreground</code> 策略：在该模式下，对象首先进入“删除中”状态，即会设置对象的 <code>deletionTimestamp</code> 字段并且对象的 <code>metadata.finalizers</code> 字段包含了值 “foregroundDeletion”，此时该对象依然存在，然后垃圾收集器会删除该对象的所有依赖对象，垃圾收集器在删除了所有“Blocking” 状态的依赖对象（指其子对象中 <code>ownerReference.blockOwnerDeletion=true</code>的对象）之后，然后才会删除对象本身；</p>
+</li>
+</ul>
+<p>在 v1.9 以前的版本中，大部分 controller 默认的删除策略为 <code>Orphan</code>，从 v1.9 开始，对于 apps/v1 下的资源默认使用 <code>Background</code> 模式。以上三种删除策略都可以在删除对象时通过设置 <code>deleteOptions.propagationPolicy</code> 字段进行指定，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ curl -k -v -XDELETE  -H &quot;Accept: application/json&quot; -H &quot;Content-Type: application/json&quot; -d &apos;&#123;&quot;propagationPolicy&quot;:&quot;Foreground&quot;&#125;&apos; &apos;https://192.168.99.108:8443/apis/apps/v1/namespaces/default/daemonsets/nginx-ds&apos;</span><br></pre></td></tr></table></figure>
+<h4 id="finalizer-机制"><a href="#finalizer-机制" class="headerlink" title="finalizer 机制"></a>finalizer 机制</h4><p>finalizer 是在删除对象时设置的一个 hook，其目的是为了让对象在删除前确认其子对象已经被完全删除，k8s 中默认有两种 finalizer：<code>OrphanFinalizer</code> 和 <code>ForegroundFinalizer</code>，finalizer 存在于对象的 ObjectMeta 中，当一个对象的依赖对象被删除后其对应的 finalizers 字段也会被移除，只有 finalizers 字段为空时，apiserver 才会删除该对象。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">	......</span><br><span class="line">	&quot;metadata&quot;: &#123;</span><br><span class="line">	   ......</span><br><span class="line">		&quot;finalizers&quot;: [</span><br><span class="line">			&quot;foregroundDeletion&quot;</span><br><span class="line">		]</span><br><span class="line">	&#125;</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>此外，finalizer 不仅仅支持以上两种字段，在使用自定义 controller 时也可以在 CR 中设置自定义的 finalizer 标识。</p>
+<h3 id="GarbageCollectorController-源码分析"><a href="#GarbageCollectorController-源码分析" class="headerlink" title="GarbageCollectorController 源码分析"></a>GarbageCollectorController 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>GarbageCollectorController 负责回收 kubernetes 中的资源，要回收 kubernetes 中所有资源首先得监控所有资源，GarbageCollectorController 会监听集群中所有可删除资源产生的所有事件，这些事件会被放入到一个队列中，然后 controller 会启动多个 goroutine 处理队列中的事件，若为删除事件会根据对象的删除策略删除关联的对象，对于非删除事件会更新对象之间的依赖关系。</p>
+<h4 id="startGarbageCollectorController"><a href="#startGarbageCollectorController" class="headerlink" title="startGarbageCollectorController"></a>startGarbageCollectorController</h4><p>首先还是看 GarbageCollectorController 的启动方法 <code>startGarbageCollectorController</code>，其主要逻辑为：</p>
+<ul>
+<li>1、初始化 discoveryClient，discoveryClient 主要用来获取集群中的所有资源； </li>
+<li>2、调用 <code>garbagecollector.GetDeletableResources</code> 获取集群内所有可删除的资源对象，支持 “delete”, “list”, “watch” 三种操作的 resource 称为 <code>deletableResource</code>；</li>
+<li>3、调用 <code>garbagecollector.NewGarbageCollector</code> 初始化 garbageCollector 对象；</li>
+<li>4、调用 <code>garbageCollector.Run</code> 启动 garbageCollector；</li>
+<li>5、调用 <code>garbageCollector.Sync</code> 监听集群中的 <code>DeletableResources</code> ，当出现新的  <code>DeletableResources</code> 时同步到 monitors 中，确保监控集群中的所有资源；</li>
+<li>6、调用 <code>garbagecollector.NewDebugHandler</code> 注册 debug 接口，用来提供集群内所有对象的关联关系；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/core.go:443</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    if !ctx.ComponentConfig.GarbageCollectorController.EnableGarbageCollector &#123;</span><br><span class="line">        return nil, false, nil</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、初始化 discoveryClient</span><br><span class="line">    gcClientset := ctx.ClientBuilder.ClientOrDie(&quot;generic-garbage-collector&quot;)</span><br><span class="line">    discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())</span><br><span class="line"></span><br><span class="line">    config := ctx.ClientBuilder.ConfigOrDie(&quot;generic-garbage-collector&quot;)</span><br><span class="line">    metadataClient, err := metadata.NewForConfig(config)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, true, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、获取 deletableResource</span><br><span class="line">    deletableResources := garbagecollector.GetDeletableResources(discoveryClient)</span><br><span class="line">    ignoredResources := make(map[schema.GroupResource]struct&#123;&#125;)</span><br><span class="line">    for _, r := range ctx.ComponentConfig.GarbageCollectorController.GCIgnoredResources &#123;</span><br><span class="line">        ignoredResources[schema.GroupResource&#123;Group: r.Group, Resource: r.Resource&#125;] = struct&#123;&#125;&#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、初始化 garbageCollector 对象</span><br><span class="line">    garbageCollector, err := garbagecollector.NewGarbageCollector(</span><br><span class="line">        ......</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, true, fmt.Errorf(&quot;failed to start the generic garbage collector: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、启动 garbage collector</span><br><span class="line">    workers := int(ctx.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)</span><br><span class="line">    go garbageCollector.Run(workers, ctx.Stop)</span><br><span class="line"></span><br><span class="line">    // 5、监听集群中的 DeletableResources</span><br><span class="line">    go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)</span><br><span class="line"></span><br><span class="line">    // 6、注册 debug 接口</span><br><span class="line">    return garbagecollector.NewDebugHandler(garbageCollector), true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>startGarbageCollectorController</code> 中主要调用了四种方法<code>garbagecollector.NewGarbageCollector</code>、<code>garbageCollector.Run</code>、<code>garbageCollector.Sync</code> 和 <code>garbagecollector.NewDebugHandler</code> 来完成核心功能，下面主要针对这四种方法进行说明。</p>
+<h4 id="garbagecollector-NewGarbageCollector"><a href="#garbagecollector-NewGarbageCollector" class="headerlink" title="garbagecollector.NewGarbageCollector"></a>garbagecollector.NewGarbageCollector</h4><p><code>NewGarbageCollector</code> 的主要功能是初始化 GarbageCollector 和 GraphBuilder 对象，并调用 <code>gb.syncMonitors</code>方法初始化 deletableResources 中所有 resource controller 的 informer。GarbageCollector  的主要作用是启动  GraphBuilder 以及启动所有的消费者，GraphBuilder 的主要作用是启动所有的生产者。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:74</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func NewGarbageCollector(......) (*GarbageCollector, error) &#123;</span><br><span class="line">    ......</span><br><span class="line">    gc := &amp;GarbageCollector&#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    gb := &amp;GraphBuilder&#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    if err := gb.syncMonitors(deletableResources); err != nil &#123;</span><br><span class="line">        utilruntime.HandleError(fmt.Errorf(&quot;failed to sync all monitors: %v&quot;, err))</span><br><span class="line">    &#125;</span><br><span class="line">    gc.dependencyGraphBuilder = gb</span><br><span class="line"></span><br><span class="line">    return gc, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="gb-syncMonitors"><a href="#gb-syncMonitors" class="headerlink" title="gb.syncMonitors"></a>gb.syncMonitors</h5><p><code>syncMonitors</code> 的主要作用是初始化各个资源对象的 informer，并调用 <code>gb.controllerFor</code> 为每种资源注册 eventHandler，此处每种资源被称为 monitors，因为为每种资源注册 eventHandler 时，对于 AddFunc、UpdateFunc 和 DeleteFunc 都会将对应的 event push 到 graphChanges 队列中，每种资源对象的 informer 都作为生产者。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:179</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]struct&#123;&#125;) error &#123;</span><br><span class="line">    gb.monitorLock.Lock()</span><br><span class="line">    defer gb.monitorLock.Unlock()</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    for resource := range resources &#123;</span><br><span class="line">        if _, ok := gb.ignoredResources[resource.GroupResource()]; ok &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        ......</span><br><span class="line">        kind, err := gb.restMapper.KindFor(resource)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            errs = append(errs, fmt.Errorf(&quot;couldn&apos;t look up resource %q: %v&quot;, resource, err))</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        // 为 resource 的 controller 注册 eventHandler </span><br><span class="line">        c, s, err := gb.controllerFor(resource, kind)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            errs = append(errs, fmt.Errorf(&quot;couldn&apos;t start monitor for resource %q: %v&quot;, resource, err))</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        current[resource] = &amp;monitor&#123;store: s, controller: c&#125;</span><br><span class="line">        added++</span><br><span class="line">    &#125;</span><br><span class="line">    gb.monitors = current</span><br><span class="line"></span><br><span class="line">    for _, monitor := range toRemove &#123;</span><br><span class="line">        if monitor.stopCh != nil &#123;</span><br><span class="line">            close(monitor.stopCh)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return utilerrors.NewAggregate(errs)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="gb-controllerFor"><a href="#gb-controllerFor" class="headerlink" title="gb.controllerFor"></a>gb.controllerFor</h6><p>在 <code>gb.controllerFor</code>中主要是为每个 deletableResources 的 informer 注册 eventHandler，此处就可以看到真正的生产者了。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:127</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) &#123;</span><br><span class="line">    handlers := cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">        AddFunc: func(obj interface&#123;&#125;) &#123;</span><br><span class="line">            event := &amp;event&#123;</span><br><span class="line">                eventType: addEvent,</span><br><span class="line">                obj:       obj,</span><br><span class="line">                gvk:       kind,</span><br><span class="line">            &#125;</span><br><span class="line">            // 将对应的 event push 到 graphChanges 队列中</span><br><span class="line">            gb.graphChanges.Add(event)</span><br><span class="line">        &#125;,</span><br><span class="line">        UpdateFunc: func(oldObj, newObj interface&#123;&#125;) &#123;</span><br><span class="line">            event := &amp;event&#123;</span><br><span class="line">                eventType: updateEvent,</span><br><span class="line">                obj:       newObj,</span><br><span class="line">                oldObj:    oldObj,</span><br><span class="line">                gvk:       kind,</span><br><span class="line">            &#125;</span><br><span class="line">            // 将对应的 event push 到 graphChanges 队列中</span><br><span class="line">            gb.graphChanges.Add(event)</span><br><span class="line">        &#125;,</span><br><span class="line">        DeleteFunc: func(obj interface&#123;&#125;) &#123;</span><br><span class="line">            if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok &#123;</span><br><span class="line">                obj = deletedFinalStateUnknown.Obj</span><br><span class="line">            &#125;</span><br><span class="line">            event := &amp;event&#123;</span><br><span class="line">                eventType: deleteEvent,</span><br><span class="line">                obj:       obj,</span><br><span class="line">                gvk:       kind,</span><br><span class="line">            &#125;</span><br><span class="line">            // 将对应的 event push 到 graphChanges 队列中</span><br><span class="line">            gb.graphChanges.Add(event)</span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;</span><br><span class="line">    shared, err := gb.sharedInformers.ForResource(resource)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)</span><br><span class="line">    return shared.Informer().GetController(), shared.Informer().GetStore(), nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>至此 <code>NewGarbageCollector</code> 的功能已经分析完了，在 <code>NewGarbageCollector</code> 中初始化了两个对象 GarbageCollector 和 GraphBuilder，然后在 <code>gb.syncMonitors</code> 中初始化了所有 deletableResources 的 informer，为每个 informer 添加 eventHandler 并将监听到的所有 event push 到 graphChanges 队列中，此处每个 informer 都被称为 monitor，所有 informer 都被称为生产者。graphChanges 是 GraphBuilder 中的一个对象，GraphBuilder 的主要功能是作为一个生产者，其会处理 graphChanges 中的所有事件并进行分类，将事件放入到 attemptToDelete 和 attemptToOrphan 两个队列中，具体处理逻辑下文讲述。</p>
+<p><code>NewGarbageCollector</code> 中的调用逻辑如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">                     |--&gt; ctx.ClientBuilder.</span><br><span class="line">                     |    ClientOrDie</span><br><span class="line">                     |</span><br><span class="line">                     |</span><br><span class="line">                     |--&gt; cacheddiscovery.</span><br><span class="line">                     |    NewMemCacheClient</span><br><span class="line">                     |                                                                  |--&gt; gb.sharedInformers.</span><br><span class="line">                     |                                                                  |       ForResource</span><br><span class="line">                     |                                                                  |</span><br><span class="line">startGarbage     ----|--&gt; garbagecollector.  --&gt; gb.syncMonitors --&gt; gb.controllerFor --|</span><br><span class="line">CollectorController  |    NewGarbageCollector                                           |</span><br><span class="line">                     |                                                                  |</span><br><span class="line">                     |                                                                  |--&gt; shared.Informer().</span><br><span class="line">                     |                                                                    AddEventHandlerWithResyncPeriod</span><br><span class="line">                     |--&gt; garbageCollector.Run</span><br><span class="line">                     |</span><br><span class="line">                     |</span><br><span class="line">                     |--&gt; garbageCollector.Sync</span><br><span class="line">                     |</span><br><span class="line">                     |</span><br><span class="line">                     |--&gt; garbagecollector.NewDebugHandler</span><br></pre></td></tr></table></figure>
+<h4 id="garbageCollector-Run"><a href="#garbageCollector-Run" class="headerlink" title="garbageCollector.Run"></a>garbageCollector.Run</h4><p>上文已经详述了 <code>NewGarbageCollector</code> 的主要功能，然后继续分析 <code>startGarbageCollectorController</code> 中的第二个核心方法 <code>garbageCollector.Run</code>，<code>garbageCollector.Run</code> 的主要作用是启动所有的生产者和消费者，其首先会调用 <code>gc.dependencyGraphBuilder.Run</code> 启动所有的生产者，即 monitors，然后再启动一个 goroutine 处理  graphChanges 队列中的事件并分别放到 attemptToDelete 和 attemptToOrphan 两个队列中，dependencyGraphBuilder 即上文提到的 GraphBuilder，<code>run</code> 方法会调用 <code>gc.runAttemptToDeleteWorker</code> 和 <code>gc.runAttemptToOrphanWorker</code> 启动多个 goroutine 处理 attemptToDelete 和 attemptToOrphan 两个队列中的事件。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:124</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) Run(workers int, stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    defer utilruntime.HandleCrash()</span><br><span class="line">    defer gc.attemptToDelete.ShutDown()</span><br><span class="line">    defer gc.attemptToOrphan.ShutDown()</span><br><span class="line">    defer gc.dependencyGraphBuilder.graphChanges.ShutDown()</span><br><span class="line"></span><br><span class="line">    defer klog.Infof(&quot;Shutting down garbage collector controller&quot;)</span><br><span class="line"></span><br><span class="line">    // 1、调用 gc.dependencyGraphBuilder.Run 启动所有的 monitors 即 informers，并且启动一个 goroutine 处理 graphChanges 中的事件将其分别放到 GraphBuilder 的 attemptToDelete 和 attemptToOrphan 两个 队列中；</span><br><span class="line">    go gc.dependencyGraphBuilder.Run(stopCh)</span><br><span class="line"></span><br><span class="line">    // 2、等待 informers 的 cache 同步完成</span><br><span class="line">    if !cache.WaitForNamedCacheSync(&quot;garbage collector&quot;, stopCh, gc.dependencyGraphBuilder.IsSynced) &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; workers; i++ &#123;</span><br><span class="line">        // 3、启动多个 goroutine 调用 gc.runAttemptToDeleteWorker 处理 attemptToDelete 中的事件</span><br><span class="line">        go wait.Until(gc.runAttemptToDeleteWorker, 1*time.Second, stopCh)</span><br><span class="line">        // 4、启动多个 goroutine 调用 gc.runAttemptToOrphanWorker 处理 attemptToDelete 中的事件</span><br><span class="line">        go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &lt;-stopCh</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>Run</code> 方法中调用了 <code>gc.dependencyGraphBuilder.Run</code> 来完成 GraphBuilder 的启动。</p>
+<h5 id="gc-dependencyGraphBuilder-Run"><a href="#gc-dependencyGraphBuilder-Run" class="headerlink" title="gc.dependencyGraphBuilder.Run"></a>gc.dependencyGraphBuilder.Run</h5><p>GraphBuilder 在 garbageCollector 整个环节中起到承上启下的作用，首先看一下 GraphBuilder 对象的结构：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">type GraphBuilder struct &#123;</span><br><span class="line">    restMapper meta.RESTMapper</span><br><span class="line"></span><br><span class="line">    // informers</span><br><span class="line">    monitors    monitors</span><br><span class="line">    monitorLock sync.RWMutex</span><br><span class="line"></span><br><span class="line">    // 当 kube-controller-manager 中所有的 controllers 都启动后，informersStarted 会被 close 掉</span><br><span class="line">    // informersStarted 会被 close 掉的调用程序在 kube-controller-manager 的启动流程中</span><br><span class="line">    informersStarted &lt;-chan struct&#123;&#125;</span><br><span class="line"></span><br><span class="line">    stopCh &lt;-chan struct&#123;&#125;</span><br><span class="line"></span><br><span class="line">    // 当调用 GraphBuilder 的 run 方法时，running 会被设置为 true</span><br><span class="line">    running bool</span><br><span class="line"></span><br><span class="line">    metadataClient metadata.Interface</span><br><span class="line">    </span><br><span class="line">    // informers 监听到的事件会放在 graphChanges 中</span><br><span class="line">    graphChanges workqueue.RateLimitingInterface</span><br><span class="line">    </span><br><span class="line">    // 维护所有对象的依赖关系 </span><br><span class="line">    uidToNode *concurrentUIDToNode</span><br><span class="line">    </span><br><span class="line">    // GarbageCollector 作为消费者要处理 attemptToDelete 和 attemptToOrphan 两个队列中的事件</span><br><span class="line">    attemptToDelete workqueue.RateLimitingInterface</span><br><span class="line">    attemptToOrphan workqueue.RateLimitingInterface</span><br><span class="line"></span><br><span class="line">    absentOwnerCache *UIDCache</span><br><span class="line">    sharedInformers  controller.InformerFactory</span><br><span class="line">    // 不需要被 gc 的资源</span><br><span class="line">    ignoredResources map[schema.GroupResource]struct&#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="uidToNode"><a href="#uidToNode" class="headerlink" title="uidToNode"></a>uidToNode</h6><p>此处有必要先说明一下 uidToNode 的功能，uidToNode 数据结构中维护着所有对象的依赖关系，此处的依赖关系是指比如当创建一个 deployment 时会创建对应的 rs 以及 pod，pod 的 owner 就是 rs，rs 的 owner 是 deployment，rs 的 dependents 是其关联的所有 pod，deployment 的 dependents 是其关联的所有 rs。</p>
+<p>uidToNode 中的 node 不是指 k8s 中的 node 节点，而是将 graphChanges 中的 event 转换为 node 对象，k8s 中所有 object 之间的级联关系是通过 node 的概念来维护的，garbageCollector 在后续的处理中会直接使用 node 对象，node 对象定义如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">type concurrentUIDToNode struct &#123;</span><br><span class="line">    uidToNodeLock sync.RWMutex</span><br><span class="line">    uidToNode     map[types.UID]*node</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">type node struct &#123;</span><br><span class="line">    identity objectReference</span><br><span class="line">    </span><br><span class="line">    dependentsLock sync.RWMutex</span><br><span class="line">    // 其依赖项指 metadata.ownerReference 中的对象</span><br><span class="line">    dependents map[*node]struct&#123;&#125;</span><br><span class="line"></span><br><span class="line">    deletingDependents     bool</span><br><span class="line">    deletingDependentsLock sync.RWMutex</span><br><span class="line"></span><br><span class="line">    beingDeleted     bool</span><br><span class="line">    beingDeletedLock sync.RWMutex</span><br><span class="line">    </span><br><span class="line">    // 当 virtual 值为 true 时，此时不确定该对象是否存在于 apiserver 中</span><br><span class="line">    virtual     bool</span><br><span class="line">    virtualLock sync.RWMutex</span><br><span class="line">    </span><br><span class="line">    // 对象本身的 OwnerReference 列表</span><br><span class="line">    owners []metav1.OwnerReference</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>GraphBuilder 主要有三个功能：</p>
+<ul>
+<li>1、监控集群中所有的可删除资源；</li>
+<li>2、基于 informers 中的资源在 uidToNode 数据结构中维护着所有对象的依赖关系；</li>
+<li>3、处理 graphChanges 中的事件并放到 attemptToDelete 和 attemptToOrphan 两个队列中；</li>
+</ul>
+<p>上文已经说了 <code>gc.dependencyGraphBuilder.Run</code> 的功能，启动所有的 informers 然后再启动一个 goroutine 处理  graphChanges 队列中的事件并分别放到 attemptToDelete 和 attemptToOrphan 两个队列中，代码如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:281</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) Run(stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    klog.Infof(&quot;GraphBuilder running&quot;)</span><br><span class="line">    defer klog.Infof(&quot;GraphBuilder stopping&quot;)</span><br><span class="line"></span><br><span class="line">    gb.monitorLock.Lock()</span><br><span class="line">    gb.stopCh = stopCh</span><br><span class="line">    gb.running = true</span><br><span class="line">    gb.monitorLock.Unlock()</span><br><span class="line"></span><br><span class="line">    gb.startMonitors()</span><br><span class="line">    </span><br><span class="line">    // 调用 gb.runProcessGraphChanges</span><br><span class="line">    // 此处为死循环，除非收到 stopCh 信号，否则下面的代码不会被执行到</span><br><span class="line">    wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)</span><br><span class="line"></span><br><span class="line">    // 若执行到此处说明收到了 stopCh 的信号，此时需要停止所有的 running monitors</span><br><span class="line">    gb.monitorLock.Lock()</span><br><span class="line">    defer gb.monitorLock.Unlock()</span><br><span class="line">    monitors := gb.monitors</span><br><span class="line">    stopped := 0</span><br><span class="line">    for _, monitor := range monitors &#123;</span><br><span class="line">        if monitor.stopCh != nil &#123;</span><br><span class="line">            stopped++</span><br><span class="line">            close(monitor.stopCh)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    gb.monitors = nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>gc.dependencyGraphBuilder.Run</code>的核心是调用了 <code>gb.startMonitors</code> 和 <code>gb.runProcessGraphChanges</code> 两个方法来完成主要功能，继续看这两个方法的主要逻辑。</p>
+<h6 id="gb-startMonitors"><a href="#gb-startMonitors" class="headerlink" title="gb.startMonitors"></a>gb.startMonitors</h6><p><code>startMonitors</code> 的功能很简单就是启动所有的 informers，代码如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:232</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) startMonitors() &#123;</span><br><span class="line">    gb.monitorLock.Lock()</span><br><span class="line">    defer gb.monitorLock.Unlock()</span><br><span class="line">		</span><br><span class="line">    // 1、当 GraphBuilder 调用 run 方法后，running 会设置为 true</span><br><span class="line">    if !gb.running &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、当 kube-controller-manager 中所有的 controllers 在启动流程中都启动后</span><br><span class="line">    //    会 close 掉 informersStarted</span><br><span class="line">    &lt;-gb.informersStarted</span><br><span class="line"></span><br><span class="line">    // 3、启动所有 informer</span><br><span class="line">    monitors := gb.monitors</span><br><span class="line">    started := 0</span><br><span class="line">    for _, monitor := range monitors &#123;</span><br><span class="line">        if monitor.stopCh == nil &#123;</span><br><span class="line">            monitor.stopCh = make(chan struct&#123;&#125;)</span><br><span class="line">            gb.sharedInformers.Start(gb.stopCh)</span><br><span class="line">            go monitor.Run()</span><br><span class="line">            started++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="gb-runProcessGraphChanges"><a href="#gb-runProcessGraphChanges" class="headerlink" title="gb.runProcessGraphChanges"></a>gb.runProcessGraphChanges</h6><p><code>runProcessGraphChanges</code> 方法的主要功能是处理 graphChanges 中的事件将其分别放到 GraphBuilder 的 attemptToDelete 和 attemptToOrphan 两个队列中，代码主要逻辑为：</p>
+<ul>
+<li>1、从 graphChanges 队列中取出一个 item 即 event；</li>
+<li>2、获取 event 的 accessor，accessor 是一个 object 的 meta.Interface，里面包含访问 object meta 中所有字段的方法；</li>
+<li>3、通过 accessor 获取 UID 判断 uidToNode 中是否存在该 object；</li>
+<li>4、若 uidToNode 中不存在该 node 且该事件是 addEvent 或 updateEvent，则为该 object 创建对应的 node，并调用 <code>gb.insertNode</code> 将该 node 加到 uidToNode 中，然后将该 node 添加到其 owner 的 dependents 中，执行完 <code>gb.insertNode</code> 中的操作后再调用 <code>gb.processTransitions</code> 方法判断该对象是否处于删除状态，若处于删除状态会判断该对象是以 <code>orphan</code> 模式删除还是以 <code>foreground</code> 模式删除，若以 <code>orphan</code> 模式删除，则将该 node 加入到 attemptToOrphan 队列中，若以 <code>foreground</code> 模式删除则将该对象以及其所有 dependents 都加入到 attemptToDelete 队列中；</li>
+<li><p>5、若 uidToNode 中存在该 node 且该事件是 addEvent 或 updateEvent 时，此时可能是一个 update 操作，调用 <code>referencesDiffs</code> 方法检查该对象的 <code>OwnerReferences</code> 字段是否有变化，若有变化(1)调用 <code>gb.addUnblockedOwnersToDeleteQueue</code> 将被删除以及更新的 owner 对应的 node 加入到 attemptToDelete 中，因为此时该 node 中已被删除或更新的 owner 可能处于删除状态且阻塞在该 node 处，此时有三种方式避免该 node 的 owner 处于删除阻塞状态，一是等待该 node 被删除，二是将该 node 自身对应 owner 的 <code>OwnerReferences</code> 字段删除，三是将该 node <code>OwnerReferences</code> 字段中对应 owner 的 <code>BlockOwnerDeletion</code> 设置为 false；(2)更新该 node 的 owners 列表；(3)若有新增的 owner，将该 node 加入到新 owner 的 dependents 中；(4) 若有被删除的 owner，将该 node 从已删除 owner 的 dependents 中删除；以上操作完成后，检查该 node 是否处于删除状态并进行标记，最后调用 <code>gb.processTransitions</code> 方法检查该 node 是否要被删除；</p>
+<p>举个例子，若以 <code>foreground</code> 模式删除 deployment 时，deployment 的 dependents 列表中有对应的 rs，那么 deployment 的删除会阻塞住等待其依赖 rs 的删除，此时 rs 有三种方法不阻塞 deployment 的删除操作，一是 rs 对象被删除，二是删除 rs 对象 <code>OwnerReferences</code> 字段中对应的 deployment，三是将 rs 对象<code>OwnerReferences</code> 字段中对应的 deployment 配置 <code>BlockOwnerDeletion</code> 设置为 false，文末会有示例演示该操作。</p>
+</li>
+<li><p>6、若该事件为 deleteEvent，首先从 uidToNode 中删除该对象，然后从该 node 所有 owners 的 dependents 中删除该对象，将该 node 所有的 dependents 加入到 attemptToDelete 队列中，最后检查该 node 的所有 owners，若有处于删除状态的 owner，此时该 owner 可能处于删除阻塞状态正在等待该 node 的删除，将该 owner 加入到 attemptToDelete 中；</p>
+</li>
+</ul>
+<p>总结一下，当从 graphChanges 中取出 event 时，不管是什么 event，主要完成三件时，首先都会将 event 转化为 uidToNode 中的 node 对象，其次一是更新 uidToNode 中维护的依赖关系，二是更新该 node 的 owners 以及 owners 的 dependents，三是检查该 node 的 owners 是否要被删除以及该 node 的 dependents 是否要被删除，若需要删除则根据 node 的删除策略将其添加到 attemptToOrphan 或者 attemptToDelete 队列中；</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:526</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) runProcessGraphChanges() &#123;</span><br><span class="line">    for gb.processGraphChanges() &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (gb *GraphBuilder) processGraphChanges() bool &#123;</span><br><span class="line">    // 1、从 graphChanges 取出一个 event</span><br><span class="line">    item, quit := gb.graphChanges.Get()</span><br><span class="line">    if quit &#123;</span><br><span class="line">        return false</span><br><span class="line">    &#125;</span><br><span class="line">    defer gb.graphChanges.Done(item)</span><br><span class="line">    event, ok := item.(*event)</span><br><span class="line">    if !ok &#123;</span><br><span class="line">        utilruntime.HandleError(fmt.Errorf(&quot;expect a *event, got %v&quot;, item))</span><br><span class="line">        return true</span><br><span class="line">    &#125;</span><br><span class="line">    obj := event.obj</span><br><span class="line">    accessor, err := meta.Accessor(obj)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        utilruntime.HandleError(fmt.Errorf(&quot;cannot access obj: %v&quot;, err))</span><br><span class="line">        return true</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、若存在 node 对象，从 uidToNode 中取出该 event 的 node 对象</span><br><span class="line">    existingNode, found := gb.uidToNode.Read(accessor.GetUID())</span><br><span class="line">    if found &#123;</span><br><span class="line">        existingNode.markObserved()</span><br><span class="line">    &#125;</span><br><span class="line">    switch &#123;</span><br><span class="line">    // 3、若 event 为 add 或 update 类型以及对应的 node 对象不存在时</span><br><span class="line">    case (event.eventType == addEvent || event.eventType == updateEvent) &amp;&amp; !found:</span><br><span class="line">        // 4、为 node 创建 event 对象</span><br><span class="line">        newNode := &amp;node&#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        // 5、在 uidToNode 中添加该 node 对象</span><br><span class="line">        gb.insertNode(newNode)</span><br><span class="line"></span><br><span class="line">        // 6、检查并处理 node 的删除操作 </span><br><span class="line">        gb.processTransitions(event.oldObj, accessor, newNode)</span><br><span class="line">        </span><br><span class="line">    // 7、若 event 为 add 或 update 类型以及对应的 node 对象存在时</span><br><span class="line">    case (event.eventType == addEvent || event.eventType == updateEvent) &amp;&amp; found:</span><br><span class="line">        added, removed, changed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())</span><br><span class="line">        // 8、若 node 的 owners 有变化</span><br><span class="line">        if len(added) != 0 || len(removed) != 0 || len(changed) != 0 &#123;</span><br><span class="line"></span><br><span class="line">            gb.addUnblockedOwnersToDeleteQueue(removed, changed)</span><br><span class="line">            // 9、更新 uidToNode 中的 owners</span><br><span class="line">            existingNode.owners = accessor.GetOwnerReferences()</span><br><span class="line">            // 10、添加更新后 Owners 对应的 dependent</span><br><span class="line">            gb.addDependentToOwners(existingNode, added)</span><br><span class="line">            // 11、移除旧 owners 对应的 dependents</span><br><span class="line">            gb.removeDependentFromOwners(existingNode, removed)</span><br><span class="line">        &#125;</span><br><span class="line">				</span><br><span class="line">        // 12、检查是否处于删除状态</span><br><span class="line">        if beingDeleted(accessor) &#123;</span><br><span class="line">            existingNode.markBeingDeleted()</span><br><span class="line">        &#125;</span><br><span class="line">        // 13、检查并处理 node 的删除操作 </span><br><span class="line">        gb.processTransitions(event.oldObj, accessor, existingNode)</span><br><span class="line">        </span><br><span class="line">    // 14、若为 delete event</span><br><span class="line">    case event.eventType == deleteEvent:</span><br><span class="line">        if !found &#123;</span><br><span class="line">            return true</span><br><span class="line">        &#125;</span><br><span class="line">        // 15、从 uidToNode 中删除该 node</span><br><span class="line">        gb.removeNode(existingNode)</span><br><span class="line">        existingNode.dependentsLock.RLock()</span><br><span class="line">        defer existingNode.dependentsLock.RUnlock()</span><br><span class="line">        if len(existingNode.dependents) &gt; 0 &#123;</span><br><span class="line">            gb.absentOwnerCache.Add(accessor.GetUID())</span><br><span class="line">        &#125;</span><br><span class="line">        // 16、删除该 node 的 dependents</span><br><span class="line">        for dep := range existingNode.dependents &#123;</span><br><span class="line">            gb.attemptToDelete.Add(dep)</span><br><span class="line">        &#125;</span><br><span class="line">        // 17、删除该 node 处于删除阻塞状态的 owner </span><br><span class="line">        for _, owner := range existingNode.owners &#123;</span><br><span class="line">            ownerNode, found := gb.uidToNode.Read(owner.UID)</span><br><span class="line">            if !found || !ownerNode.isDeletingDependents() &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            gb.attemptToDelete.Add(ownerNode)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="processTransitions"><a href="#processTransitions" class="headerlink" title="processTransitions"></a>processTransitions</h6><p>上述在处理 add 或 update event 时最后都调用了 <code>processTransitions</code> 方法检查 node 是否处于删除状态，若处于删除状态会通过其删除策略将 node 放到 attemptToOrphan 或 attemptToDelete 队列中。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/graph_builder.go:509</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func (gb *GraphBuilder) processTransitions(oldObj interface&#123;&#125;, newAccessor metav1.Object, n *node) &#123;</span><br><span class="line">    if startsWaitingForDependentsOrphaned(oldObj, newAccessor) &#123;</span><br><span class="line">        gb.attemptToOrphan.Add(n)</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    if startsWaitingForDependentsDeleted(oldObj, newAccessor) &#123;</span><br><span class="line">        n.markDeletingDependents()</span><br><span class="line">        for dep := range n.dependents &#123;</span><br><span class="line">            gb.attemptToDelete.Add(dep)</span><br><span class="line">        &#125;</span><br><span class="line">        gb.attemptToDelete.Add(n)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="gc-runAttemptToDeleteWorker"><a href="#gc-runAttemptToDeleteWorker" class="headerlink" title="gc.runAttemptToDeleteWorker"></a>gc.runAttemptToDeleteWorker</h5><p><code>runAttemptToDeleteWorker</code> 是执行删除 attemptToDelete 中 node 的方法，其主要逻辑为： </p>
+<ul>
+<li>1、调用 <code>gc.attemptToDeleteItem</code> 删除 node；</li>
+<li>2、若删除失败则重新加入到 attemptToDelete 队列中进行重试；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:280</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) runAttemptToDeleteWorker() &#123;</span><br><span class="line">    for gc.attemptToDeleteWorker() &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (gc *GarbageCollector) attemptToDeleteWorker() bool &#123;</span><br><span class="line">    item, quit := gc.attemptToDelete.Get()</span><br><span class="line">    gc.workerLock.RLock()</span><br><span class="line">    defer gc.workerLock.RUnlock()</span><br><span class="line">    if quit &#123;</span><br><span class="line">        return false</span><br><span class="line">    &#125;</span><br><span class="line">    defer gc.attemptToDelete.Done(item)</span><br><span class="line">    n, ok := item.(*node)</span><br><span class="line">    if !ok &#123;</span><br><span class="line">        utilruntime.HandleError(fmt.Errorf(&quot;expect *node, got %#v&quot;, item))</span><br><span class="line">        return true</span><br><span class="line">    &#125;</span><br><span class="line">    err := gc.attemptToDeleteItem(n)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if _, ok := err.(*restMappingError); ok &#123;</span><br><span class="line">            klog.V(5).Infof(&quot;error syncing item %s: %v&quot;, n, err)</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            utilruntime.HandleError(fmt.Errorf(&quot;error syncing item %s: %v&quot;, n, err))</span><br><span class="line">        &#125;</span><br><span class="line">        gc.attemptToDelete.AddRateLimited(item)</span><br><span class="line">    &#125; else if !n.isObserved() &#123;</span><br><span class="line">        gc.attemptToDelete.AddRateLimited(item)</span><br><span class="line">    &#125;</span><br><span class="line">    return true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>gc.runAttemptToDeleteWorker</code> 中调用了 <code>gc.attemptToDeleteItem</code> 执行实际的删除操作。</p>
+<h6 id="gc-attemptToDeleteItem"><a href="#gc-attemptToDeleteItem" class="headerlink" title="gc.attemptToDeleteItem"></a>gc.attemptToDeleteItem</h6><p><code>gc.attemptToDeleteItem</code> 的主要逻辑为：</p>
+<ul>
+<li>1、判断 node 是否处于删除状态；</li>
+<li>2、从 apiserver 获取该 node 最新的状态，该 node 可能为 virtual node，若为 virtual node 则从 apiserver 中获取不到该 node 的对象，此时会将该 node 重新加入到 graphChanges 队列中，再次处理该 node 时会将其从 uidToNode 中删除；</li>
+<li>3、判断该 node 最新状态的 uid 是否等于本地缓存中的 uid，若不匹配说明该 node 已更新过此时将其设置为 virtual node 并重新加入到 graphChanges 队列中，再次处理该 node 时会将其从 uidToNode 中删除；</li>
+<li><p>4、通过 node 的 <code>deletingDependents</code> 字段判断该 node 当前是否处于删除 dependents 的状态，若该 node 处于删除 dependents 的状态则调用 <code>processDeletingDependentsItem</code> 方法检查 node 的 <code>blockingDependents</code> 是否被完全删除，若 <code>blockingDependents</code> 已完全被删除则删除该 node 对应的 finalizer，若 <code>blockingDependents</code> 还未删除完，将未删除的 <code>blockingDependents</code> 加入到 attemptToDelete 中；</p>
+<p>上文中在 GraphBuilder 处理 graphChanges 中的事件时，若发现 node 处于删除状态，会将 node 的 dependents 加入到 attemptToDelete 中并标记 node 的 <code>deletingDependents</code> 为 true；</p>
+</li>
+<li>5、调用 <code>gc.classifyReferences</code> 将 node 的 <code>ownerReferences</code> 分类为 <code>solid</code>, <code>dangling</code>, <code>waitingForDependentsDeletion</code> 三类：<code>dangling</code>(owner 不存在)、<code>waitingForDependentsDeletion</code>(owner 存在，owner 处于删除状态且正在等待其 dependents 被删除)、<code>solid</code>(至少有一个 owner 存在且不处于删除状态)；</li>
+<li>6、对以上分类进行不同的处理，若 <code>solid</code>不为 0 即当前 node 至少存在一个 owner，该对象还不能被回收，此时需要将 <code>dangling</code> 和 <code>waitingForDependentsDeletion</code> 列表中的 owner 从 node 的 <code>ownerReferences</code> 删除，即已经被删除或等待删除的引用从对象中删掉；</li>
+<li>7、第二种情况是该 node 的 owner 处于 <code>waitingForDependentsDeletion</code> 状态并且 node 的 dependents 未被完全删除，该 node 需要等待删除完所有的 dependents 后才能被删除；</li>
+<li>8、第三种情况就是该 node 已经没有任何 dependents 了，此时按照 node 中声明的删除策略调用 apiserver 的接口删除即可；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:404</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) attemptToDeleteItem(item *node) error &#123;</span><br><span class="line">    // 1、判断 node 是否处于删除状态</span><br><span class="line">    if item.isBeingDeleted() &amp;&amp; !item.isDeletingDependents() &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // 2、从 apiserver 获取该 node 最新的状态</span><br><span class="line">    latest, err := gc.getObject(item.identity)</span><br><span class="line">    switch &#123;</span><br><span class="line">    case errors.IsNotFound(err):</span><br><span class="line">        gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)</span><br><span class="line">        item.markObserved()</span><br><span class="line">        return nil</span><br><span class="line">    case err != nil:</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、判断该 node 最新状态的 uid 是否等于本地缓存中的 uid</span><br><span class="line">    if latest.GetUID() != item.identity.UID &#123;</span><br><span class="line">        gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)</span><br><span class="line">        item.markObserved()</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、判断该 node 当前是否处于删除 dependents 状态中</span><br><span class="line">    if item.isDeletingDependents() &#123;</span><br><span class="line">        return gc.processDeletingDependentsItem(item)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、检查 node 是否还存在 ownerReferences</span><br><span class="line">    ownerReferences := latest.GetOwnerReferences()</span><br><span class="line">    if len(ownerReferences) == 0 &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、对 ownerReferences 进行分类</span><br><span class="line">    solid, dangling, waitingForDependentsDeletion, err := gc.classifyReferences(item, ownerReferences)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    switch &#123;</span><br><span class="line">    // 7、存在不处于删除状态的 owner</span><br><span class="line">    case len(solid) != 0:</span><br><span class="line">        if len(dangling) == 0 &amp;&amp; len(waitingForDependentsDeletion) == 0 &#123;</span><br><span class="line">            return nil</span><br><span class="line">        &#125;</span><br><span class="line">        ownerUIDs := append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)</span><br><span class="line">        patch := deleteOwnerRefStrategicMergePatch(item.identity.UID, ownerUIDs...)</span><br><span class="line">        _, err = gc.patch(item, patch, func(n *node) ([]byte, error) &#123;</span><br><span class="line">            return gc.deleteOwnerRefJSONMergePatch(n, ownerUIDs...)</span><br><span class="line">        &#125;)</span><br><span class="line">        return err</span><br><span class="line">    // 8、node 的 owner 处于 waitingForDependentsDeletion 状态并且 node </span><br><span class="line">    //   的 dependents 未被完全删除</span><br><span class="line">    case len(waitingForDependentsDeletion) != 0 &amp;&amp; item.dependentsLength() != 0:</span><br><span class="line">        deps := item.getDependents()</span><br><span class="line">        // 9、删除 dependents</span><br><span class="line">        for _, dep := range deps &#123;</span><br><span class="line">            if dep.isDeletingDependents() &#123;</span><br><span class="line">                patch, err := item.unblockOwnerReferencesStrategicMergePatch()</span><br><span class="line">                if err != nil &#123;</span><br><span class="line">                    return err</span><br><span class="line">                &#125;</span><br><span class="line">                if _, err := gc.patch(item, patch, gc.unblockOwnerReferencesJSONMergePatch); err != nil &#123;</span><br><span class="line">                    return err</span><br><span class="line">                &#125;</span><br><span class="line">                break</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        // 10、以 Foreground 模式删除 node 对象</span><br><span class="line">        policy := metav1.DeletePropagationForeground</span><br><span class="line">        return gc.deleteObject(item.identity, &amp;policy)</span><br><span class="line">    // 11、该 node 已经没有任何依赖了，按照 node 中声明的删除策略调用 apiserver 的接口删除</span><br><span class="line">    default:</span><br><span class="line">        var policy metav1.DeletionPropagation</span><br><span class="line">        switch &#123;</span><br><span class="line">        case hasOrphanFinalizer(latest):</span><br><span class="line">            policy = metav1.DeletePropagationOrphan</span><br><span class="line">        case hasDeleteDependentsFinalizer(latest):</span><br><span class="line">            policy = metav1.DeletePropagationForeground</span><br><span class="line">        default:</span><br><span class="line">            policy = metav1.DeletePropagationBackground</span><br><span class="line">        &#125;</span><br><span class="line">        return gc.deleteObject(item.identity, &amp;policy)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="gc-runAttemptToOrphanWorker"><a href="#gc-runAttemptToOrphanWorker" class="headerlink" title="gc.runAttemptToOrphanWorker"></a>gc.runAttemptToOrphanWorker</h5><p><code>runAttemptToOrphanWorker</code> 是处理以 <code>orphan</code> 模式删除的 node，主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>gc.orphanDependents</code> 删除 owner 所有 dependents <code>OwnerReferences</code> 中的 owner 字段；</li>
+<li>2、调用 <code>gc.removeFinalizer</code> 删除 owner 的 <code>orphan</code> Finalizer；</li>
+<li>3、以上两步中若有失败的会进行重试；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:574</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) runAttemptToOrphanWorker() &#123;</span><br><span class="line">    for gc.attemptToOrphanWorker() &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (gc *GarbageCollector) attemptToOrphanWorker() bool &#123;</span><br><span class="line">    item, quit := gc.attemptToOrphan.Get()</span><br><span class="line">    gc.workerLock.RLock()</span><br><span class="line">    defer gc.workerLock.RUnlock()</span><br><span class="line">    if quit &#123;</span><br><span class="line">        return false</span><br><span class="line">    &#125;</span><br><span class="line">    defer gc.attemptToOrphan.Done(item)</span><br><span class="line">    owner, ok := item.(*node)</span><br><span class="line">    if !ok &#123;</span><br><span class="line">        return true</span><br><span class="line">    &#125;</span><br><span class="line">    owner.dependentsLock.RLock()</span><br><span class="line">    dependents := make([]*node, 0, len(owner.dependents))</span><br><span class="line">    for dependent := range owner.dependents &#123;</span><br><span class="line">        dependents = append(dependents, dependent)</span><br><span class="line">    &#125;</span><br><span class="line">    owner.dependentsLock.RUnlock()</span><br><span class="line">    err := gc.orphanDependents(owner.identity, dependents)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        gc.attemptToOrphan.AddRateLimited(item)</span><br><span class="line">        return true</span><br><span class="line">    &#125;</span><br><span class="line">    // 更新 owner, 从 finalizers 列表中移除 &quot;orphaningFinalizer&quot;</span><br><span class="line">    err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        gc.attemptToOrphan.AddRateLimited(item)</span><br><span class="line">    &#125;</span><br><span class="line">    return true</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="garbageCollector-Sync"><a href="#garbageCollector-Sync" class="headerlink" title="garbageCollector.Sync"></a>garbageCollector.Sync</h4><p><code>garbageCollector.Sync</code> 是 <code>startGarbageCollectorController</code> 中的第三个核心方法，主要功能是周期性的查询集群中所有的资源，过滤出 <code>deletableResources</code>，然后对比已经监控的 <code>deletableResources</code> 和当前获取到的 <code>deletableResources</code> 是否一致，若不一致则更新 GraphBuilder 的 monitors 并重新启动 monitors 监控所有的  <code>deletableResources</code>，该方法的主要逻辑为：</p>
+<ul>
+<li>1、通过调用 <code>GetDeletableResources</code> 获取集群内所有的 <code>deletableResources</code> 作为 newResources，<code>deletableResources</code> 指支持 “delete”, “list”, “watch” 三种操作的 resource，包括 CR；</li>
+<li>2、检查 oldResources, newResources 是否一致，不一致则需要同步；</li>
+<li>3、调用 <code>gc.resyncMonitors</code> 同步 newResources，在 <code>gc.resyncMonitors</code> 中会重新调用 GraphBuilder 的 <code>syncMonitors</code> 和 <code>startMonitors</code> 两个方法完成 monitors 的刷新；</li>
+<li>4、等待 newResources informer 中的 cache 同步完成；</li>
+<li>5、将 newResources 作为 oldResources，继续进行下一轮的同步； </li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:164</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    oldResources := make(map[schema.GroupVersionResource]struct&#123;&#125;)</span><br><span class="line">    wait.Until(func() &#123;</span><br><span class="line">        // 1、获取集群内所有的 DeletableResources 作为 newResources</span><br><span class="line">        newResources := GetDeletableResources(discoveryClient)</span><br><span class="line"></span><br><span class="line">        if len(newResources) == 0 &#123;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 2、判断集群中的资源是否有变化</span><br><span class="line">        if reflect.DeepEqual(oldResources, newResources) &#123;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        gc.workerLock.Lock()</span><br><span class="line">        defer gc.workerLock.Unlock()</span><br><span class="line">       </span><br><span class="line">        // 3、开始更新 GraphBuilder 中的 monitors      </span><br><span class="line">        attempt := 0</span><br><span class="line">        wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) &#123;</span><br><span class="line">            attempt++</span><br><span class="line"></span><br><span class="line">            if attempt &gt; 1 &#123;</span><br><span class="line">                newResources = GetDeletableResources(discoveryClient)</span><br><span class="line">                if len(newResources) == 0 &#123;</span><br><span class="line">                    return false, nil</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            gc.restMapper.Reset()</span><br><span class="line">            // 4、调用 gc.resyncMonitors 同步 newResources</span><br><span class="line">            if err := gc.resyncMonitors(newResources); err != nil &#123;</span><br><span class="line">                return false, nil</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            // 5、等待所有 monitors 的 cache 同步完成</span><br><span class="line">            if !cache.WaitForNamedCacheSync(&quot;garbage collector&quot;, waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) &#123;</span><br><span class="line">                return false, nil</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            return true, nil</span><br><span class="line">        &#125;, stopCh)</span><br><span class="line"></span><br><span class="line">        // 6、更新 oldResources</span><br><span class="line">        oldResources = newResources</span><br><span class="line">    &#125;, period, stopCh)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>garbageCollector.Sync</code> 中主要调用了两个方法，一是调用 <code>GetDeletableResources</code> 获取集群中所有的可删除资源，二是调用 <code>gc.resyncMonitors</code> 更新 GraphBuilder 中 monitors。</p>
+<h5 id="GetDeletableResources"><a href="#GetDeletableResources" class="headerlink" title="GetDeletableResources"></a>GetDeletableResources</h5><p>在 <code>GetDeletableResources</code> 中首先通过调用 <code>discoveryClient.ServerPreferredResources</code> 方法获取集群内所有的 resource 信息，然后通过调用 <code>discovery.FilteredBy</code> 过滤出支持 “delete”, “list”, “watch” 三种方法的 resource 作为 <code>deletableResources</code>。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:636</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct&#123;&#125; &#123;</span><br><span class="line">    // 1、调用 discoveryClient.ServerPreferredResources 方法获取集群内所有的 resource 信息</span><br><span class="line">    preferredResources, err := discoveryClient.ServerPreferredResources()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if discovery.IsGroupDiscoveryFailedError(err) &#123;		</span><br><span class="line">        	......</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">        	......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if preferredResources == nil &#123;</span><br><span class="line">        return map[schema.GroupVersionResource]struct&#123;&#125;&#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、调用 discovery.FilteredBy 过滤出 deletableResources</span><br><span class="line">    deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs&#123;Verbs: []string&#123;&quot;delete&quot;, &quot;list&quot;, &quot;watch&quot;&#125;&#125;, preferredResources)</span><br><span class="line">    deletableGroupVersionResources := map[schema.GroupVersionResource]struct&#123;&#125;&#123;&#125;</span><br><span class="line">    for _, rl := range deletableResources &#123;</span><br><span class="line">        gv, err := schema.ParseGroupVersion(rl.GroupVersion)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        for i := range rl.APIResources &#123;</span><br><span class="line">            deletableGroupVersionResources[schema.GroupVersionResource&#123;Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name&#125;] =       struct&#123;&#125;&#123;&#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return deletableGroupVersionResources</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="ServerPreferredResources"><a href="#ServerPreferredResources" class="headerlink" title="ServerPreferredResources"></a>ServerPreferredResources</h6><p><code>ServerPreferredResources</code> 的主要功能是获取集群内所有的 resource 以及其 group、version、verbs 信息，该方法的主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>ServerGroups</code> 方法获取集群内所有的 GroupList，<code>ServerGroups</code> 方法首先从 apiserver 通过 <code>/api</code> URL 获取当前版本下所有可用的 <code>APIVersions</code>，再通过 <code>/apis</code> URL 获取 所有可用的 <code>APIVersions</code> 以及其下的所有 <code>APIGroupList</code>；</li>
+<li>2、调用 <code>fetchGroupVersionResources</code> 通过 serverGroupList 再获取到对应的 resource；</li>
+<li>3、将获取到的 version、group、resource 构建成标准格式添加到 <code>metav1.APIResourceList</code> 中；</li>
+</ul>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/client-go/discovery/discovery_client.go:285</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line">func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) &#123;</span><br><span class="line">    // 1、获取集群内所有的 GroupList</span><br><span class="line">    serverGroupList, err := d.ServerGroups()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、通过 serverGroupList 获取到对应的 resource</span><br><span class="line">    groupVersionResources, failedGroups := fetchGroupVersionResources(d, serverGroupList)</span><br><span class="line"></span><br><span class="line">    result := []*metav1.APIResourceList&#123;&#125;</span><br><span class="line">    grVersions := map[schema.GroupResource]string&#123;&#125;                         // selected version of a GroupResource</span><br><span class="line">    grAPIResources := map[schema.GroupResource]*metav1.APIResource&#123;&#125;        // selected APIResource for a GroupResource</span><br><span class="line">    gvAPIResourceLists := map[schema.GroupVersion]*metav1.APIResourceList&#123;&#125; // blueprint for a APIResourceList for later grouping</span><br><span class="line"></span><br><span class="line">    // 3、格式化 resource </span><br><span class="line">    for _, apiGroup := range serverGroupList.Groups &#123;</span><br><span class="line">        for _, version := range apiGroup.Versions &#123;</span><br><span class="line">            groupVersion := schema.GroupVersion&#123;Group: apiGroup.Name, Version: version.Version&#125;</span><br><span class="line"></span><br><span class="line">            apiResourceList, ok := groupVersionResources[groupVersion]</span><br><span class="line">            if !ok &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            emptyAPIResourceList := metav1.APIResourceList&#123;</span><br><span class="line">                GroupVersion: version.GroupVersion,</span><br><span class="line">            &#125;</span><br><span class="line">            gvAPIResourceLists[groupVersion] = &amp;emptyAPIResourceList</span><br><span class="line">            result = append(result, &amp;emptyAPIResourceList)</span><br><span class="line">            </span><br><span class="line">            for i := range apiResourceList.APIResources &#123;</span><br><span class="line">                apiResource := &amp;apiResourceList.APIResources[i]</span><br><span class="line">                if strings.Contains(apiResource.Name, &quot;/&quot;) &#123;</span><br><span class="line">                    continue</span><br><span class="line">                &#125;</span><br><span class="line">                gv := schema.GroupResource&#123;Group: apiGroup.Name, Resource: apiResource.Name&#125;</span><br><span class="line">                if _, ok := grAPIResources[gv]; ok &amp;&amp; version.Version != apiGroup.PreferredVersion.Version &#123;</span><br><span class="line">                    continue</span><br><span class="line">                &#125;</span><br><span class="line">                grVersions[gv] = version.Version</span><br><span class="line">                grAPIResources[gv] = apiResource</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for groupResource, apiResource := range grAPIResources &#123;</span><br><span class="line">        version := grVersions[groupResource]</span><br><span class="line">        groupVersion := schema.GroupVersion&#123;Group: groupResource.Group, Version: version&#125;</span><br><span class="line">        apiResourceList := gvAPIResourceLists[groupVersion]</span><br><span class="line">        apiResourceList.APIResources = append(apiResourceList.APIResources, *apiResource)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if len(failedGroups) == 0 &#123;</span><br><span class="line">        return result, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return result, &amp;ErrGroupDiscoveryFailed&#123;Groups: failedGroups&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>GetDeletableResources</code> 方法中的调用流程为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">                                                      |--&gt; d.ServerGroups</span><br><span class="line">                                                      |</span><br><span class="line">                        |--&gt; discoveryClient.       --|</span><br><span class="line">                        |  ServerPreferredResources   |</span><br><span class="line">                        |                             |--&gt; fetchGroupVersionResources</span><br><span class="line">GetDeletableResources --|</span><br><span class="line">                        |</span><br><span class="line">                        |--&gt; discovery.FilteredBy</span><br></pre></td></tr></table></figure>
+<h5 id="gc-resyncMonitors"><a href="#gc-resyncMonitors" class="headerlink" title="gc.resyncMonitors"></a>gc.resyncMonitors</h5><p><code>gc.resyncMonitors</code> 的主要功能是更新 GraphBuilder 的 monitors 并重新启动 monitors 监控所有的  deletableResources，GraphBuilder 的 <code>syncMonitors</code> 和 <code>startMonitors</code> 方法在前面的流程中已经分析过，此处不再详细说明。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector.go:116</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.                          GroupVersionResource]struct&#123;&#125;) error &#123;</span><br><span class="line">    if err := gc.dependencyGraphBuilder.syncMonitors(deletableResources); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    gc.dependencyGraphBuilder.startMonitors()</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="garbagecollector-NewDebugHandler"><a href="#garbagecollector-NewDebugHandler" class="headerlink" title="garbagecollector.NewDebugHandler"></a>garbagecollector.NewDebugHandler</h4><p><code>garbagecollector.NewDebugHandler</code> 主要功能是对外提供一个接口供用户查询当前集群中所有资源的依赖关系，依赖关系可以以图表的形式展示。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">	......</span><br><span class="line">	return garbagecollector.NewDebugHandler(garbageCollector), true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>具体使用方法如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">$ curl http://192.168.99.108:10252/debug/controllers/garbagecollector/graph  &gt; tmp.dot</span><br><span class="line"></span><br><span class="line">$ curl http://192.168.99.108:10252/debug/controllers/garbagecollector/graph\?uid=f9555d53-2b5f-4702-9717-54a313ed4fe8 &gt; tmp.dot</span><br><span class="line"></span><br><span class="line">// 生成 svg 文件</span><br><span class="line">$ dot -Tsvg -o graph.svg tmp.dot</span><br><span class="line"></span><br><span class="line">// 然后在浏览器中打开 svg 文件</span><br></pre></td></tr></table></figure>
+<p>依赖关系图如下所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/graph.png" alt=""></p>
+<h3 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h3><p>在此处会有一个小示例验证一下源码中的删除阻塞逻辑，当以 <code>Foreground</code> 策略删除一个对象时，该对象会处于阻塞状态等待其依依赖被删除，此时有三种方式避免该对象处于删除阻塞状态，一是将依赖对象直接删除，二是将依赖对象自身的 <code>OwnerReferences</code> 中 owner 字段删除，三是将该依赖对象 <code>OwnerReferences</code> 字段中对应 owner 的 <code>BlockOwnerDeletion</code> 设置为 false，下面会验证下这三种方式，首先创建一个 deployment，deployment 创建出的 rs 默认不会有 <code>foregroundDeletion finalizers</code>，此时使用 kubectl edit 手动加上 <code>foregroundDeletion finalizers</code>，当 deployment 正常运行时，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get deployment  nginx-deployment</span><br><span class="line">NAME               READY   UP-TO-DATE   AVAILABLE   AGE</span><br><span class="line">nginx-deployment   2/2     2            2           43s</span><br><span class="line"></span><br><span class="line">$ kubectl get rs nginx-deployment-69b6b4c5cd</span><br><span class="line">NAME                          DESIRED   CURRENT   READY   AGE</span><br><span class="line">nginx-deployment-69b6b4c5cd   2         2         2       57s</span><br><span class="line"></span><br><span class="line">$ kubectl get pod</span><br><span class="line">NAME                                READY   STATUS    RESTARTS   AGE</span><br><span class="line">nginx-deployment-69b6b4c5cd-26dsn   1/1     Running   0          66s</span><br><span class="line">nginx-deployment-69b6b4c5cd-6rqqc   1/1     Running   0          64s</span><br><span class="line"></span><br><span class="line">$ kubectl edit rs nginx-deployment-69b6b4c5cd   </span><br><span class="line">  </span><br><span class="line">// deployment 关联的 rs 对象  </span><br><span class="line">apiVersion: apps/v1</span><br><span class="line">kind: ReplicaSet</span><br><span class="line">metadata:</span><br><span class="line">  name: nginx-deployment-69b6b4c5cd</span><br><span class="line">  namespace: default</span><br><span class="line">  ownerReferences:</span><br><span class="line">  - apiVersion: apps/v1</span><br><span class="line">    blockOwnerDeletion: true</span><br><span class="line">    controller: true</span><br><span class="line">    kind: Deployment</span><br><span class="line">    name: nginx-deployment</span><br><span class="line">    uid: 40a1044e-03d1-48bc-8806-cb79d781c946</span><br><span class="line">  finalizers:</span><br><span class="line">  - foregroundDeletion       // 为 rs 手动添加的 Foreground 策略</span><br><span class="line">  ......</span><br><span class="line">spec:</span><br><span class="line">  replicas: 2</span><br><span class="line">  ......</span><br><span class="line">status:</span><br><span class="line">  ......</span><br></pre></td></tr></table></figure>
+<p>当 deployment、rs、pod 都处于正常运行状态且 deployment 关联的 rs 使用 <code>Foreground</code> 删除策略时，然后验证源码中提到的三种方法，验证时需要模拟一个依赖对象无法删除的场景，当然这个也很好模拟，三种场景如下所示：</p>
+<ul>
+<li>1、当 pod 所在的 node 处于 Ready 状态时，以 <code>Foreground</code> 策略删除 deploment，因为 rs 关联的 pod 会直接被删除，rs 也会被正常删除，此时 deployment 也会直接被删除； </li>
+<li>2、当 pod 所在的 node 处于 NotReady 状态时，以 <code>Foreground</code> 策略删除 deploment，此时因 rs 关联的 pod 无法被删除，rs 会一直处于删除阻塞状态，deployment 由于 rs 无法被删除也会处于删除阻塞状态，此时更新 rs 去掉其 <code>ownerReferences</code> 中对应的 deployment 部分，deployment 会因无依赖对象被成功删除；</li>
+<li>3、和 2 同样的场景，node 处于 NotReady 状态时，以 <code>Foreground</code> 策略删除 deploment，deployment 和 rs 将处于删除阻塞状态，此时将 rs <code>ownerReferences</code> 中关联 deployment 的 <code>blockOwnerDeletion</code> 字段设置为 false，可以看到 deployment 会因无 block 依赖对象被成功删除；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ systemctl stop kubelet</span><br><span class="line"></span><br><span class="line">// node 处于 NotReady 状态</span><br><span class="line">$ kubectl get node</span><br><span class="line">NAME       STATUS     ROLES    AGE     VERSION</span><br><span class="line">minikube   NotReady   master   6d11h   v1.16.2</span><br><span class="line"></span><br><span class="line">// 以 Foreground 策略删除 deployment</span><br><span class="line">$ curl -k -v -XDELETE  -H &quot;Accept: application/json&quot; -H &quot;Content-Type: application/json&quot; -d &apos;&#123;&quot;propagationPolicy&quot;:&quot;Foreground&quot;&#125;&apos; &apos;https://192.168.99.108:8443/apis/apps/v1/namespaces/default/deployments/nginx-deployment&apos;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>GarbageCollectorController 是一种典型的生产者消费者模型，所有 <code>deletableResources</code> 的 informer 都是生产者，每种资源的 informer 监听到变化后都会将对应的事件 push 到 graphChanges 中，graphChanges 是 GraphBuilder 对象中的一个数据结构，GraphBuilder 会启动另外的 goroutine 对 graphChanges 中的事件进行分类并放在其 attemptToDelete 和 attemptToOrphan 两个队列中，garbageCollector 会启动多个 goroutine 对 attemptToDelete 和 attemptToOrphan 两个队列中的事件进行处理，处理的结果就是回收一些需要被删除的对象。最后，再用一个流程图总结一下 GarbageCollectorController 的主要流程:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">                    monitors (producer)</span><br><span class="line">                          |</span><br><span class="line">                          |</span><br><span class="line">                          ∨</span><br><span class="line">                  graphChanges queue</span><br><span class="line">                          |</span><br><span class="line">                          |</span><br><span class="line">                          ∨</span><br><span class="line">                  processGraphChanges</span><br><span class="line">                          |</span><br><span class="line">                          |</span><br><span class="line">                          ∨</span><br><span class="line">          -------------------------------</span><br><span class="line">          |                             |</span><br><span class="line">          |                             |</span><br><span class="line">          ∨                             ∨</span><br><span class="line">attemptToDelete queue         attemptToOrphan queue</span><br><span class="line">          |                             |</span><br><span class="line">          |                             |</span><br><span class="line">          ∨                             ∨</span><br><span class="line">  AttemptToDeleteWorker       AttemptToOrphanWorker</span><br><span class="line">      (consumer)                    (consumer)</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/garbage-collector-controller/" rel="tag"># garbage collector controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/25/kubelet_status_manager/" rel="next" title="kubelet statusManager 源码分析">
+                <i class="fa fa-chevron-left"></i> kubelet statusManager 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">45</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的删除策略"><span class="nav-number">1.</span> <span class="nav-text">kubernetes 中的删除策略</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#finalizer-机制"><span class="nav-number">1.1.</span> <span class="nav-text">finalizer 机制</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GarbageCollectorController-源码分析"><span class="nav-number">2.</span> <span class="nav-text">GarbageCollectorController 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#startGarbageCollectorController"><span class="nav-number">2.1.</span> <span class="nav-text">startGarbageCollectorController</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#garbagecollector-NewGarbageCollector"><span class="nav-number">2.2.</span> <span class="nav-text">garbagecollector.NewGarbageCollector</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#gb-syncMonitors"><span class="nav-number">2.2.1.</span> <span class="nav-text">gb.syncMonitors</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#gb-controllerFor"><span class="nav-number">2.2.1.1.</span> <span class="nav-text">gb.controllerFor</span></a></li></ol></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#garbageCollector-Run"><span class="nav-number">2.3.</span> <span class="nav-text">garbageCollector.Run</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#gc-dependencyGraphBuilder-Run"><span class="nav-number">2.3.1.</span> <span class="nav-text">gc.dependencyGraphBuilder.Run</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#uidToNode"><span class="nav-number">2.3.1.1.</span> <span class="nav-text">uidToNode</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#gb-startMonitors"><span class="nav-number">2.3.1.2.</span> <span class="nav-text">gb.startMonitors</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#gb-runProcessGraphChanges"><span class="nav-number">2.3.1.3.</span> <span class="nav-text">gb.runProcessGraphChanges</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#processTransitions"><span class="nav-number">2.3.1.4.</span> <span class="nav-text">processTransitions</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#gc-runAttemptToDeleteWorker"><span class="nav-number">2.3.2.</span> <span class="nav-text">gc.runAttemptToDeleteWorker</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#gc-attemptToDeleteItem"><span class="nav-number">2.3.2.1.</span> <span class="nav-text">gc.attemptToDeleteItem</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#gc-runAttemptToOrphanWorker"><span class="nav-number">2.3.3.</span> <span class="nav-text">gc.runAttemptToOrphanWorker</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#garbageCollector-Sync"><span class="nav-number">2.4.</span> <span class="nav-text">garbageCollector.Sync</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#GetDeletableResources"><span class="nav-number">2.4.1.</span> <span class="nav-text">GetDeletableResources</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#ServerPreferredResources"><span class="nav-number">2.4.1.1.</span> <span class="nav-text">ServerPreferredResources</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#gc-resyncMonitors"><span class="nav-number">2.4.2.</span> <span class="nav-text">gc.resyncMonitors</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#garbagecollector-NewDebugHandler"><span class="nav-number">2.5.</span> <span class="nav-text">garbagecollector.NewDebugHandler</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#示例"><span class="nav-number">3.</span> <span class="nav-text">示例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
