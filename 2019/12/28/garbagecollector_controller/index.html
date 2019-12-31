@@ -88,7 +88,7 @@
 <meta property="og:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/graph.png">
-<meta property="og:updated_time" content="2019-12-28T12:39:09.259Z">
+<meta property="og:updated_time" content="2019-12-31T05:49:55.630Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="garbage collector controller 源码分析">
 <meta name="twitter:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
@@ -387,7 +387,7 @@
         <p>在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。</p>
 <h3 id="kubernetes-中的删除策略"><a href="#kubernetes-中的删除策略" class="headerlink" title="kubernetes 中的删除策略"></a>kubernetes 中的删除策略</h3><p>kubernetes 中有三种删除策略：<code>Orphan</code>、<code>Foreground</code> 和 <code>Background</code>，三种删除策略的意义分别为：</p>
 <ul>
-<li><code>Orphan</code> 策略：非级联删除，删除对象时，不会自动删除它的依赖或者是子对象，这些依赖被称作是原对象的孤儿对象，例如当执行以下命令时会使用 <code>Orphan</code> 策略进行删除，此时 ds 的依赖对象 <code>ontrollerrevision</code> 不会被删除；</li>
+<li><code>Orphan</code> 策略：非级联删除，删除对象时，不会自动删除它的依赖或者是子对象，这些依赖被称作是原对象的孤儿对象，例如当执行以下命令时会使用 <code>Orphan</code> 策略进行删除，此时 ds 的依赖对象 <code>controllerrevision</code> 不会被删除；</li>
 </ul>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl delete ds/nginx-ds --cascade=false</span><br></pre></td></tr></table></figure>
 <ul>
@@ -586,6 +586,10 @@
 
           <div class="post-nav-prev post-nav-item">
             
+              <a href="/2019/12/31/job_controller/" rel="prev" title="job controller 源码分析">
+                job controller 源码分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
           </div>
         </div>
       
@@ -664,7 +668,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">45</span>
+                  <span class="site-state-item-count">46</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -677,7 +681,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-count">50</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>
