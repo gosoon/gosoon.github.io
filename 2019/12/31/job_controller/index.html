@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。 job 的基本功能创建">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-12-31T08:00:08.759Z">
+<meta property="og:updated_time" content="2020-01-03T09:37:56.246Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="job controller 源码分析">
 <meta name="twitter:description" content="job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。 job 的基本功能创建">
@@ -389,7 +389,10 @@
 <h4 id="删除"><a href="#删除" class="headerlink" title="删除"></a>删除</h4><p>通常系统中已执行完成的 job 不再需要，将它们保留在系统中会占用一定的资源，需要进行回收，pod 在执行完任务后会进入到 <code>Completed</code> 状态，删除 job 也会清除其创建的 pod。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get pod</span><br><span class="line">pi-gdrwr                            0/1     Completed   0          10m</span><br><span class="line">pi-rjphf                            0/1     Completed   0          10m</span><br><span class="line"></span><br><span class="line">$ kubectl delete job pi</span><br></pre></td></tr></table></figure>
 <h5 id="自动清理机制"><a href="#自动清理机制" class="headerlink" title="自动清理机制"></a>自动清理机制</h5><p>每次 job 执行完成后手动回收非常麻烦，k8s 在 v1.12 版本中加入了 <code>TTLAfterFinished</code> feature-gates，启用该特性后会启动一个 TTL 控制器，在创建 job 时指定后可在 job 运行完成后自动回收相关联的 pod，如上文中的 yaml 所示，创建 job 时指定了 <code>ttlSecondsAfterFinished: 60</code>，job 在执行完成后停留 60s 会被自动回收， 若 <code>ttlSecondsAfterFinished</code> 设置为 0 则表示在 job 执行完成后立刻回收。当 TTL 控制器清理 job 时，它将级联删除 job，即 pod 和 job 一起被删除。不过该特性截止目前还是 Alpha 版本，请谨慎使用。</p>
-<h3 id="job-controller-源码分析"><a href="#job-controller-源码分析" class="headerlink" title="job controller 源码分析"></a>job controller 源码分析</h3><p>在上节介绍了 job 的基本操作后，本节会继续深入源码了解其背后的设计与实现。</p>
+<h3 id="job-controller-源码分析"><a href="#job-controller-源码分析" class="headerlink" title="job controller 源码分析"></a>job controller 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>在上节介绍了 job 的基本操作后，本节会继续深入源码了解其背后的设计与实现。</p>
 <h4 id="startJobController"><a href="#startJobController" class="headerlink" title="startJobController"></a>startJobController</h4><p>首先还是直接看 jobController 的启动方法 <code>startJobController</code>，该方法中调用 <code>NewJobController</code> 初始化 jobController 然后调用 <code>Run</code> 方法启动 jobController。从初始化流程中可以看到 JobController 监听 pod 和 job 两种资源，其中 <code>ConcurrentJobSyncs</code> 默认值为 5。</p>
 <p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/batch.go:33</code></p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">func startJobController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    if !ctx.AvailableResources[schema.GroupVersionResource&#123;Group: &quot;batch&quot;, Version: &quot;v1&quot;, Resource: &quot;jobs&quot;&#125;] &#123;</span><br><span class="line">        return nil, false, nil</span><br><span class="line">    &#125;</span><br><span class="line">    go job.NewJobController(</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.InformerFactory.Batch().V1().Jobs(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;job-controller&quot;),</span><br><span class="line">    ).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -485,6 +488,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2020/01/03/kubelet_init/" rel="prev" title="kubelet 启动流程分析">
+                kubelet 启动流程分析 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -631,7 +638,7 @@
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
