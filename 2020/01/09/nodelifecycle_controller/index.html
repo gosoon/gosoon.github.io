@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,node controller,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。 NodeLifecycleController 的功能NodeLifecycleController 主要功能是定期监控 nod">
+<meta name="keywords" content="kube-controller-manager,node controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NodeController 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。 NodeLifecycleController 的功能NodeLifecycleController 主要功能是定期监控 nod">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2020-01-09T12:36:12.798Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="NodeController 源码分析">
+<meta name="twitter:description" content="在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。 NodeLifecycleController 的功能NodeLifecycleController 主要功能是定期监控 nod">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/">
+
+
+
+
+
+  <title>NodeController 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-node controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">NodeController 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-01-09T20:18:30+08:00">
+                2020-01-09
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/01/09/nodelifecycle_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/01/09/nodelifecycle_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。</p>
+<h3 id="NodeLifecycleController-的功能"><a href="#NodeLifecycleController-的功能" class="headerlink" title="NodeLifecycleController 的功能"></a>NodeLifecycleController 的功能</h3><p>NodeLifecycleController 主要功能是定期监控 node 的状态并根据 node 的 condition 添加对应的 taint 标签或者直接驱逐 node 上的 pod。</p>
+<h4 id="taint-的作用"><a href="#taint-的作用" class="headerlink" title="taint 的作用"></a>taint 的作用</h4><p>在介绍 NodeLifecycleController 的源码前有必要先介绍一下 taint 的作用，因为 NodeLifecycleController 功能最终的结果有很大一部分都体现在 node taint 上。 </p>
+<p>taint 使用效果(Effect):</p>
+<ul>
+<li><code>PreferNoSchedule</code>：调度器尽量避免把 pod 调度到具有该污点的节点上，如果不能避免(如其他节点资源不足)，pod 也能调度到这个污点节点上，已存在于此节点上的 pod 不会被驱逐；</li>
+<li><code>NoSchedule</code>：不容忍该污点的 pod 不会被调度到该节点上，通过 kubelet 管理的 pod(static pod)不受限制，之前没有设置污点的 pod 如果已运行在此节点(有污点的节点)上，可以继续运行；</li>
+<li><code>NoExecute</code>：不容忍该污点的 pod 不会被调度到该节点上，同时会将已调度到该节点上但不容忍 node 污点的 pod 驱逐掉；</li>
+</ul>
+<h4 id="NodeLifecycleController-中的-feature-gates"><a href="#NodeLifecycleController-中的-feature-gates" class="headerlink" title="NodeLifecycleController 中的 feature-gates"></a>NodeLifecycleController 中的 feature-gates</h4><p>在 NodeLifecycleController 用到了多个 feature-gates，此处先进行解释下：</p>
+<ul>
+<li><code>NodeLease</code> ：该特性在 v1.12 引入，v1.14 为 Beta 版本并默认启用，在 v1.17 中 GA；</li>
+<li><code>NodeDisruptionExclusion</code>：该特性在 v1.16 引入，Alpha 版本，默认为 false，其功能是当 node 存在 <code>node.kubernetes.io/exclude-disruption</code> 标签时，当 node 网络中断时其节点上的 pod 不会被驱逐掉；</li>
+<li><code>LegacyNodeRoleBehavior</code>：该特性在 v1.16 中引入，Alpha 版本且默认为 true，在创建 load balancers 以及中断处理时不会忽略具有 <code>node-role.kubernetes.io/master</code> label 的 node，该功能在 v1.19 中将被移除；</li>
+<li><code>TaintBasedEvictions</code>：该特性从 v1.13 开始为 Beta 版本，默认为 true。其功能是当 node 处于 <code>NodeNotReady</code>、<code>NodeUnreachable</code> 状态时为 node 添加对应的 taint，<code>TaintBasedEvictions</code> 添加的 taint effect 为 <code>NoExecute</code>，即会驱逐 node 上对应的 pod；</li>
+<li><code>TaintNodesByCondition</code>：该特性从 v1.12 开始为 Beta 版本，默认为 true，v1.17 为 GA 版本。其功能是基于节点状态添加 taint，当节点处于 <code>NetworkUnavailable</code>、<code>MemoryPressure</code>、<code>PIDPressure</code>、<code>DiskPressure</code> 状态时会添加对应的 taint，<code>TaintNodesByCondition</code> 添加的 taint  effect 仅为<code>NoSchedule</code>，即仅仅不会让新创建的 pod 调度到该 node 上；     </li>
+<li><code>NodeLease</code>：该特性在 v1.12 引入，v 1.14 为 Beta 版本且默认启用，v 1.17 GA，主要功能是减少 node 的心跳请求以减轻 apiserver 的负担；              </li>
+</ul>
+<h3 id="NodeLifecycleController-源码分析"><a href="#NodeLifecycleController-源码分析" class="headerlink" title="NodeLifecycleController 源码分析"></a>NodeLifecycleController 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<h4 id="startNodeLifecycleController"><a href="#startNodeLifecycleController" class="headerlink" title="startNodeLifecycleController"></a>startNodeLifecycleController</h4><p>首先还是看 NodeLifecycleController 的启动方法 <code>startNodeLifecycleController</code>，在 <code>startNodeLifecycleController</code> 中主要调用了 <code>lifecyclecontroller.NewNodeLifecycleController</code> 对 lifecycleController 进行初始化，在该方法中传入了组件的多个参数以及 <code>TaintBasedEvictions</code> 和 <code>TaintNodesByCondition</code> 两个 feature-gates，然后调用了 <code>lifecycleController.Run</code> 启动 lifecycleController，可以看到 NodeLifecycleController 主要监听 lease、pods、nodes、daemonSets 四种对象。</p>
+<p>其中在启动时指定的几个参数默认值分别为：</p>
+<ul>
+<li><code>NodeMonitorPeriod</code>：通过<code>--node-monitor-period</code> 设置，默认为 5s，表示在 NodeController 中同步NodeStatus 的周期；</li>
+<li><code>NodeStartupGracePeriod</code>：<code>--node-startup-grace-period</code> 默认 60s，在 node 启动完成前标记节点为unhealthy 的允许无响应时间；</li>
+<li><code>NodeMonitorGracePeriod</code>：通过<code>--node-monitor-grace-period</code> 设置，默认 40s，表示在标记某个 node为 unhealthy 前，允许 40s 内该 node 无响应；</li>
+<li><code>PodEvictionTimeout</code>：通过<code>--pod-eviction-timeout</code> 设置，默认 5 分钟，表示在强制删除 node 上的 pod 时，容忍 pod 时间；</li>
+<li><code>NodeEvictionRate</code>：通过<code>--node-eviction-rate</code>设置， 默认 0.1，表示当集群下某个 zone 为 unhealthy 时，每秒应该剔除的 node 数量，默认即每 10s 剔除1个 node；</li>
+<li><code>SecondaryNodeEvictionRate</code>：通过 <code>--secondary-node-eviction-rate</code>设置，默认为 0.01，表示如果某个 zone 下的 unhealthy 节点的百分比超过 <code>--unhealthy-zone-threshold</code> （默认为 0.55）时，驱逐速率将会减小，如果集群较小（小于等于 <code>--large-cluster-size-threshold</code> 个 节点 - 默认为 50），驱逐操作将会停止，否则驱逐速率将降为每秒 <code>--secondary-node-eviction-rate</code> 个（默认为 0.01）；</li>
+<li><code>LargeClusterSizeThreshold</code>：通过<code>--large-cluster-size-threshold</code> 设置，默认为 50，当该 zone 的节点超过该阈值时，则认为该 zone 是一个大集群；</li>
+<li><code>UnhealthyZoneThreshold</code>：通过<code>--unhealthy-zone-threshold</code> 设置，默认为 0.55，不健康 zone 阈值，会影响什么时候开启二级驱赶速率，即当该 zone 中节点宕机数目超过 55%，认为该 zone 不健康；</li>
+<li><code>EnableTaintManager</code>：<code>--enable-taint-manager</code> 默认为 true，Beta feature，如果为 true，则表示NodeController 将会启动 TaintManager，当已经调度到该 node 上的 pod 不能容忍 node 的 taint 时，由 TaintManager 负责驱逐此类 pod，若不开启该特性则已调度到该 node 上的 pod 会继续存在；</li>
+<li><code>TaintBasedEvictions</code> ：默认为 true；</li>
+<li><code>TaintNodesByCondition</code> ：默认为 true；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/core.go:163</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(</span><br><span class="line">        ctx.InformerFactory.Coordination().V1beta1().Leases(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().Nodes(),</span><br><span class="line">        ctx.InformerFactory.Apps().V1().DaemonSets(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;node-controller&quot;),</span><br><span class="line">        ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.PodEvictionTimeout.Duration,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.NodeEvictionRate,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,</span><br><span class="line">        ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,</span><br><span class="line">        utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),</span><br><span class="line">        utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, true, err</span><br><span class="line">    &#125;</span><br><span class="line">    go lifecycleController.Run(ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="NewNodeLifecycleController"><a href="#NewNodeLifecycleController" class="headerlink" title="NewNodeLifecycleController"></a>NewNodeLifecycleController</h4><p>首先有必要说明一下 NodeLifecycleController 对象中部分字段的意义，其结构体如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line">type Controller struct &#123;</span><br><span class="line">    taintManager *scheduler.NoExecuteTaintManager</span><br><span class="line"></span><br><span class="line">    podInformerSynced cache.InformerSynced</span><br><span class="line">    kubeClient        clientset.Interface</span><br><span class="line"></span><br><span class="line">    now func() metav1.Time</span><br><span class="line"></span><br><span class="line">    // 计算 zone 下 node 驱逐速率</span><br><span class="line">    enterPartialDisruptionFunc func(nodeNum int) float32</span><br><span class="line">    enterFullDisruptionFunc    func(nodeNum int) float32</span><br><span class="line">    </span><br><span class="line">    // 计算 zone 状态</span><br><span class="line">    computeZoneStateFunc       func(nodeConditions []*v1.NodeCondition) (int, ZoneState)</span><br><span class="line"></span><br><span class="line">    // 用来记录NodeController observed节点的集合</span><br><span class="line">    knownNodeSet map[string]*v1.Node</span><br><span class="line">    // 记录 node 最近一次状态的集合</span><br><span class="line">    nodeHealthMap map[string]*nodeHealthData</span><br><span class="line"></span><br><span class="line">    evictorLock sync.Mutex</span><br><span class="line"></span><br><span class="line">    // 需要驱逐节点上 pod 的 node 队列 </span><br><span class="line">    zonePodEvictor map[string]*scheduler.RateLimitedTimedQueue</span><br><span class="line"></span><br><span class="line">    // 需要打 taint 标签的 node 队列</span><br><span class="line">    zoneNoExecuteTainter map[string]*scheduler.RateLimitedTimedQueue</span><br><span class="line"></span><br><span class="line">    // 将 node 划分为不同的 zone</span><br><span class="line">    zoneStates map[string]ZoneState</span><br><span class="line"></span><br><span class="line">    daemonSetStore          appsv1listers.DaemonSetLister</span><br><span class="line">    daemonSetInformerSynced cache.InformerSynced</span><br><span class="line">    leaseLister         coordlisters.LeaseLister</span><br><span class="line">    leaseInformerSynced cache.InformerSynced</span><br><span class="line">    nodeLister          corelisters.NodeLister</span><br><span class="line">    nodeInformerSynced  cache.InformerSynced</span><br><span class="line"></span><br><span class="line">    getPodsAssignedToNode func(nodeName string) ([]v1.Pod, error)</span><br><span class="line"></span><br><span class="line">    recorder record.EventRecorder</span><br><span class="line"></span><br><span class="line">    // kube-controller-manager 启动时指定的几个参数</span><br><span class="line">    nodeMonitorPeriod time.Duration</span><br><span class="line">    nodeStartupGracePeriod time.Duration</span><br><span class="line">    nodeMonitorGracePeriod time.Duration</span><br><span class="line">    podEvictionTimeout          time.Duration</span><br><span class="line">    evictionLimiterQPS          float32</span><br><span class="line">    secondaryEvictionLimiterQPS float32</span><br><span class="line">    largeClusterThreshold       int32</span><br><span class="line">    unhealthyZoneThreshold      float32</span><br><span class="line"></span><br><span class="line">    // 启动时默认开启的几个 feature-gates</span><br><span class="line">    runTaintManager bool</span><br><span class="line">    useTaintBasedEvictions bool</span><br><span class="line">    taintNodeByCondition bool</span><br><span class="line"></span><br><span class="line">    nodeUpdateQueue workqueue.Interface</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>NewNodeLifecycleController</code> 的主要逻辑为：</p>
+<ul>
+<li>1、初始化 controller 对象；</li>
+<li>2、为 podInformer 注册与 <code>taintManager</code> 相关的 EventHandler；</li>
+<li>3、若启用 TaintManager 则为 nodeInformer 注册与 <code>taintManager</code> 相关的 EventHandler；</li>
+<li>4、为 NodeLifecycleController 注册 nodeInformer；</li>
+<li>5、检查是否启用了 <code>NodeLease</code> feature-gates；</li>
+<li>6、daemonSet 默认不会注册对应的 EventHandler，此处仅仅是同步该对象；</li>
+</ul>
+<p>由以上逻辑可以看出，<code>taintManager</code> 以及 NodeLifecycleController 都会 watch node 的变化并进行不同的处理。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:268</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br></pre></td><td class="code"><pre><span class="line">func NewNodeLifecycleController(......) (*Controller, error) &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、初始化 controller 对象</span><br><span class="line">    nc := &amp;Controller&#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    ......</span><br><span class="line">		</span><br><span class="line">    // 2、注册计算 node 驱逐速率以及 zone 状态的方法</span><br><span class="line">    nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc</span><br><span class="line">    nc.enterFullDisruptionFunc = nc.HealthyQPSFunc</span><br><span class="line">    nc.computeZoneStateFunc = nc.ComputeZoneState</span><br><span class="line"></span><br><span class="line">    // 3、为 podInformer 注册 EventHandler，监听到的对象会被放到 nc.taintManager.PodUpdated 中</span><br><span class="line">    podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">        AddFunc: func(obj interface&#123;&#125;) &#123;</span><br><span class="line">            pod := obj.(*v1.Pod)</span><br><span class="line">            if nc.taintManager != nil &#123;</span><br><span class="line">                nc.taintManager.PodUpdated(nil, pod)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        UpdateFunc: func(prev, obj interface&#123;&#125;) &#123;</span><br><span class="line">            prevPod := prev.(*v1.Pod)</span><br><span class="line">            newPod := obj.(*v1.Pod)</span><br><span class="line">            if nc.taintManager != nil &#123;</span><br><span class="line">                nc.taintManager.PodUpdated(prevPod, newPod)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        DeleteFunc: func(obj interface&#123;&#125;) &#123;</span><br><span class="line">            pod, isPod := obj.(*v1.Pod)</span><br><span class="line">            if !isPod &#123;</span><br><span class="line">                deletedState, ok := obj.(cache.DeletedFinalStateUnknown)</span><br><span class="line">                if !ok &#123;</span><br><span class="line">                    return</span><br><span class="line">                &#125;</span><br><span class="line">                pod, ok = deletedState.Obj.(*v1.Pod)</span><br><span class="line">                if !ok &#123;</span><br><span class="line">                    return</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            if nc.taintManager != nil &#123;</span><br><span class="line">                nc.taintManager.PodUpdated(pod, nil)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;)</span><br><span class="line">    nc.podInformerSynced = podInformer.Informer().HasSynced</span><br><span class="line">    podInformer.Informer().AddIndexers(cache.Indexers&#123;</span><br><span class="line">        nodeNameKeyIndex: func(obj interface&#123;&#125;) ([]string, error) &#123;</span><br><span class="line">            pod, ok := obj.(*v1.Pod)</span><br><span class="line">            if !ok &#123;</span><br><span class="line">                return []string&#123;&#125;, nil</span><br><span class="line">            &#125;</span><br><span class="line">            if len(pod.Spec.NodeName) == 0 &#123;</span><br><span class="line">                return []string&#123;&#125;, nil</span><br><span class="line">            &#125;</span><br><span class="line">            return []string&#123;pod.Spec.NodeName&#125;, nil</span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    podIndexer := podInformer.Informer().GetIndexer()</span><br><span class="line">    nc.getPodsAssignedToNode = func(nodeName string) ([]v1.Pod, error) &#123;</span><br><span class="line">        objs, err := podIndexer.ByIndex(nodeNameKeyIndex, nodeName)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return nil, err</span><br><span class="line">        &#125;</span><br><span class="line">        pods := make([]v1.Pod, 0, len(objs))</span><br><span class="line">        for _, obj := range objs &#123;</span><br><span class="line">            pod, ok := obj.(*v1.Pod)</span><br><span class="line">            if !ok &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            pods = append(pods, *pod)</span><br><span class="line">        &#125;</span><br><span class="line">        return pods, nil</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 4、初始化 TaintManager，为 nodeInformer 注册 EventHandler</span><br><span class="line">    //    监听到的对象会被放到 nc.taintManager.NodeUpdated 中</span><br><span class="line">    if nc.runTaintManager &#123;</span><br><span class="line">        podLister := podInformer.Lister()</span><br><span class="line">        podGetter := func(name, namespace string) (*v1.Pod, error) &#123; return podLister.Pods(namespace).Get(name) &#125;</span><br><span class="line">        nodeLister := nodeInformer.Lister()</span><br><span class="line">        nodeGetter := func(name string) (*v1.Node, error) &#123; return nodeLister.Get(name) &#125;</span><br><span class="line">        </span><br><span class="line">        // 5、初始化 taintManager</span><br><span class="line">        nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode)</span><br><span class="line">        nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">            AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error &#123;</span><br><span class="line">                nc.taintManager.NodeUpdated(nil, node)</span><br><span class="line">                return nil</span><br><span class="line">            &#125;),</span><br><span class="line">            UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error &#123;</span><br><span class="line">                nc.taintManager.NodeUpdated(oldNode, newNode)</span><br><span class="line">                return nil</span><br><span class="line">            &#125;),</span><br><span class="line">            DeleteFunc: nodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error &#123;</span><br><span class="line">                nc.taintManager.NodeUpdated(node, nil)</span><br><span class="line">                return nil</span><br><span class="line">            &#125;),</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 6、为 NodeLifecycleController 注册 nodeInformer </span><br><span class="line">    nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs&#123;</span><br><span class="line">        AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error &#123;</span><br><span class="line">            nc.nodeUpdateQueue.Add(node.Name)</span><br><span class="line">            return nil</span><br><span class="line">        &#125;),</span><br><span class="line">        UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error &#123;</span><br><span class="line">            nc.nodeUpdateQueue.Add(newNode.Name)</span><br><span class="line">            return nil</span><br><span class="line">        &#125;),</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">		</span><br><span class="line">    // 7、检查是否启用了 NodeLease feature-gates</span><br><span class="line">    nc.leaseLister = leaseInformer.Lister()</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &#123;</span><br><span class="line">        nc.leaseInformerSynced = leaseInformer.Informer().HasSynced</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        nc.leaseInformerSynced = func() bool &#123; return true &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    nc.nodeLister = nodeInformer.Lister()</span><br><span class="line">    nc.nodeInformerSynced = nodeInformer.Informer().HasSynced</span><br><span class="line"></span><br><span class="line">    nc.daemonSetStore = daemonSetInformer.Lister()</span><br><span class="line">    nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced</span><br><span class="line"></span><br><span class="line">    return nc, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Run"><a href="#Run" class="headerlink" title="Run"></a>Run</h4><p><code>Run</code> 方法是 NodeLifecycleController 的启动方法，其中会启动多个 goroutine 完成 controller 的功能，主要逻辑为：</p>
+<ul>
+<li>1、等待四种对象 Informer 中的 cache 同步完成；</li>
+<li>2、若指定要运行 taintManager 则调用 <code>nc.taintManager.Run</code> 启动 taintManager；</li>
+<li>3、启动多个 goroutine 调用 <code>nc.doNodeProcessingPassWorker</code> 处理 <code>nc.nodeUpdateQueue</code> 队列中的 node；</li>
+<li>4、若启用了 <code>TaintBasedEvictions</code> 特性则启动一个 goroutine 调用 <code>nc.doNoExecuteTaintingPass</code> 处理 <code>nc.zoneNoExecuteTainter</code> 队列中的 node，否则调用 <code>nc.doEvictionPass</code> 处理 <code>nc.zonePodEvictor</code> 队列中的 node；  </li>
+<li>5、启动一个 goroutine 调用 <code>nc.monitorNodeHealth</code> 定期监控 node 的状态；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:455</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) Run(stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    defer utilruntime.HandleCrash()</span><br><span class="line"></span><br><span class="line">    defer klog.Infof(&quot;Shutting down node controller&quot;)</span><br><span class="line"></span><br><span class="line">    if !cache.WaitForNamedCacheSync(&quot;taint&quot;, stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) &#123;         return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 1、启动 taintManager</span><br><span class="line">    if nc.runTaintManager &#123;</span><br><span class="line">        go nc.taintManager.Run(stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    defer nc.nodeUpdateQueue.ShutDown()</span><br><span class="line"></span><br><span class="line">    // 2、执行 nc.doNodeProcessingPassWorker</span><br><span class="line">    for i := 0; i &lt; scheduler.UpdateWorkerSize; i++ &#123;</span><br><span class="line">        go wait.Until(nc.doNodeProcessingPassWorker, time.Second, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、根据是否启用 TaintBasedEvictions 执行不同的处理逻辑</span><br><span class="line">    if nc.useTaintBasedEvictions &#123;</span><br><span class="line">        go wait.Until(nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod, stopCh)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        go wait.Until(nc.doEvictionPass, scheduler.NodeEvictionPeriod, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、执行 nc.monitorNodeHealth</span><br><span class="line">    go wait.Until(func() &#123;</span><br><span class="line">        if err := nc.monitorNodeHealth(); err != nil &#123;</span><br><span class="line">            klog.Errorf(&quot;Error monitoring node health: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, nc.nodeMonitorPeriod, stopCh)</span><br><span class="line"></span><br><span class="line">    &lt;-stopCh</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>Run</code> 方法中主要调用了 5 个方法来完成其核心功能：</p>
+<ul>
+<li><code>nc.taintManager.Run</code>：处理 <code>taintManager</code> 中 nodeUpdateQueue 和  podUpdateQueue 中的 pod 以及 node，若 pod 不能容忍 node 上的 taint 则将其加入到 <code>taintEvictionQueue</code> 中并最终会删除；</li>
+<li><code>nc.doNodeProcessingPassWorker</code>：从 NodeLifecycleController 的 nodeUpdateQueue 取出 node，（1）若启用 <code>taintNodeByCondition</code> 特性时根据 node condition 以及 node 是否调度为 node 添加对应的 <code>NoSchedule</code> taint 标签；（2）调用 <code>nc.reconcileNodeLabels</code> 为 node 添加默认的 label；</li>
+<li><code>nc.doNoExecuteTaintingPass</code>：处理 <code>nc.zoneNoExecuteTainter</code> 队列中的数据，根据 node 的 NodeReadyCondition 添加或移除对应的 taint；</li>
+<li><code>nc.doEvictionPass</code>：处理 <code>nc.zonePodEvictor</code> 队列中的 node，将 node 上的 pod 进行驱逐；</li>
+<li><code>nc.monitorNodeHealth</code>：持续监控 node 的状态，当 node 处于异常状态时更新 node 的 taint 以及 node 上 pod 的状态或者直接驱逐 node 上的 pod，此外还会为集群下的所有 node 划分 zoneStates 并为每个 zoneStates 设置对应的驱逐速率；</li>
+</ul>
+<p>下文会详细分析以上 5 种方法的具体实现。</p>
+<h4 id="nc-taintManager-Run"><a href="#nc-taintManager-Run" class="headerlink" title="nc.taintManager.Run"></a>nc.taintManager.Run</h4><p>当组件启动时设置 <code>--enable-taint-manager</code> 参数为 true 时(默认为 true)，该功能会启用，其主要作用是当该 node 上的 pod 不容忍 node taint 时将 pod 进行驱逐，若不开启该功能则已调度到该 node 上的 pod 会继续存在，新创建的 pod 需要容忍 node 的 taint 才会调度至该 node 上。</p>
+<p>主要逻辑为：</p>
+<ul>
+<li>1、处理 nodeUpdateQueue 中的 node 并将其发送到 nodeUpdateChannels 中；</li>
+<li>2、处理 podUpdateQueue 中的 pod 并将其发送到 podUpdateChannels 中；</li>
+<li>3、调用 <code>tc.worker</code> 处理 nodeUpdateChannels 和 podUpdateChannels 中的数据；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler/taint_manager.go:185</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line">func (tc *NoExecuteTaintManager) Run(stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    for i := 0; i &lt; UpdateWorkerSize; i++ &#123;</span><br><span class="line">        tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan nodeUpdateItem, NodeUpdateChannelSize))</span><br><span class="line">        tc.podUpdateChannels = append(tc.podUpdateChannels, make(chan podUpdateItem, podUpdateChannelSize))</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    go func(stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">        for &#123;</span><br><span class="line">            item, shutdown := tc.nodeUpdateQueue.Get()</span><br><span class="line">            if shutdown &#123;</span><br><span class="line">                break</span><br><span class="line">            &#125;</span><br><span class="line">            nodeUpdate := item.(nodeUpdateItem)</span><br><span class="line">            hash := hash(nodeUpdate.nodeName, UpdateWorkerSize)</span><br><span class="line">            select &#123;</span><br><span class="line">            case &lt;-stopCh:</span><br><span class="line">                tc.nodeUpdateQueue.Done(item)</span><br><span class="line">                return</span><br><span class="line">            case tc.nodeUpdateChannels[hash] &lt;- nodeUpdate:</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;(stopCh)</span><br><span class="line">    </span><br><span class="line">    go func(stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">        for &#123;</span><br><span class="line">            item, shutdown := tc.podUpdateQueue.Get()</span><br><span class="line">            if shutdown &#123;</span><br><span class="line">                break</span><br><span class="line">            &#125;</span><br><span class="line">            podUpdate := item.(podUpdateItem)</span><br><span class="line">            hash := hash(podUpdate.nodeName, UpdateWorkerSize)</span><br><span class="line">            select &#123;</span><br><span class="line">            case &lt;-stopCh:</span><br><span class="line">                tc.podUpdateQueue.Done(item)</span><br><span class="line">                return</span><br><span class="line">            case tc.podUpdateChannels[hash] &lt;- podUpdate:</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;(stopCh)</span><br><span class="line"></span><br><span class="line">    wg := sync.WaitGroup&#123;&#125;</span><br><span class="line">    wg.Add(UpdateWorkerSize)</span><br><span class="line">    for i := 0; i &lt; UpdateWorkerSize; i++ &#123;</span><br><span class="line">        go tc.worker(i, wg.Done, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line">    wg.Wait()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="tc-worker"><a href="#tc-worker" class="headerlink" title="tc.worker"></a>tc.worker</h5><p><code>tc.worker</code> 主要功能是调用 <code>tc.handleNodeUpdate</code> 和 <code>tc.handlePodUpdate</code> 处理 <code>tc.nodeUpdateChannels</code> 和 <code>tc.podUpdateChannels</code> 两个 channel 中的数据，但会优先处理 nodeUpdateChannels 中的数据。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler/taint_manager.go:243</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">func (tc *NoExecuteTaintManager) worker(worker int, done func(), stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    defer done()</span><br><span class="line"></span><br><span class="line">    for &#123;</span><br><span class="line">        select &#123;</span><br><span class="line">        case &lt;-stopCh:</span><br><span class="line">            return</span><br><span class="line">        case nodeUpdate := &lt;-tc.nodeUpdateChannels[worker]:</span><br><span class="line">            tc.handleNodeUpdate(nodeUpdate)</span><br><span class="line">            tc.nodeUpdateQueue.Done(nodeUpdate)</span><br><span class="line">        case podUpdate := &lt;-tc.podUpdateChannels[worker]:</span><br><span class="line"></span><br><span class="line">        // 优先处理 nodeUpdateChannels </span><br><span class="line">        priority:</span><br><span class="line">            for &#123;</span><br><span class="line">                select &#123;</span><br><span class="line">                case nodeUpdate := &lt;-tc.nodeUpdateChannels[worker]:</span><br><span class="line">                    tc.handleNodeUpdate(nodeUpdate)</span><br><span class="line">                    tc.nodeUpdateQueue.Done(nodeUpdate)</span><br><span class="line">                default:</span><br><span class="line">                    break priority</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            tc.handlePodUpdate(podUpdate)</span><br><span class="line">            tc.podUpdateQueue.Done(podUpdate)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="tc-handleNodeUpdate"><a href="#tc-handleNodeUpdate" class="headerlink" title="tc.handleNodeUpdate"></a>tc.handleNodeUpdate</h6><p><code>tc.handleNodeUpdate</code> 的主要逻辑为：</p>
+<ul>
+<li>1、首先通过 nodeLister 获取 node 对象；</li>
+<li>2、获取 node 上 effect 为 <code>NoExecute</code> 的 taints；</li>
+<li>3、调用 <code>tc.getPodsAssignedToNode</code> 获取该 node 上的所有 pods；</li>
+<li>4、若 node 上的 taints 为空直接返回，否则遍历每一个 pod 调用 <code>tc.processPodOnNode</code> 检查 pod 是否要被驱逐；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler/taint_manager.go:417</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) &#123;</span><br><span class="line">    node, err := tc.getNode(nodeUpdate.nodeName)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、获取 node 的 taints</span><br><span class="line">    taints := getNoExecuteTaints(node.Spec.Taints)</span><br><span class="line">    func() &#123;</span><br><span class="line">        tc.taintedNodesLock.Lock()</span><br><span class="line">        defer tc.taintedNodesLock.Unlock()</span><br><span class="line">        if len(taints) == 0 &#123;</span><br><span class="line">            delete(tc.taintedNodes, node.Name)</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            tc.taintedNodes[node.Name] = taints</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">    </span><br><span class="line">    // 2、获取 node 上的所有 pod</span><br><span class="line">    pods, err := tc.getPodsAssignedToNode(node.Name)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        klog.Errorf(err.Error())</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    if len(pods) == 0 &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、若不存在 taints，则取消所有的驱逐操作</span><br><span class="line">    if len(taints) == 0 &#123;</span><br><span class="line">        for i := range pods &#123;</span><br><span class="line">            tc.cancelWorkWithEvent(types.NamespacedName&#123;Namespace: pods[i].Namespace, Name: pods[i].Name&#125;)</span><br><span class="line">        &#125;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    now := time.Now()</span><br><span class="line">    for i := range pods &#123;</span><br><span class="line">        pod := &amp;pods[i]</span><br><span class="line">        podNamespacedName := types.NamespacedName&#123;Namespace: pod.Namespace, Name: pod.Name&#125;</span><br><span class="line">        // 4、调用 tc.processPodOnNode 进行处理</span><br><span class="line">        tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="tc-handlePodUpdate"><a href="#tc-handlePodUpdate" class="headerlink" title="tc.handlePodUpdate"></a>tc.handlePodUpdate</h6><p>主要逻辑为：</p>
+<ul>
+<li>1、通过 podLister 获取 pod 对象；</li>
+<li>2、获取 pod 所在 node 的 taints；</li>
+<li>3、调用 <code>tc.processPodOnNode</code> 进行处理；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler/taint_manager.go:377</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) &#123;</span><br><span class="line">    pod, err := tc.getPod(podUpdate.podName, podUpdate.podNamespace)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if pod.Spec.NodeName != podUpdate.nodeName &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    podNamespacedName := types.NamespacedName&#123;Namespace: pod.Namespace, Name: pod.Name&#125;</span><br><span class="line"></span><br><span class="line">    nodeName := pod.Spec.NodeName</span><br><span class="line">    if nodeName == &quot;&quot; &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    taints, ok := func() ([]v1.Taint, bool) &#123;</span><br><span class="line">        tc.taintedNodesLock.Lock()</span><br><span class="line">        defer tc.taintedNodesLock.Unlock()</span><br><span class="line">        taints, ok := tc.taintedNodes[nodeName]</span><br><span class="line">        return taints, ok</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    if !ok &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    // 调用 tc.processPodOnNode 进行处理</span><br><span class="line">    tc.processPodOnNode(podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="tc-processPodOnNode"><a href="#tc-processPodOnNode" class="headerlink" title="tc.processPodOnNode"></a>tc.processPodOnNode</h6><p><code>tc.handlePodUpdate</code> 和 <code>tc.handleNodeUpdate</code> 最终都是调用 <code>tc.processPodOnNode</code> 检查 pod 是否容忍 node 的 taints，<code>tc.processPodOnNode</code> 首先检查 pod 的 tolerations 是否能匹配 node 上所有的 taints，若无法完全匹配则将 pod 加入到 taintEvictionQueue 然后被删除，若能匹配首先获取 pod tolerations 中的最小容忍时间，如果 tolerations 未设置容忍时间说明会一直容忍则直接返回，否则加入到 taintEvictionQueue 的延迟队列中，当达到最小容忍时间时 pod 会被加入到 taintEvictionQueue 中并驱逐。</p>
+<p>通常情况下，如果给一个节点添加了一个 effect 值为 <code>NoExecute</code> 的 taint，则任何不能忍受这个 taint 的 pod 都会马上被驱逐，任何可以忍受这个 taint 的 pod 都不会被驱逐。但是，如果 pod 存在一个 effect 值为 <code>NoExecute</code> 的 toleration 指定了可选属性 <code>tolerationSeconds</code> 的值，则表示在给节点添加了上述 taint 之后，pod 还能继续在节点上运行的时间。例如，</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">tolerations:</span><br><span class="line">- key: &quot;key1&quot;</span><br><span class="line">  operator: &quot;Equal&quot;</span><br><span class="line">  value: &quot;value1&quot;</span><br><span class="line">  effect: &quot;NoExecute&quot;</span><br><span class="line">  tolerationSeconds: 3600</span><br></pre></td></tr></table></figure>
+<p>这表示如果这个 pod 正在运行，然后一个匹配的 taint 被添加到其所在的节点，那么 pod 还将继续在节点上运行 3600 秒，然后被驱逐。如果在此之前上述 taint 被删除了，则 pod 不会被驱逐。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler/taint_manager.go:339</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">func (tc *NoExecuteTaintManager) processPodOnNode(......) &#123;</span><br><span class="line">    if len(taints) == 0 &#123;</span><br><span class="line">        tc.cancelWorkWithEvent(podNamespacedName)</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、检查 pod 的 tolerations 是否匹配所有 taints</span><br><span class="line">    allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)</span><br><span class="line">    if !allTolerated &#123;</span><br><span class="line">        tc.cancelWorkWithEvent(podNamespacedName)</span><br><span class="line">        tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 2、获取最小容忍时间</span><br><span class="line">    minTolerationTime := getMinTolerationTime(usedTolerations)</span><br><span class="line">    if minTolerationTime &lt; 0 &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、若存在最小容忍时间则将其加入到延时队列中</span><br><span class="line">    startTime := now</span><br><span class="line">    triggerTime := startTime.Add(minTolerationTime)</span><br><span class="line">    scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())</span><br><span class="line">    if scheduledEviction != nil &#123;</span><br><span class="line">        startTime = scheduledEviction.CreatedAt</span><br><span class="line">        if startTime.Add(minTolerationTime).Before(triggerTime) &#123;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line">        tc.cancelWorkWithEvent(podNamespacedName)</span><br><span class="line">    &#125;</span><br><span class="line">    tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="nc-doNodeProcessingPassWorker"><a href="#nc-doNodeProcessingPassWorker" class="headerlink" title="nc.doNodeProcessingPassWorker"></a>nc.doNodeProcessingPassWorker</h4><p>NodeLifecycleController 中 nodeInformer 监听到 node 变化时会将其添加到 nodeUpdateQueue 中，<code>nc.doNodeProcessingPassWorker</code> 主要是处理 nodeUpdateQueue 中的 node，为其添加合适的 <code>NoSchedule</code> taint 以及 label，其主要逻辑为：</p>
+<ul>
+<li>1、从 <code>nc.nodeUpdateQueue</code> 中取出 node；</li>
+<li>2、若启用了 <code>TaintNodeByCondition</code> feature-gates，调用<code>nc.doNoScheduleTaintingPass</code> 检查该 node 是否需要添加对应的 <code>NoSchedule</code> taint；<br><code>nc.doNoScheduleTaintingPass</code> 中的主要逻辑为：<ul>
+<li>1、从 nodeLister 中获取该 node 对象；</li>
+<li>2、判断该 node 是否存在以下几种 Condition：(1) False 或 Unknown 状态的 NodeReady Condition；(2) MemoryPressureCondition；(3) DiskPressureCondition；(4) NetworkUnavailableCondition；(5) PIDPressureCondition；若任一一种存在会添加对应的 <code>NoSchedule</code> taint；</li>
+<li>3、判断 node 是否处于 <code>Unschedulable</code> 状态，若为 <code>Unschedulable</code> 也添加对应的 <code>NoSchedule</code> taint；</li>
+<li>4、对比 node 已有的 taints 以及需要添加的 taints，以需要添加的 taints 为准，调用 <code>nodeutil.SwapNodeControllerTaint</code> 为 node 添加不存在的 taints 并删除不需要的 taints；</li>
+</ul>
+</li>
+<li><p>3、调用 <code>nc.reconcileNodeLabels</code> 检查 node 是否存在以下 label，若不存在则为其添加；</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">labels:</span><br><span class="line">  beta.kubernetes.io/arch: amd64</span><br><span class="line">  beta.kubernetes.io/os: linux</span><br><span class="line">  kubernetes.io/arch: amd64</span><br><span class="line">  kubernetes.io/os: linux</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:502</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) doNodeProcessingPassWorker() &#123;</span><br><span class="line">    for &#123;</span><br><span class="line">        obj, shutdown := nc.nodeUpdateQueue.Get()</span><br><span class="line">        if shutdown &#123;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line">        nodeName := obj.(string)</span><br><span class="line">        if nc.taintNodeByCondition &#123;</span><br><span class="line">            if err := nc.doNoScheduleTaintingPass(nodeName); err != nil &#123;</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if err := nc.reconcileNodeLabels(nodeName); err != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        nc.nodeUpdateQueue.Done(nodeName)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error &#123;</span><br><span class="line">    // 1、获取 node 对象</span><br><span class="line">    node, err := nc.nodeLister.Get(nodeName)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">		</span><br><span class="line">    // 2、若 node 存在对应的 condition 则为其添加对应的 taint</span><br><span class="line">    var taints []v1.Taint</span><br><span class="line">    for _, condition := range node.Status.Conditions &#123;</span><br><span class="line">        if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found &#123;</span><br><span class="line">            if taintKey, found := taintMap[condition.Status]; found &#123;</span><br><span class="line">                taints = append(taints, v1.Taint&#123;</span><br><span class="line">                    Key:    taintKey,</span><br><span class="line">                    Effect: v1.TaintEffectNoSchedule,</span><br><span class="line">                &#125;)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、判断是否为 Unschedulable </span><br><span class="line">    if node.Spec.Unschedulable &#123;</span><br><span class="line">        taints = append(taints, v1.Taint&#123;</span><br><span class="line">            Key:    schedulerapi.TaintNodeUnschedulable,</span><br><span class="line">            Effect: v1.TaintEffectNoSchedule,</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool &#123;</span><br><span class="line">        if t.Effect != v1.TaintEffectNoSchedule &#123;</span><br><span class="line">            return false</span><br><span class="line">        &#125;</span><br><span class="line">        if t.Key == schedulerapi.TaintNodeUnschedulable &#123;</span><br><span class="line">            return true</span><br><span class="line">        &#125;</span><br><span class="line">        _, found := taintKeyToNodeConditionMap[t.Key]</span><br><span class="line">        return found</span><br><span class="line">    &#125;)</span><br><span class="line">    </span><br><span class="line">    // 4、对比 node 已有 taints 和需要添加的 taints 得到 taintsToAdd, taintsToDel</span><br><span class="line">    taintsToAdd, taintsToDel := taintutils.TaintSetDiff(taints, nodeTaints)</span><br><span class="line">    if len(taintsToAdd) == 0 &amp;&amp; len(taintsToDel) == 0 &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 5、更新 node 的 taints</span><br><span class="line">    if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) &#123;</span><br><span class="line">        return fmt.Errorf(&quot;failed to swap taints of node %+v&quot;, node)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="nc-doNoExecuteTaintingPass"><a href="#nc-doNoExecuteTaintingPass" class="headerlink" title="nc.doNoExecuteTaintingPass"></a>nc.doNoExecuteTaintingPass</h4><p>当启用了 <code>TaintBasedEvictions</code> 特性时，通过 <code>nc.monitorNodeHealth</code> 检测到 node 异常时会将其加入到 <code>nc.zoneNoExecuteTainter</code> 队列中，<code>nc.doNoExecuteTaintingPass</code> 会处理 <code>nc.zoneNoExecuteTainter</code> 队列中的 node，并且会按一定的速率进行，此时会根据 node 实际的 NodeCondition 为 node 添加对应的 taint，当 node 存在 taint 时，taintManager 会驱逐 node 上的 pod。此过程中为 node 添加 taint 时进行了限速避免一次性驱逐过多 pod，在驱逐 node 上的 pod 时不会限速。</p>
+<p><code>nc.doNoExecuteTaintingPass</code> 的主要逻辑为：</p>
+<ul>
+<li>1、遍历 zoneNoExecuteTainter 中的 node 列表，从 nodeLister 中获取 node 对象；</li>
+<li>2、获取该 node 的 NodeReadyCondition；</li>
+<li>3、判断 NodeReadyCondition 的状态，若为 false，则为 node 添加 <code>node.kubernetes.io/not-ready:NoExecute</code> 的 taint 且保证 node 不存在 <code>node.kubernetes.io/unreachable:NoExecute</code> 的 taint</li>
+<li>4、若 NodeReadyCondition 为 unknown，则为 node 添加 <code>node.kubernetes.io/unreachable:NoExecute</code> 的 taint 且保证 node 不存在 <code>node.kubernetes.io/not-ready:NoExecute</code> 的 taint；<br>“unreachable” 和 “not ready” 两个 taint 是互斥的，只能存在一个； </li>
+<li>5、若 NodeReadyCondition 为 true，此时说明该 node 处于正常状态直接返回；</li>
+<li>6、调用 <code>nodeutil.SwapNodeControllerTaint</code> 更新 node 的 taint；</li>
+<li>7、若整个过程中有失败的操作会进行重试；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:582</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) doNoExecuteTaintingPass() &#123;</span><br><span class="line">    nc.evictorLock.Lock()</span><br><span class="line">    defer nc.evictorLock.Unlock()</span><br><span class="line">    for k := range nc.zoneNoExecuteTainter &#123;</span><br><span class="line">        nc.zoneNoExecuteTainter[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) &#123;</span><br><span class="line">            // 1、获取 node 对象</span><br><span class="line">            node, err := nc.nodeLister.Get(value.Value)</span><br><span class="line">            if apierrors.IsNotFound(err) &#123;</span><br><span class="line">                return true, 0</span><br><span class="line">            &#125; else if err != nil &#123;</span><br><span class="line">                return false, 50 * time.Millisecond</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            // 2、获取 node 的 NodeReadyCondition</span><br><span class="line">            _, condition := nodeutil.GetNodeCondition(&amp;node.Status, v1.NodeReady)</span><br><span class="line">            taintToAdd := v1.Taint&#123;&#125;</span><br><span class="line">            oppositeTaint := v1.Taint&#123;&#125;</span><br><span class="line">            </span><br><span class="line">            // 3、判断 Condition 状态，并为其添加对应的 taint</span><br><span class="line">            switch condition.Status &#123;</span><br><span class="line">            case v1.ConditionFalse:</span><br><span class="line">                taintToAdd = *NotReadyTaintTemplate</span><br><span class="line">                oppositeTaint = *UnreachableTaintTemplate</span><br><span class="line">            case v1.ConditionUnknown:</span><br><span class="line">                taintToAdd = *UnreachableTaintTemplate</span><br><span class="line">                oppositeTaint = *NotReadyTaintTemplate</span><br><span class="line">            default:</span><br><span class="line">                return true, 0</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            // 4、更新 node 的 taint</span><br><span class="line">            result := nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint&#123;&amp;taintToAdd&#125;, []*v1.Taint&#123;&amp;oppositeTaint&#125;, node)</span><br><span class="line">            if result &#123;</span><br><span class="line">                zone := utilnode.GetZoneKey(node)</span><br><span class="line">                evictionsNumber.WithLabelValues(zone).Inc()</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            return result, 0</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="nc-doEvictionPass"><a href="#nc-doEvictionPass" class="headerlink" title="nc.doEvictionPass"></a>nc.doEvictionPass</h4><p>若未启用 <code>TaintBasedEvictions</code> 特性，此时通过 <code>nc.monitorNodeHealth</code> 检测到 node 异常时会将其加入到  <code>nc.zonePodEvictor</code> 队列中，<code>nc.doEvictionPass</code> 会将 <code>nc.zonePodEvictor</code> 队列中 node 上的 pod 驱逐掉。</p>
+<p><code>nc.doEvictionPass</code> 的主要逻辑为：</p>
+<ul>
+<li>1、遍历 zonePodEvictor 的 node 列表获，从 nodeLister 中获取 node 对象；</li>
+<li>2、调用 <code>nodeutil.DeletePods</code> 删除该 node 上的所有 pod，在 <code>nodeutil.DeletePods</code> 中首先通过从 apiserver  获取该 node 上所有的 pod，逐个删除 pod，若该 pod 为 daemonset 所管理的 pod 则忽略；</li>
+<li>3、若整个过程中有失败的操作会进行重试；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:626</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) doEvictionPass() &#123;</span><br><span class="line">    nc.evictorLock.Lock()</span><br><span class="line">    defer nc.evictorLock.Unlock()</span><br><span class="line">    for k := range nc.zonePodEvictor &#123;</span><br><span class="line">        nc.zonePodEvictor[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) &#123;</span><br><span class="line">            node, err := nc.nodeLister.Get(value.Value)</span><br><span class="line">            ......</span><br><span class="line">            nodeUID, _ := value.UID.(string)</span><br><span class="line">            remaining, err := nodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                utilruntime.HandleError(fmt.Errorf(&quot;unable to evict node %q: %v&quot;, value.Value, err))</span><br><span class="line">                return false, 0</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line"></span><br><span class="line">            if node != nil &#123;</span><br><span class="line">                zone := utilnode.GetZoneKey(node)</span><br><span class="line">                evictionsNumber.WithLabelValues(zone).Inc()</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            return true, 0</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="nc-monitorNodeHealth"><a href="#nc-monitorNodeHealth" class="headerlink" title="nc.monitorNodeHealth"></a>nc.monitorNodeHealth</h4><p>上面已经介绍了无论是否启用了 <code>TaintBasedEvictions</code> 特性，需要打 taint 或者驱逐 pod 的 node 都会被放在 zoneNoExecuteTainter 或者 zonePodEvictor 队列中，而 <code>nc.monitorNodeHealth</code> 就是这两个队列中数据的生产者。<code>nc.monitorNodeHealth</code> 的主要功能是持续监控 node 的状态，当 node 处于异常状态时更新 node 的 taint 以及 node 上 pod 的状态或者直接驱逐 node 上的 pod，此外还会为集群下的所有 node 划分 zoneStates 并为每个 zoneStates 设置对应的驱逐速率。</p>
+<p><code>nc.monitorNodeHealth</code> 主要逻辑为：</p>
+<ul>
+<li>1、从 nodeLister 中获取所有的 node；</li>
+<li>2、NodeLifecycleController 根据自身 knownNodeSet 列表中的数据调用 <code>nc.classifyNodes</code> 将 node 分为三类：added、deleted、newZoneRepresentatives，added 表示新增的，deleted 表示被删除的，newZoneRepresentatives 代表该 node 不存在 zoneStates，NodeLifecycleController 会为每一个 node 划分一个 zoneStates，zoneStates 有 Initial、Normal、FullDisruption、PartialDisruption 四种，新增加的 node 默认的 zoneStates 为 Initial，其余的几个 zoneStates 分别对应着不同的驱逐速率；</li>
+<li>3、对于 newZoneRepresentatives 中 node 列表，调用 <code>nc.addPodEvictorForNewZone</code> 将 node 添加到对应的的 zoneStates 中，然后根据是否启用了 <code>TaintBasedEvictions</code> 特性将 node 分别加入到 zonePodEvictor 或 zoneNoExecuteTainter 列表中，若启用了则加入到 zoneNoExecuteTainter 列表中否则加入到 zonePodEvictor 中；</li>
+<li>4、对应 added 列表中的 node，首先将其加入到 knownNodeSet 列表中，然后调用 <code>nc.addPodEvictorForNewZone</code> 将该 node 添加到对应的 zoneStates 中，判断是否启用了 <code>TaintBasedEvictions</code> 特性，若启用了则调用 <code>nc.markNodeAsReachable</code> 移除该 node 上的 <code>UnreachableTaint</code> 和 <code>NotReadyTaint</code>，并从 zoneNoExecuteTainter 中移除该 node，表示为该 node 进行一次初始化，若未启用 <code>TaintBasedEvictions</code> 特性则调用 <code>nc.cancelPodEviction</code> 将该 node 从 zonePodEvictor 中删除；</li>
+<li>5、对于 deleted 列表中的 node，将其从 knownNodeSet 列表中删除；</li>
+<li>6、遍历所有的 nodes：</li>
+<li>7、调用 <code>nc.tryUpdateNodeHealth</code> 获取该 node 的 gracePeriod、observedReadyCondition、currentReadyCondition，observedReadyCondition 可以理解为 node 上一次的状态， currentReadyCondition 为本次的状态；</li>
+<li>8、检查 node 是否在中断检查中被排除，主要判断当启用 <code>LegacyNodeRoleBehavior</code> 或 <code>NodeDisruptionExclusion</code> 特性时，node 是否存在对应的标签，如果该 node 没有被排除，则将其对应的 zone 加入到 zoneToNodeConditions 中；</li>
+<li>9、当该 node 的 currentReadyCondition 不为空时，检查 observedReadyCondition，即检查上一次的状态：<ul>
+<li>1、若 observedReadyCondition 为 false，此时若启用了 <code>TaintBasedEvictions</code> 时，为其添加 <code>NotReadyTaint</code> 并且确保 node 不存在 <code>UnreachableTaint</code> 。若未启用 <code>TaintBasedEvictions</code> 则判断距 node 上一次 readyTransitionTimestamp 的时间是否超过了 <code>podEvictionTimeout</code>（默认 5 分钟），若超过则将 node 加入到 zonePodEvictor 队列中，最终会驱逐 node 上的所有 pod；</li>
+<li>2、若 observedReadyCondition 为 unknown，此时若启用了 <code>TaintBasedEvictions</code> 时，则为 node 添加 <code>UnreachableTaint</code> 并且确保 node 不会有 <code>NotReadyTaint</code>。若未启用 <code>TaintBasedEvictions</code> 则判断距 node 上一次 probeTimestamp 的时间是否超过了 <code>podEvictionTimeout</code>（默认 5 分钟），若超过则将 node 加入到 zonePodEvictor 队列中，最终会驱逐 node 上的所有 pod；</li>
+<li>3、若 observedReadyCondition 为 true 时，此时若启用了 <code>TaintBasedEvictions</code> 时，调用 <code>nc.markNodeAsReachable</code> 移除 node 上的 <code>NotReadyTaint</code> 和 <code>UnreachableTaint</code> ，若未启用 <code>TaintBasedEvictions</code> 则将 node 从 zonePodEvictor 队列中移除；<br>此处主要是判断是否启用了 <code>TaintBasedEvictions</code>  特性，然后根据 node 的 ReadyCondition 判断是否直接驱逐 node 上的 pod 还是为 node 打 taint 等待 taintManager 驱逐 node 上的 pod； </li>
+</ul>
+</li>
+<li>10、最后判断当 node ReadyCondition 由 true 变为 false 时，调用 <code>nodeutil.MarkAllPodsNotReady</code> 将该node 上的所有 pod 标记为 notReady；</li>
+<li>11、调用 <code>nc.handleDisruption</code> 处理中断情况，为不同 zoneState 设置驱逐的速度；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:664</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) monitorNodeHealth() error &#123;</span><br><span class="line">    // 1、从 nodeLister 获取所有 node</span><br><span class="line">    nodes, err := nc.nodeLister.List(labels.Everything())</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 2、根据 controller knownNodeSet 中的记录将 node 分为三类</span><br><span class="line">    added, deleted, newZoneRepresentatives := nc.classifyNodes(nodes)</span><br><span class="line">	</span><br><span class="line">    // 3、为没有 zone 的 node 添加对应的 zone</span><br><span class="line">    for i := range newZoneRepresentatives &#123;</span><br><span class="line">        nc.addPodEvictorForNewZone(newZoneRepresentatives[i])</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、将新增加的 node 添加到 knownNodeSet 中并且对 node 进行初始化</span><br><span class="line">    for i := range added &#123;</span><br><span class="line">        ......</span><br><span class="line">        nc.knownNodeSet[added[i].Name] = added[i]</span><br><span class="line">        nc.addPodEvictorForNewZone(added[i])</span><br><span class="line">        if nc.useTaintBasedEvictions &#123;</span><br><span class="line">            nc.markNodeAsReachable(added[i])</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            nc.cancelPodEviction(added[i])</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 5、将 deleted 列表中的 node 从 knownNodeSet 中删除</span><br><span class="line">    for i := range deleted &#123;</span><br><span class="line">        ......</span><br><span class="line">        delete(nc.knownNodeSet, deleted[i].Name)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    zoneToNodeConditions := map[string][]*v1.NodeCondition&#123;&#125;</span><br><span class="line">    for i := range nodes &#123;</span><br><span class="line">        var gracePeriod time.Duration</span><br><span class="line">        var observedReadyCondition v1.NodeCondition</span><br><span class="line">        var currentReadyCondition *v1.NodeCondition</span><br><span class="line">        node := nodes[i].DeepCopy()</span><br><span class="line">        </span><br><span class="line">        // 6、获取 node 的 gracePeriod, observedReadyCondition, currentReadyCondition</span><br><span class="line">        if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) &#123;</span><br><span class="line">            gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(node)</span><br><span class="line">            if err == nil &#123;</span><br><span class="line">                return true, nil</span><br><span class="line">            &#125;</span><br><span class="line">            name := node.Name</span><br><span class="line">            node, err = nc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions&#123;&#125;)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                return false, err</span><br><span class="line">            &#125;</span><br><span class="line">            return false, nil</span><br><span class="line">        &#125;); err != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 7、若 node 没有被排除则加入到 zoneToNodeConditions 列表中</span><br><span class="line">        if !isNodeExcludedFromDisruptionChecks(node) &#123;</span><br><span class="line">            zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        decisionTimestamp := nc.now()</span><br><span class="line">        </span><br><span class="line">        // 8、根据 observedReadyCondition 为 node 添加不同的 taint </span><br><span class="line">        if currentReadyCondition != nil &#123;</span><br><span class="line">            switch observedReadyCondition.Status &#123;</span><br><span class="line">            </span><br><span class="line">            case v1.ConditionFalse:</span><br><span class="line">                // 9、false 状态添加 NotReady taint</span><br><span class="line">                if nc.useTaintBasedEvictions &#123;</span><br><span class="line">                    if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) &#123;</span><br><span class="line">                        taintToAdd := *NotReadyTaintTemplate</span><br><span class="line">                        if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint&#123;&amp;taintToAdd&#125;, []*v1.Taint&#123;UnreachableTaintTemplate&#125;, node) &#123;</span><br><span class="line">                            ......</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125; else if nc.markNodeForTainting(node) &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                // 10、或者当超过 podEvictionTimeout 后直接驱逐 node 上的 pod</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    if decisionTimestamp.After(nc.nodeHealthMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) &#123;</span><br><span class="line">                        if nc.evictPods(node) &#123;</span><br><span class="line">                            ......</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            case v1.ConditionUnknown:</span><br><span class="line">                // 11、unknown 状态时添加 UnreachableTaint</span><br><span class="line">                if nc.useTaintBasedEvictions &#123;</span><br><span class="line">                    if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) &#123;</span><br><span class="line">                        taintToAdd := *UnreachableTaintTemplate</span><br><span class="line">                        if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint&#123;&amp;taintToAdd&#125;, []*v1.Taint&#123;NotReadyTaintTemplate&#125;, node) &#123;</span><br><span class="line">                            ......</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125; else if nc.markNodeForTainting(node) &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    if decisionTimestamp.After(nc.nodeHealthMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) &#123;</span><br><span class="line">                        if nc.evictPods(node) &#123;</span><br><span class="line">                            ......</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            case v1.ConditionTrue:</span><br><span class="line">                // 12、true 状态时移除所有 UnreachableTaint 和 NotReadyTaint</span><br><span class="line">                if nc.useTaintBasedEvictions &#123;</span><br><span class="line">                    removed, err := nc.markNodeAsReachable(node)</span><br><span class="line">                    if err != nil &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                // 13、从 PodEviction 队列中移除</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    if nc.cancelPodEviction(node) &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            // 14、ReadyCondition 由 true 变为 false 时标记 node 上的 pod 为 notready</span><br><span class="line">            if currentReadyCondition.Status != v1.ConditionTrue &amp;&amp; observedReadyCondition.Status == v1.ConditionTrue &#123;</span><br><span class="line">                nodeutil.RecordNodeStatusChange(nc.recorder, node, &quot;NodeNotReady&quot;)</span><br><span class="line">                if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil &#123;</span><br><span class="line">                    utilruntime.HandleError(fmt.Errorf(&quot;Unable to mark all pods NotReady on node %v: %v&quot;, node.Name, err))</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 15、处理中断情况</span><br><span class="line">    nc.handleDisruption(zoneToNodeConditions, nodes)</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="nc-tryUpdateNodeHealth"><a href="#nc-tryUpdateNodeHealth" class="headerlink" title="nc.tryUpdateNodeHealth"></a>nc.tryUpdateNodeHealth</h5><p><code>nc.tryUpdateNodeHealth</code> 会根据当前获取的 node status 更新 <code>nc.nodeHealthMap</code> 中的数据，<code>nc.nodeHealthMap</code> 保存 node 最近一次的状态，并会根据 <code>nc.nodeHealthMap</code> 判断 node 是否已经处于 unknown 状态。</p>
+<p><code>nc.tryUpdateNodeHealth</code> 的主要逻辑为：</p>
+<ul>
+<li>1、获取当前 node 的 ReadyCondition 作为 currentReadyCondition，若 ReadyCondition 为空则此 node 可能未上报 status，此时为该 node fake 一个 observedReadyCondition 且其 status 为 Unknown，将其 gracePeriod 设为 nodeStartupGracePeriod，否则 observedReadyCondition 设为 currentReadyCondition 且 gracePeriod 为 nodeMonitorGracePeriod，然后在 <code>nc.nodeHealthMap</code> 中更新 node 的 Status；</li>
+<li>2、若 ReadyCondition 存在，则将 observedReadyCondition 置位当前 ReadyCondition，gracePeriod 设为 40s；</li>
+<li>3、计算 node 当前的 nodeHealthData，nodeHealthData 中保存了 node 最近一次的状态，包含 probeTimestamp、readyTransitionTimestamp、status、lease 四个字段。从  <code>nc.nodeHealthMap</code> 中获取 node 的 condition 和 lease 信息，更新 savedNodeHealth 中 status、probeTimestamp、readyTransitionTimestamp，若启用了 <code>NodeLease</code> 特性也会更新 NodeHealth 中的 lease 以及 probeTimestamp，最后将当前计算出 savedNodeHealth 保存到 <code>nc.nodeHealthMap</code> 中；</li>
+<li>4、通过获取到的 savedNodeHealth 检查 node 状态，若 NodeReady condition 或者 lease 对象更新时间超过 gracePeriod，则更新 node 的 Ready、MemoryPressure、DiskPressure、PIDPressure 为 Unknown，若当前计算出来的 node status 与上一次的 status 不一致则同步到 apiserver，并且更新 nodeHealthMap； </li>
+<li>5、最后返回 gracePeriod、observedReadyCondition、currentReadyCondition；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:851</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) &#123;</span><br><span class="line">    var gracePeriod time.Duration</span><br><span class="line">    var observedReadyCondition v1.NodeCondition</span><br><span class="line">    _, currentReadyCondition := nodeutil.GetNodeCondition(&amp;node.Status, v1.NodeReady)</span><br><span class="line">    </span><br><span class="line">    // 1、若 currentReadyCondition 为 nil 则 fake 一个 observedReadyCondition</span><br><span class="line">    if currentReadyCondition == nil &#123;</span><br><span class="line">        observedReadyCondition = v1.NodeCondition&#123;</span><br><span class="line">            Type:               v1.NodeReady,</span><br><span class="line">            Status:             v1.ConditionUnknown,</span><br><span class="line">            LastHeartbeatTime:  node.CreationTimestamp,</span><br><span class="line">            LastTransitionTime: node.CreationTimestamp,</span><br><span class="line">        &#125;</span><br><span class="line">        gracePeriod = nc.nodeStartupGracePeriod</span><br><span class="line">        if _, found := nc.nodeHealthMap[node.Name]; found &#123;</span><br><span class="line">            nc.nodeHealthMap[node.Name].status = &amp;node.Status</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            nc.nodeHealthMap[node.Name] = &amp;nodeHealthData&#123;</span><br><span class="line">                status:                   &amp;node.Status,</span><br><span class="line">                probeTimestamp:           node.CreationTimestamp,</span><br><span class="line">                readyTransitionTimestamp: node.CreationTimestamp,</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        observedReadyCondition = *currentReadyCondition</span><br><span class="line">        gracePeriod = nc.nodeMonitorGracePeriod</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 2、savedNodeHealth 中保存 node 最近的一次状态</span><br><span class="line">    savedNodeHealth, found := nc.nodeHealthMap[node.Name]</span><br><span class="line"></span><br><span class="line">    var savedCondition *v1.NodeCondition</span><br><span class="line">    var savedLease *coordv1beta1.Lease</span><br><span class="line">    if found &#123;</span><br><span class="line">        _, savedCondition = nodeutil.GetNodeCondition(savedNodeHealth.status, v1.NodeReady)</span><br><span class="line">        savedLease = savedNodeHealth.lease</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、根据 savedCondition 以及 currentReadyCondition 更新 savedNodeHealth 中的数据</span><br><span class="line">    if !found &#123;</span><br><span class="line">        savedNodeHealth = &amp;nodeHealthData&#123;</span><br><span class="line">            status:                   &amp;node.Status,</span><br><span class="line">            probeTimestamp:           nc.now(),</span><br><span class="line">            readyTransitionTimestamp: nc.now(),</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else if savedCondition == nil &amp;&amp; currentReadyCondition != nil &#123;</span><br><span class="line">        savedNodeHealth = &amp;nodeHealthData&#123;</span><br><span class="line">            status:                   &amp;node.Status,</span><br><span class="line">            probeTimestamp:           nc.now(),</span><br><span class="line">            readyTransitionTimestamp: nc.now(),</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else if savedCondition != nil &amp;&amp; currentReadyCondition == nil &#123;</span><br><span class="line">        savedNodeHealth = &amp;nodeHealthData&#123;</span><br><span class="line">            status:                   &amp;node.Status,</span><br><span class="line">            probeTimestamp:           nc.now(),</span><br><span class="line">            readyTransitionTimestamp: nc.now(),</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else if savedCondition != nil &amp;&amp; currentReadyCondition != nil &amp;&amp; savedCondition.LastHeartbeatTime != currentReadyCondition.LastHeartbeatTime &#123;</span><br><span class="line">        var transitionTime metav1.Time</span><br><span class="line">        if savedCondition.LastTransitionTime != currentReadyCondition.LastTransitionTime &#123;</span><br><span class="line">            transitionTime = nc.now()</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            transitionTime = savedNodeHealth.readyTransitionTimestamp</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        savedNodeHealth = &amp;nodeHealthData&#123;</span><br><span class="line">            status:                   &amp;node.Status,</span><br><span class="line">            probeTimestamp:           nc.now(),</span><br><span class="line">            readyTransitionTimestamp: transitionTime,</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 4、判断是否启用了 nodeLease 功能</span><br><span class="line">    var observedLease *coordv1beta1.Lease</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &#123;</span><br><span class="line">        observedLease, _ = nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)</span><br><span class="line">        if observedLease != nil &amp;&amp; (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) &#123;</span><br><span class="line">            savedNodeHealth.lease = observedLease</span><br><span class="line">            savedNodeHealth.probeTimestamp = nc.now()</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    nc.nodeHealthMap[node.Name] = savedNodeHealth</span><br><span class="line"></span><br><span class="line">    // 5、检查 node 是否已经超过 gracePeriod 时间没有上报状态了</span><br><span class="line">    if nc.now().After(savedNodeHealth.probeTimestamp.Add(gracePeriod)) &#123;</span><br><span class="line">        nodeConditionTypes := []v1.NodeConditionType&#123;</span><br><span class="line">            v1.NodeReady,</span><br><span class="line">            v1.NodeMemoryPressure,</span><br><span class="line">            v1.NodeDiskPressure,</span><br><span class="line">            v1.NodePIDPressure,</span><br><span class="line">        &#125;</span><br><span class="line">        nowTimestamp := nc.now()</span><br><span class="line">        </span><br><span class="line">        // 6、若 node 超过 gracePeriod 时间没有上报状态将其所有 Condition 设置 unknown</span><br><span class="line">        for _, nodeConditionType := range nodeConditionTypes &#123;</span><br><span class="line">            _, currentCondition := nodeutil.GetNodeCondition(&amp;node.Status, nodeConditionType)</span><br><span class="line">            if currentCondition == nil &#123;</span><br><span class="line">                node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition&#123;</span><br><span class="line">                    Type:               nodeConditionType,</span><br><span class="line">                    Status:             v1.ConditionUnknown,</span><br><span class="line">                    Reason:             &quot;NodeStatusNeverUpdated&quot;,</span><br><span class="line">                    Message:            &quot;Kubelet never posted node status.&quot;,</span><br><span class="line">                    LastHeartbeatTime:  node.CreationTimestamp,</span><br><span class="line">                    LastTransitionTime: nowTimestamp,</span><br><span class="line">                &#125;)</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                if currentCondition.Status != v1.ConditionUnknown &#123;</span><br><span class="line">                    currentCondition.Status = v1.ConditionUnknown</span><br><span class="line">                    currentCondition.Reason = &quot;NodeStatusUnknown&quot;</span><br><span class="line">                    currentCondition.Message = &quot;Kubelet stopped posting node status.&quot;</span><br><span class="line">                    currentCondition.LastTransitionTime = nowTimestamp</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 7、更新 node 最新状态至 apiserver 并更新 nodeHealthMap 中的数据</span><br><span class="line">        _, currentReadyCondition = nodeutil.GetNodeCondition(&amp;node.Status, v1.NodeReady)</span><br><span class="line">        if !apiequality.Semantic.DeepEqual(currentReadyCondition, &amp;observedReadyCondition) &#123;</span><br><span class="line">            if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(node); err != nil &#123;</span><br><span class="line">                return gracePeriod, observedReadyCondition, currentReadyCondition, err</span><br><span class="line">            &#125;</span><br><span class="line">            nc.nodeHealthMap[node.Name] = &amp;nodeHealthData&#123;</span><br><span class="line">                status:                   &amp;node.Status,</span><br><span class="line">                probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,</span><br><span class="line">                readyTransitionTimestamp: nc.now(),</span><br><span class="line">                lease:                    observedLease,</span><br><span class="line">            &#125;</span><br><span class="line">            return gracePeriod, observedReadyCondition, currentReadyCondition, nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return gracePeriod, observedReadyCondition, currentReadyCondition, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="nc-handleDisruption"><a href="#nc-handleDisruption" class="headerlink" title="nc.handleDisruption"></a>nc.handleDisruption</h5><p><code>monitorNodeHealth</code> 中会为每个 node 划分 zone 并设置 zoneState，<code>nc.handleDisruption</code> 的目的是当集群中不同 zone 下出现多个 unhealthy node 时会 zone 设置不同的驱逐速率。</p>
+<p><code>nc.handleDisruption</code> 主要逻辑为：</p>
+<ul>
+<li>1、设置 allAreFullyDisrupted 默认值为 true，根据 zoneToNodeConditions 中的数据，判断当前所有 zone 是否都为 FullDisruption 状态；</li>
+<li>2、遍历 zoneToNodeConditions 首先调用 <code>nc.computeZoneStateFunc</code> 计算每个 zone 的状态，分为三种 <code>fullyDisrupted</code>（zone 下所有 node 都处于 notReady 状态）、<code>partiallyDisrupted</code>（notReady node 占比 &gt;= unhealthyZoneThreshold 的值且 node 数超过三个）、<code>normal</code>（以上两种情况之外）。若 newState 不为 <code>stateFullDisruption</code> 将 allAreFullyDisrupted 设为 false，将 newState 保存在 newZoneStates 中，</li>
+<li>3、将 allWasFullyDisrupted 默认值设置为 true，根据 zoneStates 中 nodeCondition 的数据，判断上一次观察到的所有 zone 是否都为 <code>FullDisruption</code> 状态；</li>
+<li>4、如果所有 zone 都为 <code>FullyDisrupted</code> 直接停止所有的驱逐工作，因为此时可能处于网络中断的状态；</li>
+<li>5、如果 allAreFullyDisrupted 为 true，allWasFullyDisrupted 为 false，说明从非 <code>FullyDisrupted</code> 切换到了 <code>FullyDisrupted</code> 模式，此时需要停止所有 node 的驱逐工作，首先去掉 node 上的 taint 并设置所有zone的对应 zoneNoExecuteTainter 或者 zonePodEvictor 的 Rate Limeter 为0，最后更新所有 zone 的状态为 <code>FullDisruption</code>；</li>
+<li>6、如果 allWasFullyDisrupted 为 true，allAreFullyDisrupted 为 false，说明集群从 <code>FullyDisrupted</code> 变为 非 <code>FullyDisrupted</code> 模式，此时首先更新 <code>nc.nodeHealthMap</code> 中所有 node 的 probeTimestamp 和 readyTransitionTimestamp 为当前时间，然后调用 <code>nc.setLimiterInZone</code> 重置每个 zone 的驱逐速率；</li>
+<li>7、如果 allWasFullyDisrupted为false 且 allAreFullyDisrupted 为false，即集群状态保持为非 <code>FullDisruption</code> 时，此时根据 zone 的 state 为每个 zone 设置默认的驱逐速率；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:1017</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.NodeCondition, nodes []*v1.Node) &#123;</span><br><span class="line">    newZoneStates := map[string]ZoneState&#123;&#125;</span><br><span class="line">    allAreFullyDisrupted := true</span><br><span class="line">    </span><br><span class="line">    // 1、判断当前所有 zone 是否都为 FullDisruption 状态</span><br><span class="line">    for k, v := range zoneToNodeConditions &#123;</span><br><span class="line">        zoneSize.WithLabelValues(k).Set(float64(len(v)))</span><br><span class="line">        // 2、计算 zone state 以及 unhealthy node</span><br><span class="line">        unhealthy, newState := nc.computeZoneStateFunc(v)</span><br><span class="line">        zoneHealth.WithLabelValues(k).Set(float64(100*(len(v)-unhealthy)) / float64(len(v)))</span><br><span class="line">        unhealthyNodes.WithLabelValues(k).Set(float64(unhealthy))</span><br><span class="line">        if newState != stateFullDisruption &#123;</span><br><span class="line">            allAreFullyDisrupted = false</span><br><span class="line">        &#125;</span><br><span class="line">        newZoneStates[k] = newState</span><br><span class="line">        if _, had := nc.zoneStates[k]; !had &#123;</span><br><span class="line">            nc.zoneStates[k] = stateInitial</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、判断上一次观察到的所有 zone 是否都为 FullDisruption 状态</span><br><span class="line">    allWasFullyDisrupted := true</span><br><span class="line">    for k, v := range nc.zoneStates &#123;</span><br><span class="line">        if _, have := zoneToNodeConditions[k]; !have &#123;</span><br><span class="line">            zoneSize.WithLabelValues(k).Set(0)</span><br><span class="line">            zoneHealth.WithLabelValues(k).Set(100)</span><br><span class="line">            unhealthyNodes.WithLabelValues(k).Set(0)</span><br><span class="line">            delete(nc.zoneStates, k)</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        if v != stateFullDisruption &#123;</span><br><span class="line">            allWasFullyDisrupted = false</span><br><span class="line">            break</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、若存在一个不为 FullyDisrupted </span><br><span class="line">    if !allAreFullyDisrupted || !allWasFullyDisrupted &#123;</span><br><span class="line">        // 5、如果 allAreFullyDisrupted 为 true，则 allWasFullyDisrupted 为 false</span><br><span class="line">        //   说明从非 FullyDisrupted 切换到了 FullyDisrupted 模式</span><br><span class="line">        if allAreFullyDisrupted &#123;</span><br><span class="line">            for i := range nodes &#123;</span><br><span class="line">                if nc.useTaintBasedEvictions &#123;</span><br><span class="line">                    _, err := nc.markNodeAsReachable(nodes[i])</span><br><span class="line">                    if err != nil &#123;</span><br><span class="line">                        klog.Errorf(&quot;Failed to remove taints from Node %v&quot;, nodes[i].Name)</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    nc.cancelPodEviction(nodes[i])</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            for k := range nc.zoneStates &#123;</span><br><span class="line">                if nc.useTaintBasedEvictions &#123;</span><br><span class="line">                    nc.zoneNoExecuteTainter[k].SwapLimiter(0)</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    nc.zonePodEvictor[k].SwapLimiter(0)</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            for k := range nc.zoneStates &#123;</span><br><span class="line">                nc.zoneStates[k] = stateFullDisruption</span><br><span class="line">            &#125;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line">        // 6、如果 allWasFullyDisrupted 为 true，则 allAreFullyDisrupted 为 false</span><br><span class="line">        //   说明 cluster 从 FullyDisrupted 切换为非 FullyDisrupted 模式</span><br><span class="line">        if allWasFullyDisrupted &#123;</span><br><span class="line">            now := nc.now()</span><br><span class="line">            for i := range nodes &#123;</span><br><span class="line">                v := nc.nodeHealthMap[nodes[i].Name]</span><br><span class="line">                v.probeTimestamp = now</span><br><span class="line">                v.readyTransitionTimestamp = now</span><br><span class="line">                nc.nodeHealthMap[nodes[i].Name] = v</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            for k := range nc.zoneStates &#123;</span><br><span class="line">                nc.setLimiterInZone(k, len(zoneToNodeConditions[k]), newZoneStates[k])</span><br><span class="line">                nc.zoneStates[k] = newZoneStates[k]</span><br><span class="line">            &#125;</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 7、根据 zoneState 为每个 zone 设置驱逐速率</span><br><span class="line">        for k, v := range nc.zoneStates &#123;</span><br><span class="line">            newState := newZoneStates[k]</span><br><span class="line">            if v == newState &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            nc.setLimiterInZone(k, len(zoneToNodeConditions[k]), newState)</span><br><span class="line">            nc.zoneStates[k] = newState</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="nc-computeZoneStateFunc"><a href="#nc-computeZoneStateFunc" class="headerlink" title="nc.computeZoneStateFunc"></a>nc.computeZoneStateFunc</h6><p><code>nc.computeZoneStateFunc</code> 是计算 zone state 的方法，该方法会计算每个 zone 下 notReady 的 node 并将 zone 分为三种：</p>
+<ul>
+<li><code>fullyDisrupted</code>：zone 下所有 node 都处于 notReady 状态；</li>
+<li><code>partiallyDisrupted</code>：notReady node 占比 &gt;= unhealthyZoneThreshold 的值(默认为0.55，通过<code>--unhealthy-zone-threshold</code>设置)且 notReady node 数超过2个；</li>
+<li><code>normal</code>：以上两种情况之外的；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:1262</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) (int, ZoneState) &#123;</span><br><span class="line">    readyNodes := 0</span><br><span class="line">    notReadyNodes := 0</span><br><span class="line">    for i := range nodeReadyConditions &#123;</span><br><span class="line">        if nodeReadyConditions[i] != nil &amp;&amp; nodeReadyConditions[i].Status == v1.ConditionTrue &#123;</span><br><span class="line">            readyNodes++</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            notReadyNodes++</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    switch &#123;</span><br><span class="line">    case readyNodes == 0 &amp;&amp; notReadyNodes &gt; 0:</span><br><span class="line">        return notReadyNodes, stateFullDisruption</span><br><span class="line">    case notReadyNodes &gt; 2 &amp;&amp; float32(notReadyNodes)/float32(notReadyNodes+readyNodes) &gt;= nc.unhealthyZoneThreshold:</span><br><span class="line">        return notReadyNodes, statePartialDisruption</span><br><span class="line">    default:</span><br><span class="line">        return notReadyNodes, stateNormal</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="nc-setLimiterInZone"><a href="#nc-setLimiterInZone" class="headerlink" title="nc.setLimiterInZone"></a>nc.setLimiterInZone</h6><p><code>nc.setLimiterInZone</code> 方法会根据不同的 zoneState 设置对应的驱逐速率：</p>
+<ul>
+<li><code>stateNormal</code> ：驱逐速率为 evictionLimiterQPS（默认为0.1，可以通过 <code>--node-eviction-rate</code> 参数指定)的值，即每隔 10s 清空一个节点；</li>
+<li><code>statePartialDisruption</code>：如果当前 zone size 大于 <code>nc.largeClusterThreshold</code>（默认为 50，通过<code>--large-cluster-size-threshold</code>设置），则设置为 secondaryEvictionLimiterQPS（默认为 0.01，可以通过 <code>--secondary-node-eviction-rate</code> 指定），否则设置为 0；</li>
+<li><code>stateFullDisruption</code>：为 evictionLimiterQPS（默认为0.1，可以通过 <code>--node-eviction-rate</code> 参数指定)的值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/nodelifecycle/node_lifecycle_controller.go:1115</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">func (nc *Controller) setLimiterInZone(zone string, zoneSize int, state ZoneState) &#123;</span><br><span class="line">    switch state &#123;</span><br><span class="line">    case stateNormal:</span><br><span class="line">        if nc.useTaintBasedEvictions &#123;</span><br><span class="line">            nc.zoneNoExecuteTainter[zone].SwapLimiter(nc.evictionLimiterQPS)</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            nc.zonePodEvictor[zone].SwapLimiter(nc.evictionLimiterQPS)</span><br><span class="line">        &#125;</span><br><span class="line">    case statePartialDisruption:</span><br><span class="line">        if nc.useTaintBasedEvictions &#123;</span><br><span class="line">            nc.zoneNoExecuteTainter[zone].SwapLimiter(</span><br><span class="line">                nc.enterPartialDisruptionFunc(zoneSize))</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            nc.zonePodEvictor[zone].SwapLimiter(</span><br><span class="line">                nc.enterPartialDisruptionFunc(zoneSize))</span><br><span class="line">        &#125;</span><br><span class="line">    case stateFullDisruption:</span><br><span class="line">        if nc.useTaintBasedEvictions &#123;</span><br><span class="line">            nc.zoneNoExecuteTainter[zone].SwapLimiter(</span><br><span class="line">                nc.enterFullDisruptionFunc(zoneSize))</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            nc.zonePodEvictor[zone].SwapLimiter(</span><br><span class="line">                nc.enterFullDisruptionFunc(zoneSize))</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h5><p>monitorNodeHealth 中的主要流程如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">                           monitorNodeHealth</span><br><span class="line">                                  |</span><br><span class="line">                                  |</span><br><span class="line">                        useTaintBasedEvictions</span><br><span class="line">                                  |</span><br><span class="line">                                  |</span><br><span class="line">           ---------------------------------------------</span><br><span class="line">       yes |                                           | no</span><br><span class="line">           |                                           |</span><br><span class="line">           v                                           v</span><br><span class="line">   addPodEvictorForNewZone                         evictPods</span><br><span class="line">           |                                           |</span><br><span class="line">           |                                           |</span><br><span class="line">           v                                           v</span><br><span class="line">   zoneNoExecuteTainter                         zonePodEvictor</span><br><span class="line">(RateLimitedTimedQueue)                     (RateLimitedTimedQueue)</span><br><span class="line">           |                                           |</span><br><span class="line">           |                                           |</span><br><span class="line">           |                                           |</span><br><span class="line">           v                                           v</span><br><span class="line">   doNoExecuteTaintingPass                       doEvictionPass</span><br><span class="line">       (consumer)                                 (consumer)</span><br></pre></td></tr></table></figure>
+<p>NodeLifecycleController 中三个核心组件之间的交互流程如下所示:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">                        monitorNodeHealth</span><br><span class="line">                                |</span><br><span class="line">                                |</span><br><span class="line">                                | 为 node 添加 NoExecute taint</span><br><span class="line">                                |</span><br><span class="line">                                |</span><br><span class="line">                                v       为 node 添加</span><br><span class="line">             watch nodeList           NoSchedule taint</span><br><span class="line"> taintManager   ------&gt;     APIServer  &lt;-----------  nc.doNodeProcessingPassWorker</span><br><span class="line">       |</span><br><span class="line">       |</span><br><span class="line">       |</span><br><span class="line">       v</span><br><span class="line">驱逐 node 上不容忍</span><br><span class="line">node taint 的 pod</span><br></pre></td></tr></table></figure>
+<p>至此，NodeLifecycleController 的核心代码已经分析完。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要分析了 NodeLifecycleController 的设计与实现，NodeLifecycleController 主要是监控 node 状态，当 node 异常时驱逐 node 上的 pod，其行为与其他组件有一定关系，node 的状态由 kubelet 上报，node 异常时为 node 添加 taint 标签后，scheduler 调度 pod 也会有对应的行为。为了保证由于网络等问题引起的 pod 驱逐行为，NodeLifecycleController 会为 node 进行分区并会为每个区设置不同的驱逐速率，即实际上会以 rate-limited 的方式添加 taint，在某些情况下可以避免 pod 被大量驱逐。</p>
+<p>此外，NodeLifecycleController 还会对外暴露多个 metrics，包括 zoneHealth、zoneSize、unhealthyNodes、evictionsNumber 等，便于用户查看集群下 node 的状态。</p>
+<p>参考：</p>
+<p><a href="https://kubernetes.io/zh/docs/concepts/configuration/taint-and-toleration/" target="_blank" rel="noopener">https://kubernetes.io/zh/docs/concepts/configuration/taint-and-toleration/</a></p>
+<p><a href="https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/node-controller/" rel="tag"># node controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/01/03/kubelet_init/" rel="next" title="kubelet 启动流程分析">
+                <i class="fa fa-chevron-left"></i> kubelet 启动流程分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">47</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">51</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#NodeLifecycleController-的功能"><span class="nav-number">1.</span> <span class="nav-text">NodeLifecycleController 的功能</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#taint-的作用"><span class="nav-number">1.1.</span> <span class="nav-text">taint 的作用</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#NodeLifecycleController-中的-feature-gates"><span class="nav-number">1.2.</span> <span class="nav-text">NodeLifecycleController 中的 feature-gates</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NodeLifecycleController-源码分析"><span class="nav-number">2.</span> <span class="nav-text">NodeLifecycleController 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#startNodeLifecycleController"><span class="nav-number">2.1.</span> <span class="nav-text">startNodeLifecycleController</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#NewNodeLifecycleController"><span class="nav-number">2.2.</span> <span class="nav-text">NewNodeLifecycleController</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Run"><span class="nav-number">2.3.</span> <span class="nav-text">Run</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#nc-taintManager-Run"><span class="nav-number">2.4.</span> <span class="nav-text">nc.taintManager.Run</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#tc-worker"><span class="nav-number">2.4.1.</span> <span class="nav-text">tc.worker</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#tc-handleNodeUpdate"><span class="nav-number">2.4.1.1.</span> <span class="nav-text">tc.handleNodeUpdate</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#tc-handlePodUpdate"><span class="nav-number">2.4.1.2.</span> <span class="nav-text">tc.handlePodUpdate</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#tc-processPodOnNode"><span class="nav-number">2.4.1.3.</span> <span class="nav-text">tc.processPodOnNode</span></a></li></ol></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#nc-doNodeProcessingPassWorker"><span class="nav-number">2.5.</span> <span class="nav-text">nc.doNodeProcessingPassWorker</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#nc-doNoExecuteTaintingPass"><span class="nav-number">2.6.</span> <span class="nav-text">nc.doNoExecuteTaintingPass</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#nc-doEvictionPass"><span class="nav-number">2.7.</span> <span class="nav-text">nc.doEvictionPass</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#nc-monitorNodeHealth"><span class="nav-number">2.8.</span> <span class="nav-text">nc.monitorNodeHealth</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#nc-tryUpdateNodeHealth"><span class="nav-number">2.8.1.</span> <span class="nav-text">nc.tryUpdateNodeHealth</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#nc-handleDisruption"><span class="nav-number">2.8.2.</span> <span class="nav-text">nc.handleDisruption</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#nc-computeZoneStateFunc"><span class="nav-number">2.8.2.1.</span> <span class="nav-text">nc.computeZoneStateFunc</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#nc-setLimiterInZone"><span class="nav-number">2.8.2.2.</span> <span class="nav-text">nc.setLimiterInZone</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#小结"><span class="nav-number">2.8.3.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
