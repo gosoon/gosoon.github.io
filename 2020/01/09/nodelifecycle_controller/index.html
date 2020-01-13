@@ -87,7 +87,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。 NodeLifecycleController 的功能NodeLifecycleController 主要功能是定期监控 nod">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2020-01-09T12:58:39.303Z">
+<meta property="og:updated_time" content="2020-01-13T06:20:49.277Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="NodeController 源码分析">
 <meta name="twitter:description" content="在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。 NodeLifecycleController 的功能NodeLifecycleController 主要功能是定期监控 nod">
@@ -393,7 +393,6 @@
 </ul>
 <h4 id="NodeLifecycleController-中的-feature-gates"><a href="#NodeLifecycleController-中的-feature-gates" class="headerlink" title="NodeLifecycleController 中的 feature-gates"></a>NodeLifecycleController 中的 feature-gates</h4><p>在 NodeLifecycleController 用到了多个 feature-gates，此处先进行解释下：</p>
 <ul>
-<li><code>NodeLease</code> ：该特性在 v1.12 引入，v1.14 为 Beta 版本并默认启用，在 v1.17 中 GA；</li>
 <li><code>NodeDisruptionExclusion</code>：该特性在 v1.16 引入，Alpha 版本，默认为 false，其功能是当 node 存在 <code>node.kubernetes.io/exclude-disruption</code> 标签时，当 node 网络中断时其节点上的 pod 不会被驱逐掉；</li>
 <li><code>LegacyNodeRoleBehavior</code>：该特性在 v1.16 中引入，Alpha 版本且默认为 true，在创建 load balancers 以及中断处理时不会忽略具有 <code>node-role.kubernetes.io/master</code> label 的 node，该功能在 v1.19 中将被移除；</li>
 <li><code>TaintBasedEvictions</code>：该特性从 v1.13 开始为 Beta 版本，默认为 true。其功能是当 node 处于 <code>NodeNotReady</code>、<code>NodeUnreachable</code> 状态时为 node 添加对应的 taint，<code>TaintBasedEvictions</code> 添加的 taint effect 为 <code>NoExecute</code>，即会驱逐 node 上对应的 pod；</li>
