@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kubelet,qos,cgroup,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="kubernetes 中的 QosQoS(Quality of Service) 即服务质量，QoS 是一种控制机制，它提供了针对不同用户或者不同数据流采用相应不同的优先级，或者是根据应用程序的要求，保证数据流的性能达到一定的水准。kubernetes 中有三种 Qos，分别为：  1、Guaranteed：pod 的 requests 与 limits 设定的值相等； 2、Burstable：p">
+<meta name="keywords" content="kubelet,qos,cgroup">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes 中 Qos 的设计与实现">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kubernetes 中的 QosQoS(Quality of Service) 即服务质量，QoS 是一种控制机制，它提供了针对不同用户或者不同数据流采用相应不同的优先级，或者是根据应用程序的要求，保证数据流的性能达到一定的水准。kubernetes 中有三种 Qos，分别为：  1、Guaranteed：pod 的 requests 与 limits 设定的值相等； 2、Burstable：p">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/image-20200120164659896.png">
+<meta property="og:updated_time" content="2020-01-21T08:42:57.018Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernetes 中 Qos 的设计与实现">
+<meta name="twitter:description" content="kubernetes 中的 QosQoS(Quality of Service) 即服务质量，QoS 是一种控制机制，它提供了针对不同用户或者不同数据流采用相应不同的优先级，或者是根据应用程序的要求，保证数据流的性能达到一定的水准。kubernetes 中有三种 Qos，分别为：  1、Guaranteed：pod 的 requests 与 limits 设定的值相等； 2、Burstable：p">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/image-20200120164659896.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/">
+
+
+
+
+
+  <title>kubernetes 中 Qos 的设计与实现 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernetes 中 Qos 的设计与实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-01-21T16:28:30+08:00">
+                2020-01-21
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/01/21/kubelet_qos/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/01/21/kubelet_qos/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="kubernetes-中的-Qos"><a href="#kubernetes-中的-Qos" class="headerlink" title="kubernetes 中的 Qos"></a>kubernetes 中的 Qos</h3><p>QoS(Quality of Service) 即服务质量，QoS 是一种控制机制，它提供了针对不同用户或者不同数据流采用相应不同的优先级，或者是根据应用程序的要求，保证数据流的性能达到一定的水准。kubernetes 中有三种 Qos，分别为：</p>
+<ul>
+<li>1、<code>Guaranteed</code>：pod 的 requests 与 limits 设定的值相等；</li>
+<li>2、<code>Burstable</code>：pod requests 小于 limits 的值且不为 0；</li>
+<li>3、<code>BestEffort</code>：pod 的 requests 与 limits 均为 0；</li>
+</ul>
+<p>三者的优先级如下所示，依次递增：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">BestEffort -&gt; Burstable -&gt; Guaranteed</span><br></pre></td></tr></table></figure>
+<h4 id="不同-Qos-的本质区别"><a href="#不同-Qos-的本质区别" class="headerlink" title="不同 Qos 的本质区别"></a>不同 Qos 的本质区别</h4><p>三种 Qos 在调度和底层表现上都不一样：</p>
+<ul>
+<li>1、在调度时调度器只会根据 request 值进行调度；</li>
+<li>2、二是当系统 OOM上时对于处理不同 OOMScore 的进程表现不同，OOMScore 是针对 memory 的，当宿主上 memory 不足时系统会优先 kill 掉 OOMScore 值低的进程，可以使用  <code>$ cat /proc/$PID/oom_score</code> 查看进程的 OOMScore。OOMScore 的取值范围为 [-1000, 1000]，<code>Guaranteed</code> pod 的默认值为 -998，<code>Burstable</code> pod 的值为 2~999，<code>BestEffort</code> pod 的值为 1000，也就是说当系统 OOM 时，首先会 kill 掉 <code>BestEffort</code> pod 的进程，若系统依然处于 OOM 状态，然后才会 kill 掉  <code>Burstable</code> pod，最后是 <code>Guaranteed</code> pod；</li>
+<li>3、三是 cgroup 的配置不同，kubelet 为会三种 Qos 分别创建对应的 QoS level cgroups，<code>Guaranteed</code> Pod Qos 的 cgroup level 会直接创建在 <code>RootCgroup/kubepods</code> 下，<code>Burstable</code> Pod Qos 的创建在 <code>RootCgroup/kubepods/burstable</code> 下，<code>BestEffort</code> Pod Qos 的创建在 <code>RootCgroup/kubepods/BestEffort</code> 下，上文已经说了  root cgroup 可以通过 <code>$ mount | grep cgroup</code>看到，在 cgroup 的每个子系统下都会创建 Qos level cgroups， 此外在对应的 QoS level cgroups 还会为 pod 创建 Pod level cgroups；</li>
+</ul>
+<h3 id="启用-Qos-和-Pod-level-cgroup"><a href="#启用-Qos-和-Pod-level-cgroup" class="headerlink" title="启用 Qos 和 Pod level cgroup"></a>启用 Qos 和 Pod level cgroup</h3><p>在 kubernetes 中为了限制容器资源的使用，避免容器之间争抢资源或者容器影响所在的宿主机，kubelet 组件需要使用 cgroup 限制容器资源的使用量，cgroup 目前支持对进程多种资源的限制，而 kubelet 只支持限制 cpu、memory、pids、hugetlb 几种资源，与此资源有关的几个参数如下所示：<br><code>--cgroups-per-qos</code>：启用后会为每个 pod 以及 pod 对应的 Qos 创建 cgroups 层级树，默认启用；<br><code>--cgroup-root</code>：指定 root cgroup，如果不指定默认为“”，若为默认值则直接使用 root cgroup dir，在 node 上执行 <code>$ mount | grep cgroup</code> 可以看到 cgroup 所有子系统的挂载点，这些挂载点就是 root cgroup；<br><code>--cpu-manager-policy</code>：默认为 “none”，即默认不开启 ,支持使用 “static”，开启后可以支持对 <code>Guaranteed</code> Pod 进行绑核操作，绑核的主要目的是为了高效使用 cpu cache 以及内存节点；<br><code>--kube-reserved</code>：为 kubernetes 系统组件设置预留资源值，可以设置 cpu、memory、ephemeral-storage；<br><code>--kube-reserved-cgroup</code>：指定 kube-reserved 的 cgroup dir name，默认为 “/kube-reserved”；<br><code>--system-reserved</code>：为非 kubernetes 组件设置预留资源值，可以设置 cpu、memory、ephemeral-storage；<br><code>--system-reserved-cgroup</code>：设置 system-reserved 的 cgroup dir name，默认为 “/system-reserved”；<br><code>--qos-reserved</code>：Alpha feature，可以通过此参数为高优先级 pod 设置预留资源比例，目前只支持预留 memory，使用前需要开启 QOSReserved feature gate；</p>
+<p>当启用了 <code>--cgroups-per-qos</code> 后，kubelet 会为不同 Qos 创建对应的 level cgroups，在 Qos level cgroups 下也会为 pod 创建对应的 pod level cgroups，在 pod level cgroups 下最终会为 container 创建对应的 level cgroups，从 Qos –&gt; pod –&gt; container，层层限制每个 level cgroups 的资源使用量。</p>
+<h4 id="配置-cgroup-driver"><a href="#配置-cgroup-driver" class="headerlink" title="配置 cgroup driver"></a>配置 cgroup driver</h4><p>runtime 有两种 cgroup 驱动：一种是 <code>systemd</code>，另外一种是 <code>cgroupfs</code>：</p>
+<ul>
+<li><code>cgroupfs</code> 比较好理解，比如说要限制内存是多少、要用 CPU share 为多少，其实直接把 pid 写入到对应cgroup task 文件中，然后把对应需要限制的资源也写入相应的 memory cgroup 文件和 CPU 的 cgroup 文件就可以了；</li>
+<li>另外一个是 <code>systemd</code> 的 cgroup 驱动，这个驱动是因为 <code>systemd</code> 本身可以提供一个 cgroup 管理方式。所以如果用 <code>systemd</code> 做 cgroup 驱动的话，所有的写 cgroup 操作都必须通过 systemd 的接口来完成，不能手动更改 cgroup 的文件；</li>
+</ul>
+<p>kubernetes 中默认 kubelet 的 cgroup 驱动就是 <code>cgroupfs</code>，若要使用 <code>systemd</code>，则必须将 kubelet 以及 runtime 都需要配置为 <code>systemd</code> 驱动。</p>
+<blockquote>
+<p>关于 cgroupfs 与 systemd driver 的区别可以参考 k8s 官方文档：<a href="https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cgroup-drivers" target="_blank" rel="noopener">container-runtimes/#cgroup-drivers</a>，或者 runc 中的实现 <a href="https://github.com/opencontainers/runc/tree/master/libcontainer/cgroups" target="_blank" rel="noopener">github.com/opencontainers/runc/libcontainer/cgroups</a>。</p>
+</blockquote>
+<h3 id="kubernetes-中的-cgroup-level"><a href="#kubernetes-中的-cgroup-level" class="headerlink" title="kubernetes 中的 cgroup level"></a>kubernetes 中的 cgroup level</h3><p>kubelet 启动后会在 root cgroup 下面创建一个叫做 <code>kubepods</code> 子 cgroup，kubelet 会把本机的 allocatable 资源写入到 <code>kubepods</code> 下对应的 cgroup 文件中，比如 <code>kubepods/cpu.share</code>，而这个 cgroup 下面也会存放节点上面所有 pod 的 cgroup，以此来达到限制节点上所有 pod 资源的目的。在 <code>kubepods</code> cgroup 下面，kubernetes 会进一步再分别创建两个 QoS level cgroup，名字分别叫做 <code>burstable</code> 和 <code>besteffort</code>，这两个 QoS level 的 cgroup 是作为各自 QoS 级别的所有 Pod 的父 cgroup 来存在的，在为 pod 创建 cgroup 时，首先在对应的 Qos cgroup 下创建 pod level cgroup，然后在 pod level cgroup 继续创建对应的 container level cgroup，对于 <code>Guaranteed</code> Qos 对应的 pod 会直接在 <code>kubepods</code> 同级的 cgroup 中创建 pod cgroup。</p>
+<p>目前 kubernetes 仅支持  cpu、memory、pids 、hugetlb 四个 cgroup 子系统。</p>
+<p>当 kubernetes 在收到一个 pod 的资源申请信息后通过 kubelet 为 pod 分配资源，kubelet 基于 pod 申请的资源以及 pod 对应的 QoS 级别来通过 cgroup 机制最终为这个 pod 分配资源的，针对每一种资源，它会做以下几件事情：</p>
+<ul>
+<li>首先判断 pod 属于哪种 Qos，在对应的 Qos level cgroup 下对 pod 中的每一个容器在 cgroup 所有子系统下都创建一个 pod level cgroup 以及 container level cgroup，并且 pod level cgroup 是 container level cgroup 的父 cgroup，Qos level cgroup 在 kubelet 初始化时已经创建完成了；</li>
+<li>然后根据 pod 的资源信息更新 QoS level cgroup 中的值；</li>
+<li>最后会更新 <code>kubepods</code> level cgroup 中的值；</li>
+</ul>
+<p>对于每一个 pod 设定的 requests 和 limits，kubernetes 都会转换为 cgroup 中的计算方式，CPU 的转换方式如下所示：</p>
+<ul>
+<li>cpu.shares = (cpu in millicores * 1024) / 1000</li>
+<li>cpu.cfs_period_us = 100000 (i.e. 100ms)</li>
+<li>cpu.cfs_quota_us = quota = (cpu in millicores * 100000) / 1000</li>
+<li>memory.limit_in_bytes</li>
+</ul>
+<p>CPU 最终都会转换为以微秒为单位，memory 会转换为以 bytes 为单位。</p>
+<p>以下是 kubernetes 中的 cgroup level 的一个示例，此处仅展示 cpu、memory 对应的子 cgroup：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">|-- blkio</span><br><span class="line">|-- cpu -&gt; cpu,cpuacct</span><br><span class="line">|-- cpu,cpuacct</span><br><span class="line">|   |-- init.scope</span><br><span class="line">|   |-- kubepods</span><br><span class="line">|   |   |-- besteffort</span><br><span class="line">|   |   |-- burstable</span><br><span class="line">|   |   `-- podd15c4b83-c250-4f1e-94ff-8a4bf31c6f25</span><br><span class="line">|   |-- system.slice</span><br><span class="line">|   `-- user.slice</span><br><span class="line">|-- cpuacct -&gt; cpu,cpuacct</span><br><span class="line">|-- cpuset</span><br><span class="line">|   |-- kubepods</span><br><span class="line">|   |   |-- besteffort</span><br><span class="line">|   |   |-- burstable</span><br><span class="line">|   |   `-- podd15c4b83-c250-4f1e-94ff-8a4bf31c6f25</span><br><span class="line">|-- devices</span><br><span class="line">|-- hugetlb</span><br><span class="line">|-- memory</span><br><span class="line">|   |-- init.scope</span><br><span class="line">|   |-- kubepods</span><br><span class="line">|   |   |-- besteffort</span><br><span class="line">|   |   |-- burstable</span><br><span class="line">|   |   `-- podd15c4b83-c250-4f1e-94ff-8a4bf31c6f25</span><br><span class="line">|   |-- system.slice</span><br><span class="line">|   |   |-- -.mount</span><br><span class="line">|   `-- user.slice</span><br><span class="line">|-- net_cls -&gt; net_cls,net_prio</span><br><span class="line">|-- net_cls,net_prio</span><br><span class="line">|-- net_prio -&gt; net_cls,net_prio</span><br><span class="line">|-- perf_event</span><br><span class="line">|-- pids</span><br><span class="line">`-- systemd</span><br></pre></td></tr></table></figure>
+<p><img src="http://cdn.tianfeiyu.com/image-20200120164659896.png" alt=""></p>
+<p>例如，当创建资源如下所示的 pod：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">spec:</span><br><span class="line">  containers:</span><br><span class="line">  - name: nginx</span><br><span class="line">    image: nginx:latest</span><br><span class="line">    imagePullPolicy: IfNotPresent</span><br><span class="line">    resources:</span><br><span class="line">      requests:</span><br><span class="line">        cpu: 250m</span><br><span class="line">        memory: 1Gi</span><br><span class="line">      limits:</span><br><span class="line">        cpu: 500m</span><br><span class="line">        memory: 2Gi</span><br></pre></td></tr></table></figure>
+<p>首先会根据 pod 的 Qos 该 pod 为 burstable 在其所属 Qos 下创建 <code>ROOT/kubepods/burstable/pod&lt;UID&gt;/container&lt;UID&gt;</code> 两个 cgroup level，然后会更新 pod 的父 cgroup 也就是 <code>burstable/</code> cgroup 中的值，最后会更新 <code>kubepods</code> cgroup 中的值，下面会针对每个 cgroup level 一一进行解释。</p>
+<h4 id="Container-level-cgroups"><a href="#Container-level-cgroups" class="headerlink" title="Container level cgroups"></a>Container level cgroups</h4><p>在 Container level cgroups 中，kubelet 会根据上述公式将 pod 中每个 container 的资源转换为 cgroup 中的值并写入到对应的文件中。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">/sys/fs/cgroup/cpu/kubepods/burstable/pod&lt;UID&gt;/container&lt;UID&gt;/cpu.shares = 256</span><br><span class="line">/sys/fs/cgroup/cpu/kubepods/burstable/pod&lt;UID&gt;/container&lt;UID&gt;/cpu.cfs_quota_us = 50000</span><br><span class="line">/sys/fs/cgroup/memory/kubepods/burstable/pod&lt;UID&gt;/container&lt;UID&gt;/memory.limit_in_bytes = 104857600</span><br></pre></td></tr></table></figure>
+<h4 id="Pod-level-cgroups"><a href="#Pod-level-cgroups" class="headerlink" title="Pod level cgroups"></a>Pod level cgroups</h4><p>在创建完 container level 的 cgroup 之后，kubelet 会为同属于某个 pod 的 containers 创建一个 pod level cgroup。为何要引入 pod level cgroup，主要是基于以下几点原因：</p>
+<ul>
+<li>方便对 pod 内的容器资源进行统一的限制；</li>
+<li>方便对 pod 使用的资源进行统一统计；</li>
+</ul>
+<p>对于不同 Pod level cgroups 的设置方法如下所示：</p>
+<h5 id="Guaranteed-Pod-QoS"><a href="#Guaranteed-Pod-QoS" class="headerlink" title="Guaranteed Pod QoS"></a>Guaranteed Pod QoS</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pod&lt;UID&gt;/cpu.shares = sum(pod.spec.containers.resources.requests[cpu])</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_period_us = 100000</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_quota_us = sum(pod.spec.containers.resources.limits[cpu])</span><br><span class="line">pod&lt;UID&gt;/memory.limit_in_bytes = sum(pod.spec.containers.resources.limits[memory])</span><br></pre></td></tr></table></figure>
+<h5 id="Burstable-Pod-QoS"><a href="#Burstable-Pod-QoS" class="headerlink" title="Burstable Pod QoS"></a>Burstable Pod QoS</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pod&lt;UID&gt;/cpu.shares = sum(pod.spec.containers.resources.requests[cpu])</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_period_us = 100000</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_quota_us = sum(pod.spec.containers.resources.limits[cpu])</span><br><span class="line">pod&lt;UID&gt;/memory.limit_in_bytes = sum(pod.spec.containers.resources.limits[memory])</span><br></pre></td></tr></table></figure>
+<h5 id="BestEffort-Pod-QoS"><a href="#BestEffort-Pod-QoS" class="headerlink" title="BestEffort Pod QoS"></a>BestEffort Pod QoS</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pod&lt;UID&gt;/cpu.shares = 2</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_quota_us = -1</span><br></pre></td></tr></table></figure>
+<p><code>cpu.shares</code> 指定了 cpu 可以使用的下限，cpu 的上限通过使用 <code>cpu.cfs_period_us + cpu.cfs_quota_us</code> 两个参数做动态绝对配额，两个参数的意义如下所示：</p>
+<ul>
+<li>cpu.cfs_period_us：指 cpu 使用时间的周期统计；</li>
+<li>cpu.cfs_quota_us：指周期内允许占用的 cpu 时间(指单核的时间, 多核则需要在设置时累加) ；</li>
+</ul>
+<p>container runtime 中 <code>cpu.cfs_period_us</code> 的值默认为 100000。若 kubelet 启用了 <code>--cpu-manager-policy=static</code> 时，对于 <code>Guaranteed</code> Qos，如果它的 request 是一个整数的话，cgroup 会同时设置 <code>cpuset.cpus</code> 和 <code>cpuset.mems</code> 两个参数以此来对它进行绑核。</p>
+<p>如果 pod 指定了 requests 和 limits，kubelet 会按以上的计算方式为 pod 设置资源限制，如果没有指定 limit 的话，那么 <code>cpu.cfs_quota_us</code> 将会被设置为 -1，即没有限制。而如果 limit 和 request 都没有指定的话，<code>cpu.shares</code> 将会被指定为 2，这个是 <code>cpu.shares</code> 允许指定的最小数值了，可见针对这种 pod，kubernetes 只会给它分配最少的 cpu 资源。而对于内存来说，如果没有 limit 的指定的话，<code>memory.limit_in_bytes</code> 将会被指定为一个非常大的值，一般是 2^64 ，可见含义就是不对内存做出限制。</p>
+<p>针对上面的例子，其 pod level cgroups 中的配置如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pod&lt;UID&gt;/cpu.shares = 102</span><br><span class="line">pod&lt;UID&gt;/cpu.cfs_quota_us = 20000</span><br></pre></td></tr></table></figure>
+<h4 id="QoS-level-cgroups"><a href="#QoS-level-cgroups" class="headerlink" title="QoS level cgroups"></a>QoS level cgroups</h4><p>上文已经提到了 kubelet 会首先创建 kubepods cgroup，然后会在 kubepods cgroup 下面再分别创建 burstable 和 besteffort 两个 QoS level cgroup，那么这两个 QoS level cgroup 存在的目的是什么？为什么不为 guaranteed Qos 创建 cgroup level？</p>
+<p>首先看一下三种 QoS level cgroups 的设置方法，对于 guaranteed Qos 因其直接使用 root cgroup，此处只看另外两种的计算方式：</p>
+<p><code>Burstable cgroup</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ROOT/burstable/cpu.shares = max(sum(Burstable pods cpu requests）, 2)</span><br><span class="line">ROOT/burstable/memory.limit_in_bytes =</span><br><span class="line">    Node.Allocatable - &#123;(summation of memory requests of `Guaranteed` pods)*(reservePercent / 100)&#125;</span><br></pre></td></tr></table></figure>
+<p><code>BestEffort cgroup</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ROOT/besteffort/cpu.shares = 2</span><br><span class="line">ROOT/besteffort/memory.limit_in_bytes =</span><br><span class="line">    Node.Allocatable - &#123;(summation of memory requests of all `Guaranteed` and `Burstable` pods)*(reservePercent / 100)&#125;</span><br></pre></td></tr></table></figure>
+<p>首先第一个问题，所有 guaranteed 级别的 pod 的 cgroup 直接位于 kubepods 这个 cgroup 之下，和 burstable、besteffort QoS level cgroup 同级，主要原因在于 guaranteed 级别的 pod 有明确的资源申请量(request)和资源限制量(limit)，所以并不需要一个统一的 QoS level 的 cgroup 进行管理或限制。</p>
+<p>针对 burstable 和 besteffort 这两种类型的 pod，在默认情况下，kubernetes 则是希望能尽可能地提升资源利用率，所以并不会对这两种 QoS 的 pod 的资源使用做限制。但在某些场景下我们还是希望能够尽可能保证 guaranteed level pod 这种高 QoS 级别 pod 的资源，尤其是不可压缩资源（如内存），不要被低 QoS 级别的 pod 抢占，导致高 QoS 级别的 pod 连它 request 的资源量的资源都无法得到满足，此时就可以使用 <code>--qos-reserved</code> 为高 Qos pod 进行预留资源，举个例子，当前机器的 allocatable 内存资源量为 8G，当为这台机器的 kubelet 开启 <code>--qos-reserved</code> 参数后，并且设置为 memory=100%，如果此时创建了一个内存 request 为 1G 的 guaranteed level 的 pod，那么需要预留的资源就是 1G，此时这台机器上面的 burstable QoS level cgroup 的 <code>memory.limit_in_bytes</code> 的值将会被设置为 7G，besteffort QoS level cgroup 的 <code>memory.limit_in_bytes</code> 的值也会被设置为 7G。而如果此时又创建了一个 burstable level 的 pod，它的内存申请量为 2G，那么此时需要预留的资源为 3G，而 besteffort QoS level cgroup 的 <code>memory.limit_in_bytes</code> 的值也会被调整为 5G。</p>
+<p>由上面的公式也可以看到，burstable 的 cgroup 需要为比他等级高的 guaranteed 级别的 pod 的内存资源做预留，而 besteffort 需要为 burstable 和 guaranteed 都要预留内存资源。</p>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>kubelet 启动时首先会创建 root cgroups 以及为 Qos 创建对应的 level cgroups，然后当 pod 调度到节点上时，kubelet 也会为 pod 以及 pod 下的 container 创建对应的 level cgroups。root cgroups 限制节点上所有 pod 的资源使用量，Qos  level cgroups 限制不同 Qos 下 pod 的资源使用量，Pod  level cgroups 限制一个 pod 下的资源使用量，Container level cgroups 限制 pod 下 container 的资源使用量。</p>
+<p>节点上 cgroup 层级树如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">$ROOT</span><br><span class="line">  |</span><br><span class="line">  +- Pod1</span><br><span class="line">  |   |</span><br><span class="line">  |   +- Container1</span><br><span class="line">  |   +- Container2</span><br><span class="line">  |   ...</span><br><span class="line">  +- Pod2</span><br><span class="line">  |   +- Container3</span><br><span class="line">  |   ...</span><br><span class="line">  +- ...</span><br><span class="line">  |</span><br><span class="line">  +- burstable</span><br><span class="line">  |   |</span><br><span class="line">  |   +- Pod3</span><br><span class="line">  |   |   |</span><br><span class="line">  |   |   +- Container4</span><br><span class="line">  |   |   ...</span><br><span class="line">  |   +- Pod4</span><br><span class="line">  |   |   +- Container5</span><br><span class="line">  |   |   ...</span><br><span class="line">  |   +- ...</span><br><span class="line">  |</span><br><span class="line">  +- besteffort</span><br><span class="line">  |   |</span><br><span class="line">  |   +- Pod5</span><br><span class="line">  |   |   |</span><br><span class="line">  |   |   +- Container6</span><br><span class="line">  |   |   +- Container7</span><br><span class="line">  |   |   ...</span><br><span class="line">  |   +- ...</span><br></pre></td></tr></table></figure>
+<h3 id="QOSContainerManager-源码分析"><a href="#QOSContainerManager-源码分析" class="headerlink" title="QOSContainerManager 源码分析"></a>QOSContainerManager 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>qos 的具体实现是在 kubelet 中的 <code>QOSContainerManager</code>，<code>QOSContainerManager</code> 被包含在 <code>containerManager</code> 模块中，kubelet 的 <code>containerManager</code> 模块中包含多个模块还有，<code>cgroupManager</code>、<code>containerManager</code>、<code>nodeContainerManager</code>、<code>podContainerManager</code>、<code>topologyManager</code>、<code>deviceManager</code>、<code>cpuManager</code> 等。</p>
+<h4 id="qosContainerManager-的初始化"><a href="#qosContainerManager-的初始化" class="headerlink" title="qosContainerManager 的初始化"></a>qosContainerManager 的初始化</h4><p>首先看 <code>QOSContainerManager</code> 的初始化，因为 <code>QOSContainerManager</code> 包含在 <code>containerManager</code> 中，在初始化 <code>containerManager</code> 时也会初始化 <code>QOSContainerManager</code>。</p>
+<p><code>k8s.io/kubernetes/cmd/kubelet/app/server.go:471</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh &lt;-chan struct&#123;&#125;) (err error) &#123;</span><br><span class="line">	......</span><br><span class="line">	kubeDeps.ContainerManager, err = cm.NewContainerManager(......)</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/container_manager_linux.go:200</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">// 在 NewContainerManager 中会初始化 qosContainerManager</span><br><span class="line">func NewContainerManager(......) (ContainerManager, error) &#123;</span><br><span class="line">    ......</span><br><span class="line">    qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="qosContainerManager-的启动"><a href="#qosContainerManager-的启动" class="headerlink" title="qosContainerManager 的启动"></a>qosContainerManager 的启动</h4><p>在调用 <code>kl.containerManager.Start</code> 启动 <code>containerManager</code> 时也会启动 <code>qosContainerManager</code>，代码如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kubelet.go:1361</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) initializeRuntimeDependentModules() &#123;</span><br><span class="line">    ......</span><br><span class="line">    if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil &#123;</span><br><span class="line">        klog.Fatalf(&quot;Failed to start ContainerManager %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="cm-setupNode"><a href="#cm-setupNode" class="headerlink" title="cm.setupNode"></a>cm.setupNode</h5><p><code>cm.setupNode</code> 是启动 <code>qosContainerManager</code> 的方法，其主要逻辑为：</p>
+<ul>
+<li>1、检查 kubelet 依赖的内核参数是否配置正确；</li>
+<li>2、若 <code>CgroupsPerQOS</code> 为 true，首先调用 <code>cm.createNodeAllocatableCgroups</code> 创建 root cgroup，然后调用 <code>cm.qosContainerManager.Start</code> 启动 <code>qosContainerManager</code>；</li>
+<li>3、调用 <code>cm.enforceNodeAllocatableCgroups</code> 计算 node 的 allocatable 资源并配置到 root cgroup 中，然后判断是否启用了 <code>SystemReserved</code> 以及 <code>KubeReserved</code> 并配置对应的 cgroup；</li>
+<li>4、为系统组件配置对应的 cgroup 资源限制；</li>
+<li>5、为系统进程配置 oom_score_adj；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/container_manager_linux.go:568</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br></pre></td><td class="code"><pre><span class="line">func (cm *containerManagerImpl) Start(......) &#123;</span><br><span class="line">    ......</span><br><span class="line">    if err := cm.setupNode(activePods); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 在 setupNode 中会启动 qosContainerManager</span><br><span class="line">func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error &#123;</span><br><span class="line">    f, err := validateSystemRequirements(cm.mountUtil)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if !f.cpuHardcapping &#123;</span><br><span class="line">        cm.status.SoftRequirements = fmt.Errorf(&quot;CPU hardcapping unsupported&quot;)</span><br><span class="line">    &#125;</span><br><span class="line">    b := KernelTunableModify</span><br><span class="line">    if cm.GetNodeConfig().ProtectKernelDefaults &#123;</span><br><span class="line">        b = KernelTunableError</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、检查依赖的内核参数是否配置正确</span><br><span class="line">    if err := setupKernelTunables(b); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if cm.NodeConfig.CgroupsPerQOS &#123;</span><br><span class="line">        // 2、创建 root cgroup，即 kubepods dir</span><br><span class="line">        if err := cm.createNodeAllocatableCgroups(); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">        // 3、启动 qosContainerManager</span><br><span class="line">        err = cm.qosContainerManager.Start(cm.getNodeAllocatableAbsolute, activePods)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to initialize top level QOS containers: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、为 node 配置 cgroup 资源限制</span><br><span class="line">    if err := cm.enforceNodeAllocatableCgroups(); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    if cm.ContainerRuntime == &quot;docker&quot; &#123;</span><br><span class="line">        cm.periodicTasks = append(cm.periodicTasks, func() &#123;</span><br><span class="line">            cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                klog.Error(err)</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">            cm.Lock()</span><br><span class="line">            defer cm.Unlock()</span><br><span class="line">            cm.RuntimeCgroupsName = cont</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、为系统组件配置对应的 cgroup 资源限制</span><br><span class="line">    if cm.SystemCgroupsName != &quot;&quot; &#123;</span><br><span class="line">        if cm.SystemCgroupsName == &quot;/&quot; &#123;</span><br><span class="line">            return fmt.Errorf(&quot;system container cannot be root (\&quot;/\&quot;)&quot;)</span><br><span class="line">        &#125;</span><br><span class="line">        cont := newSystemCgroups(cm.SystemCgroupsName)</span><br><span class="line">        cont.ensureStateFunc = func(manager *fs.Manager) error &#123;</span><br><span class="line">            return ensureSystemCgroups(&quot;/&quot;, manager)</span><br><span class="line">        &#125;</span><br><span class="line">        systemContainers = append(systemContainers, cont)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、为系统进程配置 oom_score_adj</span><br><span class="line">    if cm.KubeletCgroupsName != &quot;&quot; &#123;</span><br><span class="line">        cont := newSystemCgroups(cm.KubeletCgroupsName)</span><br><span class="line">        allowAllDevices := true</span><br><span class="line">        manager := fs.Manager&#123;</span><br><span class="line">            Cgroups: &amp;configs.Cgroup&#123;</span><br><span class="line">                Parent: &quot;/&quot;,</span><br><span class="line">                Name:   cm.KubeletCgroupsName,</span><br><span class="line">                Resources: &amp;configs.Resources&#123;</span><br><span class="line">                    AllowAllDevices: &amp;allowAllDevices,</span><br><span class="line">                &#125;,</span><br><span class="line">            &#125;,</span><br><span class="line">        &#125;</span><br><span class="line">        cont.ensureStateFunc = func(_ *fs.Manager) error &#123;</span><br><span class="line">            return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, &amp;manager)</span><br><span class="line">        &#125;</span><br><span class="line">        systemContainers = append(systemContainers, cont)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        cm.periodicTasks = append(cm.periodicTasks, func() &#123;</span><br><span class="line">            if err := ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, nil); err != nil &#123;</span><br><span class="line">                klog.Error(err)</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">            cont, err := getContainer(os.Getpid())</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                klog.Errorf(&quot;failed to find cgroups of kubelet - %v&quot;, err)</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">            cm.Lock()</span><br><span class="line">            defer cm.Unlock()</span><br><span class="line"></span><br><span class="line">            cm.KubeletCgroupsName = cont</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    cm.systemContainers = systemContainers</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="cm-qosContainerManager-Start"><a href="#cm-qosContainerManager-Start" class="headerlink" title="cm.qosContainerManager.Start"></a>cm.qosContainerManager.Start</h5><p><code>cm.qosContainerManager.Start</code> 主要逻辑为：</p>
+<ul>
+<li>1、检查 root cgroup 是否存在，root cgroup 会在启动 <code>qosContainerManager</code> 之前创建；</li>
+<li>2、为 <code>Burstable</code> 和 <code>BestEffort</code> 创建 Qos level cgroups 并设置默认值；</li>
+<li>3、调用 <code>m.UpdateCgroups</code> 每分钟定期更新 cgroup 信息；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/qos_container_manager_linux.go:80</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line">func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error &#123;</span><br><span class="line">    cm := m.cgroupManager</span><br><span class="line">    rootContainer := m.cgroupRoot</span><br><span class="line"></span><br><span class="line">    // 1、检查 root cgroup 是否存在</span><br><span class="line">    if !cm.Exists(rootContainer) &#123;</span><br><span class="line">        return fmt.Errorf(&quot;root container %v doesn&apos;t exist&quot;, rootContainer)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、为 Qos 配置 Top level cgroups</span><br><span class="line">    qosClasses := map[v1.PodQOSClass]CgroupName&#123;</span><br><span class="line">        v1.PodQOSBurstable:  NewCgroupName(rootContainer, strings.ToLower(string(v1.PodQOSBurstable))),</span><br><span class="line">        v1.PodQOSBestEffort: NewCgroupName(rootContainer, strings.ToLower(string(v1.PodQOSBestEffort))),</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、为 Qos 创建 top level cgroups</span><br><span class="line">    for qosClass, containerName := range qosClasses &#123;</span><br><span class="line">        resourceParameters := &amp;ResourceConfig&#123;&#125;</span><br><span class="line">        // 4、为 BestEffort QoS cpu.shares 设置默认值，默认为 2</span><br><span class="line">        if qosClass == v1.PodQOSBestEffort &#123;</span><br><span class="line">            minShares := uint64(MinShares)</span><br><span class="line">            resourceParameters.CpuShares = &amp;minShares</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        containerConfig := &amp;CgroupConfig&#123;</span><br><span class="line">            Name:               containerName,</span><br><span class="line">            ResourceParameters: resourceParameters,</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 5、配置 huge page size</span><br><span class="line">        m.setHugePagesUnbounded(containerConfig)</span><br><span class="line"></span><br><span class="line">        // 6、为 Qos 创建 cgroup 目录</span><br><span class="line">        if !cm.Exists(containerName) &#123;</span><br><span class="line">            if err := cm.Create(containerConfig); err != nil &#123;</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            if err := cm.Update(containerConfig); err != nil &#123;</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 7、每分钟定期更新 cgroup 配置</span><br><span class="line">    go wait.Until(func() &#123;</span><br><span class="line">        err := m.UpdateCgroups()</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            klog.Warningf(&quot;[ContainerManager] Failed to reserve QoS requests: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, periodicQOSCgroupUpdateInterval, wait.NeverStop)</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="m-UpdateCgroups"><a href="#m-UpdateCgroups" class="headerlink" title="m.UpdateCgroups"></a>m.UpdateCgroups</h5><p><code>m.UpdateCgroups</code>  是用来更新 Qos level cgroup 中的值，其主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>m.setCPUCgroupConfig</code> 计算 node 上的 activePods 的资源以此来更新 <code>bestEffort</code> 和 <code>burstable</code> Qos level cgroup 的 <code>cpu.shares</code> 值，<code>besteffort</code> 的 <code>cpu.shares</code> 值默认为 2，<code>burstable cpu.shares</code> 的计算方式为：max(sum(Burstable pods cpu requests）* 1024 /1000, 2)；</li>
+<li>2、调用<code>m.setHugePagesConfig</code> 更新 huge pages；</li>
+<li>3、检查是否启用了<code>--qos-reserved</code> 参数，若启用了则调用 <code>m.setMemoryReserve</code> 计算每个 Qos class 中需要设定的值然后调用 <code>m.cgroupManager.Update</code> 更新 cgroup 中的值；</li>
+<li>4、最后调用 <code>m.cgroupManager.Update</code> 更新 cgroup 中的值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/qos_container_manager_linux.go:269</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line">func (m *qosContainerManagerImpl) UpdateCgroups() error &#123;</span><br><span class="line">    m.Lock()</span><br><span class="line">    defer m.Unlock()</span><br><span class="line"></span><br><span class="line">    qosConfigs := map[v1.PodQOSClass]*CgroupConfig&#123;</span><br><span class="line">        v1.PodQOSBurstable: &#123;</span><br><span class="line">            Name:               m.qosContainersInfo.Burstable,</span><br><span class="line">            ResourceParameters: &amp;ResourceConfig&#123;&#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">        v1.PodQOSBestEffort: &#123;</span><br><span class="line">            Name:               m.qosContainersInfo.BestEffort,</span><br><span class="line">            ResourceParameters: &amp;ResourceConfig&#123;&#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 1、更新 bestEffort 和 burstable Qos level cgroup 的 cpu.shares 值</span><br><span class="line">    if err := m.setCPUCgroupConfig(qosConfigs); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、调用 m.setHugePagesConfig 更新 huge pages</span><br><span class="line">    if err := m.setHugePagesConfig(qosConfigs); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、设置资源预留</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) &#123;</span><br><span class="line">        for resource, percentReserve := range m.qosReserved &#123;</span><br><span class="line">            switch resource &#123;</span><br><span class="line">            case v1.ResourceMemory:</span><br><span class="line">                m.setMemoryReserve(qosConfigs, percentReserve)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        updateSuccess := true</span><br><span class="line">        for _, config := range qosConfigs &#123;</span><br><span class="line">            err := m.cgroupManager.Update(config)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                updateSuccess = false</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        if updateSuccess &#123;</span><br><span class="line">            klog.V(4).Infof(&quot;[ContainerManager]: Updated QoS cgroup configuration&quot;)</span><br><span class="line">            return nil</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        for resource, percentReserve := range m.qosReserved &#123;</span><br><span class="line">            switch resource &#123;</span><br><span class="line">            case v1.ResourceMemory:</span><br><span class="line">                m.retrySetMemoryReserve(qosConfigs, percentReserve)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、更新 cgroup 中的值</span><br><span class="line">    for _, config := range qosConfigs &#123;</span><br><span class="line">        err := m.cgroupManager.Update(config)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="m-cgroupManager-Update"><a href="#m-cgroupManager-Update" class="headerlink" title="m.cgroupManager.Update"></a>m.cgroupManager.Update</h5><p><code>m.cgroupManager.Update</code> 方法主要是根据 cgroup 配置来更新 cgroup 中的值，其主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>m.buildCgroupPaths</code> 创建对应的 cgroup 目录，在每个 cgroup 子系统下面都有一个 kubelet 对应的 root cgroup 目录；</li>
+<li>2、调用  <code>setSupportedSubsystems</code> 更新的 cgroup 子系统中的值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/cgroup_manager_linux.go:409</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    resourceConfig := cgroupConfig.ResourceParameters</span><br><span class="line">    resources := m.toResources(resourceConfig)</span><br><span class="line"></span><br><span class="line">    cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)</span><br><span class="line"></span><br><span class="line">    libcontainerCgroupConfig := &amp;libcontainerconfigs.Cgroup&#123;</span><br><span class="line">        Resources: resources,</span><br><span class="line">        Paths:     cgroupPaths,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if m.adapter.cgroupManagerType == libcontainerSystemd &#123;</span><br><span class="line">        updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) &amp;&amp; cgroupConfig.ResourceParameters != nil &amp;&amp; cgroupConfig.               ResourceParameters.PidsLimit != nil &#123;</span><br><span class="line">        libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;failed to set supported cgroup subsystems for cgroup %v: %v&quot;, cgroupConfig.Name, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="setSupportedSubsystem"><a href="#setSupportedSubsystem" class="headerlink" title="setSupportedSubsystem"></a>setSupportedSubsystem</h6><p><code>setSupportedSubsystems</code> 首先通过 <code>getSupportedSubsystems</code> 获取 kubelet 支持哪些 cgroup 子系统，然后调用 <code>sys.Set</code> 设置对应子系统的值，<code>sys.Set</code> 是调用 <code>runc/libcontainer</code> 中的包进行设置的，其主要逻辑是在 cgroup 子系统对应的文件中写入值。</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/cgroup_manager_linux.go:345</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error &#123;</span><br><span class="line">    for sys, required := range getSupportedSubsystems() &#123;</span><br><span class="line">        if _, ok := cgroupConfig.Paths[sys.Name()]; !ok &#123;</span><br><span class="line">            if required &#123;</span><br><span class="line">                return fmt.Errorf(&quot;failed to find subsystem mount for required subsystem: %v&quot;, sys.Name())</span><br><span class="line">            &#125;</span><br><span class="line">            ......</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to set config for supported subsystems : %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>例如为 cgroup 中 cpu 子系统设置值的方法如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error &#123;</span><br><span class="line">    if cgroup.Resources.CpuShares != 0 &#123;</span><br><span class="line">        if err := writeFile(path, &quot;cpu.shares&quot;, strconv.FormatUint(cgroup.Resources.CpuShares, 10)); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if cgroup.Resources.CpuPeriod != 0 &#123;</span><br><span class="line">        if err := writeFile(path, &quot;cpu.cfs_period_us&quot;, strconv.FormatUint(cgroup.Resources.CpuPeriod, 10)); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if cgroup.Resources.CpuQuota != 0 &#123;</span><br><span class="line">        if err := writeFile(path, &quot;cpu.cfs_quota_us&quot;, strconv.FormatInt(cgroup.Resources.CpuQuota, 10)); err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return s.SetRtSched(path, cgroup)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Pod-Level-Cgroup"><a href="#Pod-Level-Cgroup" class="headerlink" title="Pod Level Cgroup"></a>Pod Level Cgroup</h4><p>Pod Level cgroup 是 kubelet 在创建 pod 时创建的，创建 pod 是在 kubelet 的 <code>syncPod</code> 方法中进行的，在 <code>syncPod</code> 方法中首先会调用 <code>kl.containerManager.UpdateQOSCgroups</code> 更新 Qos Level cgroup，然后调用 <code>pcm.EnsureExists</code> 创建 pod level cgroup。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) syncPod(o syncPodOptions) error &#123;</span><br><span class="line">        ......</span><br><span class="line">        if !kl.podIsTerminated(pod) &#123;</span><br><span class="line">            ......</span><br><span class="line">            if !(podKilled &amp;&amp; pod.Spec.RestartPolicy == v1.RestartPolicyNever) &#123;</span><br><span class="line">                if !pcm.Exists(pod) &#123;</span><br><span class="line">                    if err := kl.containerManager.UpdateQOSCgroups(); err != nil &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                    if err := pcm.EnsureExists(pod); err != nil &#123;</span><br><span class="line">                        ......</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>EnsureExists</code> 的主要逻辑是检查 pod 的 cgroup 是否存在，若不存在则调用 <code>m.cgroupManager.Create</code> 进行创建。</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/cm/pod_container_manager_linux.go:79</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error &#123;</span><br><span class="line">    podContainerName, _ := m.GetPodContainerName(pod)</span><br><span class="line"></span><br><span class="line">    alreadyExists := m.Exists(pod)</span><br><span class="line">    if !alreadyExists &#123;</span><br><span class="line">        containerConfig := &amp;CgroupConfig&#123;</span><br><span class="line">            Name:               podContainerName,</span><br><span class="line">            ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod),</span><br><span class="line">        &#125;</span><br><span class="line">        if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) &amp;&amp; m.podPidsLimit &gt; 0 &#123;</span><br><span class="line">            containerConfig.ResourceParameters.PidsLimit = &amp;m.podPidsLimit</span><br><span class="line">        &#125;</span><br><span class="line">        if err := m.cgroupManager.Create(containerConfig); err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to create container for %v : %v&quot;, podContainerName, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Container-Level-Cgroup"><a href="#Container-Level-Cgroup" class="headerlink" title="Container Level Cgroup"></a>Container Level Cgroup</h4><p>Container Level Cgroup 是通过 runtime 进行创建的，若使用 runc  其会调用 runc 的 <code>InitProcess.start</code>  方法对 cgroup 资源组进行配置与应用。</p>
+<p><code>k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/process_linux.go:282</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">func (p *initProcess) start() error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 调用 p.manager.Apply 为进程配置 cgroup</span><br><span class="line">    if err := p.manager.Apply(p.pid()); err != nil &#123;</span><br><span class="line">        return newSystemErrorWithCause(err, &quot;applying cgroup configuration for process&quot;)</span><br><span class="line">    &#125;</span><br><span class="line">    if p.intelRdtManager != nil &#123;</span><br><span class="line">        if err := p.intelRdtManager.Apply(p.pid()); err != nil &#123;</span><br><span class="line">            return newSystemErrorWithCause(err, &quot;applying Intel RDT configuration for process&quot;)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>kubernetes 中有三种 Qos，分别为 Guaranteed、Burstable、BestEffort，三种 Qos 以 node 上 allocatable 资源量为基于为 pod 进行分配，并通过多个 level cgroup 进行层层限制，对 cgroup 的配置都是通过调用 <code>runc/libcontainer/cgroups/fs</code> 中的方法进行资源更新的。对于 Qos level cgroup，kubelet 会根据以下事件动态更新：</p>
+<ul>
+<li>1、kubelet 服务启动时；</li>
+<li>2、在创建 pod level cgroup 之前，即创建 pod 前；</li>
+<li>3、在删除 pod level cgroup 后；</li>
+<li>4、定期检测是否需要为 qos level cgroup 预留资源；</li>
+</ul>
+<p>参考：</p>
+<p><a href="https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cgroup-drivers" target="_blank" rel="noopener">https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cgroup-drivers</a></p>
+<p><a href="https://zhuanlan.zhihu.com/p/38359775" target="_blank" rel="noopener">https://zhuanlan.zhihu.com/p/38359775</a></p>
+<p><a href="https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-resource-management.md" target="_blank" rel="noopener">https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-resource-management.md</a></p>
+<p><a href="https://github.com/cri-o/cri-o/issues/842" target="_blank" rel="noopener">https://github.com/cri-o/cri-o/issues/842</a></p>
+<p><a href="https://yq.aliyun.com/articles/737784?spm=a2c4e.11153940.0.0.577f6149mYFkTR" target="_blank" rel="noopener">https://yq.aliyun.com/articles/737784?spm=a2c4e.11153940.0.0.577f6149mYFkTR</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kubelet/" rel="tag"># kubelet</a>
+          
+            <a href="/tags/qos/" rel="tag"># qos</a>
+          
+            <a href="/tags/cgroup/" rel="tag"># cgroup</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/01/09/nodelifecycle_controller/" rel="next" title="NodeController 源码分析">
+                <i class="fa fa-chevron-left"></i> NodeController 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">48</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的-Qos"><span class="nav-number">1.</span> <span class="nav-text">kubernetes 中的 Qos</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#不同-Qos-的本质区别"><span class="nav-number">1.1.</span> <span class="nav-text">不同 Qos 的本质区别</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#启用-Qos-和-Pod-level-cgroup"><span class="nav-number">2.</span> <span class="nav-text">启用 Qos 和 Pod level cgroup</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#配置-cgroup-driver"><span class="nav-number">2.1.</span> <span class="nav-text">配置 cgroup driver</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubernetes-中的-cgroup-level"><span class="nav-number">3.</span> <span class="nav-text">kubernetes 中的 cgroup level</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Container-level-cgroups"><span class="nav-number">3.1.</span> <span class="nav-text">Container level cgroups</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Pod-level-cgroups"><span class="nav-number">3.2.</span> <span class="nav-text">Pod level cgroups</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Guaranteed-Pod-QoS"><span class="nav-number">3.2.1.</span> <span class="nav-text">Guaranteed Pod QoS</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Burstable-Pod-QoS"><span class="nav-number">3.2.2.</span> <span class="nav-text">Burstable Pod QoS</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#BestEffort-Pod-QoS"><span class="nav-number">3.2.3.</span> <span class="nav-text">BestEffort Pod QoS</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#QoS-level-cgroups"><span class="nav-number">3.3.</span> <span class="nav-text">QoS level cgroups</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#小结"><span class="nav-number">3.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#QOSContainerManager-源码分析"><span class="nav-number">4.</span> <span class="nav-text">QOSContainerManager 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#qosContainerManager-的初始化"><span class="nav-number">4.1.</span> <span class="nav-text">qosContainerManager 的初始化</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#qosContainerManager-的启动"><span class="nav-number">4.2.</span> <span class="nav-text">qosContainerManager 的启动</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#cm-setupNode"><span class="nav-number">4.2.1.</span> <span class="nav-text">cm.setupNode</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#cm-qosContainerManager-Start"><span class="nav-number">4.2.2.</span> <span class="nav-text">cm.qosContainerManager.Start</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#m-UpdateCgroups"><span class="nav-number">4.2.3.</span> <span class="nav-text">m.UpdateCgroups</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#m-cgroupManager-Update"><span class="nav-number">4.2.4.</span> <span class="nav-text">m.cgroupManager.Update</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#setSupportedSubsystem"><span class="nav-number">4.2.4.1.</span> <span class="nav-text">setSupportedSubsystem</span></a></li></ol></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Pod-Level-Cgroup"><span class="nav-number">4.3.</span> <span class="nav-text">Pod Level Cgroup</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Container-Level-Cgroup"><span class="nav-number">4.4.</span> <span class="nav-text">Container Level Cgroup</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
