@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kubelet,GarbageCollect,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="kubernetes 中的垃圾回收机制主要有两部分组成：  一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象； 二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；  本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的">
+<meta name="keywords" content="kubelet,GarbageCollect">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubelet 中垃圾回收机制的设计与实现">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kubernetes 中的垃圾回收机制主要有两部分组成：  一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象； 二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；  本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2020-02-06T08:17:56.008Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubelet 中垃圾回收机制的设计与实现">
+<meta name="twitter:description" content="kubernetes 中的垃圾回收机制主要有两部分组成：  一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象； 二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；  本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/">
+
+
+
+
+
+  <title>kubelet 中垃圾回收机制的设计与实现 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubelet 中垃圾回收机制的设计与实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-02-06T16:03:00+08:00">
+                2020-02-06
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/02/06/kubelet_garbage_collect/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/02/06/kubelet_garbage_collect/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>kubernetes 中的垃圾回收机制主要有两部分组成：</p>
+<ul>
+<li>一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象；</li>
+<li>二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；</li>
+</ul>
+<p>本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的资源，gc controller 的回收机制可以参考以前的文章 <a href="https://mp.weixin.qq.com/s?__biz=MzAwNzcyMDY5Mg==&amp;mid=2648900249&amp;idx=1&amp;sn=16456e1156b781e57c00fdfae74f2e3f&amp;chksm=836e7902b419f0140d03c37d4e5f9970c8f8bd665437970348fd64d0ff29f64ecc796600da8b&amp;token=674969506&amp;lang=zh_CN#rd" target="_blank" rel="noopener">garbage collector controller 源码分析</a>。</p>
+<p>kubelet 中与容器垃圾回收有关的主要有以下三个参数:</p>
+<ul>
+<li><code>--maximum-dead-containers-per-container</code>: 表示一个 pod 最多可以保存多少个已经停止的容器，默认为1；（maxPerPodContainerCount）</li>
+<li><code>--maximum-dead-containers</code>：一个 node 上最多可以保留多少个已经停止的容器，默认为 -1，表示没有限制；</li>
+<li><code>--minimum-container-ttl-duration</code>：已经退出的容器可以存活的最小时间，默认为 0s；</li>
+</ul>
+<p>与镜像回收有关的主要有以下三个参数：</p>
+<ul>
+<li><code>--image-gc-high-threshold</code>：当 kubelet 磁盘达到多少时，kubelet 开始回收镜像，默认为 85% 开始回收，根目录以及数据盘；</li>
+<li><code>--image-gc-low-threshold</code>：回收镜像时当磁盘使用率减少至多少时停止回收，默认为 80%；</li>
+<li><code>--minimum-image-ttl-duration</code>：未使用的镜像在被回收前的最小存留时间，默认为 2m0s；</li>
+</ul>
+<p><strong>kubelet 中容器回收过程如下:</strong><br>pod 中的容器退出时间超过<code>--minimum-container-ttl-duration</code>后会被标记为可回收，一个 pod 中最多可以保留<code>--maximum-dead-containers-per-container</code>个已经停止的容器，一个 node 上最多可以保留<code>--maximum-dead-containers</code>个已停止的容器。在回收容器时，kubelet 会按照容器的退出时间排序，最先回收退出时间最久的容器。需要注意的是，kubelet 在回收时会将 pod 中的 container 与 sandboxes 分别进行回收，且在回收容器后会将其对应的 log dir 也进行回收；</p>
+<p><strong>kubelet 中镜像回收过程如下:</strong><br>当容器镜像挂载点文件系统的磁盘使用率大于<code>--image-gc-high-threshold</code>时（containerRuntime 为 docker 时，镜像存放目录默认为 <code>/var/lib/docker</code>），kubelet 开始删除节点中未使用的容器镜像，直到磁盘使用率降低至<code>--image-gc-low-threshold</code> 时停止镜像的垃圾回收。</p>
+<h3 id="kubelet-GarbageCollect-源码分析"><a href="#kubelet-GarbageCollect-源码分析" class="headerlink" title="kubelet GarbageCollect 源码分析"></a>kubelet GarbageCollect 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>GarbageCollect 是在 kubelet 对象初始化完成后启动的，在 <code>createAndInitKubelet</code> 方法中首先调用 <code>kubelet.NewMainKubelet</code> 初始化了 kubelet 对象，随后调用 <code>k.StartGarbageCollection</code> 启动了 GarbageCollect。</p>
+<p><code>k8s.io/kubernetes/cmd/kubelet/app/server.go:1089</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">func createAndInitKubelet(......) &#123;</span><br><span class="line">    k, err = kubelet.NewMainKubelet(</span><br><span class="line">        ......</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    k.BirthCry()</span><br><span class="line"></span><br><span class="line">    k.StartGarbageCollection()</span><br><span class="line"></span><br><span class="line">    return k, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="k-StartGarbageCollection"><a href="#k-StartGarbageCollection" class="headerlink" title="k.StartGarbageCollection"></a>k.StartGarbageCollection</h4><p>在 kubelet 中镜像的生命周期和容器的生命周期是通过 imageManager 和 containerGC 管理的。在 <code>StartGarbageCollection</code> 方法中会启动容器和镜像垃圾回收两个任务，其主要逻辑为：</p>
+<ul>
+<li>1、启动 containerGC goroutine，ContainerGC 间隔时间默认为 1 分钟；</li>
+<li>2、检查 <code>--image-gc-high-threshold</code> 参数的值，若为 100 则禁用 imageGC；</li>
+<li>3、启动 imageGC goroutine，imageGC 间隔时间默认为 5 分钟；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kubelet.go:1270</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">func (kl *Kubelet) StartGarbageCollection() &#123;</span><br><span class="line">    loggedContainerGCFailure := false</span><br><span class="line">    </span><br><span class="line">    // 1、启动容器垃圾回收服务</span><br><span class="line">    go wait.Until(func() &#123;</span><br><span class="line">        if err := kl.containerGC.GarbageCollect(); err != nil &#123;</span><br><span class="line">            loggedContainerGCFailure = true</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            var vLevel klog.Level = 4</span><br><span class="line">            if loggedContainerGCFailure &#123;</span><br><span class="line">                vLevel = 1</span><br><span class="line">                loggedContainerGCFailure = false</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            klog.V(vLevel).Infof(&quot;Container garbage collection succeeded&quot;)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, ContainerGCPeriod, wait.NeverStop)</span><br><span class="line">    </span><br><span class="line">    // 2、检查 ImageGCHighThresholdPercent 参数的值</span><br><span class="line">    if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、启动镜像垃圾回收服务</span><br><span class="line">    prevImageGCFailed := false</span><br><span class="line">    go wait.Until(func() &#123;</span><br><span class="line">        if err := kl.imageManager.GarbageCollect(); err != nil &#123;</span><br><span class="line">            ......</span><br><span class="line">            prevImageGCFailed = true</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            var vLevel klog.Level = 4</span><br><span class="line">            if prevImageGCFailed &#123;</span><br><span class="line">                vLevel = 1</span><br><span class="line">                prevImageGCFailed = false</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, ImageGCPeriod, wait.NeverStop)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="kl-containerGC-GarbageCollect"><a href="#kl-containerGC-GarbageCollect" class="headerlink" title="kl.containerGC.GarbageCollect"></a>kl.containerGC.GarbageCollect</h4><p><code>kl.containerGC.GarbageCollect</code> 调用的是 ContainerGC manager 中的方法，ContainerGC 是在 <code>NewMainKubelet</code> 中初始化的，ContainerGC 在初始化时需要指定一个 runtime，该 runtime 即 ContainerRuntime，在 kubelet 中即 kubeGenericRuntimeManager，也是在 <code>NewMainKubelet</code> 中初始化的。</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kubelet.go</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func NewMainKubelet()&#123;</span><br><span class="line">    ......</span><br><span class="line">    // MinAge、MaxPerPodContainer、MaxContainers 分别上文章开头提到的与容器垃圾回收有关的</span><br><span class="line">    // 三个参数</span><br><span class="line">    containerGCPolicy := kubecontainer.ContainerGCPolicy&#123;</span><br><span class="line">        MinAge:             minimumGCAge.Duration,</span><br><span class="line">        MaxPerPodContainer: int(maxPerPodContainerCount),</span><br><span class="line">        MaxContainers:      int(maxContainerCount),</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 初始化 containerGC 模块</span><br><span class="line">    containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以下是 ContainerGC 的初始化以及 GarbageCollect 的启动：</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/container/container_gc.go:68</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) &#123;</span><br><span class="line">    if policy.MinAge &lt; 0 &#123;</span><br><span class="line">        return nil, fmt.Errorf(&quot;invalid minimum garbage collection age: %v&quot;, policy.MinAge)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return &amp;realContainerGC&#123;</span><br><span class="line">        runtime:              runtime,</span><br><span class="line">        policy:               policy,</span><br><span class="line">        sourcesReadyProvider: sourcesReadyProvider,</span><br><span class="line">    &#125;, nil</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func (cgc *realContainerGC) GarbageCollect() error &#123;</span><br><span class="line">    return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到，ContainerGC 中的 GarbageCollect 最终是调用 runtime 中的 GarbageCollect 方法，runtime 即 kubeGenericRuntimeManager。</p>
+<h5 id="cgc-runtime-GarbageCollect"><a href="#cgc-runtime-GarbageCollect" class="headerlink" title="cgc.runtime.GarbageCollect"></a>cgc.runtime.GarbageCollect</h5><p>cgc.runtime.GarbageCollect 的实现是在 kubeGenericRuntimeManager 中，其主要逻辑为：</p>
+<ul>
+<li>1、回收 pod 中的 container；</li>
+<li>2、回收 pod 中的 sandboxes；</li>
+<li>3、回收 pod 以及 container 的 log dir；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kuberuntime/kuberuntime_gc.go:378</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error &#123;</span><br><span class="line">    errors := []error&#123;&#125;</span><br><span class="line">    // 1、回收 pod 中的 container</span><br><span class="line">    if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictTerminatedPods); err != nil &#123;</span><br><span class="line">        errors = append(errors, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、回收 pod 中的 sandboxes</span><br><span class="line">    if err := cgc.evictSandboxes(evictTerminatedPods); err != nil &#123;</span><br><span class="line">        errors = append(errors, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、回收 pod 以及 container 的 log dir</span><br><span class="line">    if err := cgc.evictPodLogsDirectories(allSourcesReady); err != nil &#123;</span><br><span class="line">        errors = append(errors, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return utilerrors.NewAggregate(errors)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="cgc-evictContainers"><a href="#cgc-evictContainers" class="headerlink" title="cgc.evictContainers"></a>cgc.evictContainers</h5><p>在 <code>cgc.evictContainers</code> 方法中会回收所有可被回收的容器，其主要逻辑为：</p>
+<ul>
+<li>1、首先调用 <code>cgc.evictableContainers</code> 获取可被回收的容器作为 evictUnits，可被回收的容器指非 running 状态且创建时间超过 MinAge，evictUnits 数组中包含 pod 与 container 的对应关系；</li>
+<li>2、回收 deleted 状态以及 terminated 状态的 pod，遍历 evictUnits，若 pod 是否处于 deleted 或者 terminated 状态，则调用 <code>cgc.removeOldestN</code> 回收 pod 中的所有容器。deleted 状态指 pod 已经被删除或者其 <code>status.phase</code> 为 failed 且其 <code>status.reason</code> 为 evicted 或者 pod.deletionTimestamp != nil 且 pod 中所有容器的 status 为 terminated 或者 waiting 状态，terminated 状态指 pod 处于 Failed 或者 succeeded 状态；</li>
+<li>3、对于非 deleted 或者 terminated 状态的 pod，调用 <code>cgc.enforceMaxContainersPerEvictUnit</code> 为其保留 <code>MaxPerPodContainer</code> 个已经退出的容器，按照容器退出的时间进行排序优先删除退出时间最久的，<code>MaxPerPodContainer</code> 在上文已经提过，表示一个 pod 最多可以保存多少个已经停止的容器，默认为1，可以使用 <code>--maximum-dead-containers-per-container</code> 在启动时指定；</li>
+<li>4、若 kubelet 启动时指定了<code>--maximum-dead-containers</code>（默认为 -1 即不限制），即需要为 node 保留退出的容器数，若 node 上保留已经停止的容器数超过 <code>--maximum-dead-containers</code>，首先计算需要为每个 pod 保留多少个已退出的容器保证其总数不超过 <code>--maximum-dead-containers</code> 的值，若计算结果小于 1 则取 1，即至少保留一个，然后删除每个 pod 中不需要保留的容器，此时若 node 上保留已经停止的容器数依然超过需要保留的最大值，则将 evictUnits 中的容器按照退出时间进行排序删除退出时间最久的容器，使 node 上保留已经停止的容器数满足 <code>--maximum-dead-containers</code> 值；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kuberuntime/kuberuntime_gc.go:222</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error &#123;</span><br><span class="line">    // 1、获取可被回收的容器列表</span><br><span class="line">    evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、回收 Deleted 状态以及 Terminated 状态的 pod，此处 allSourcesReady 指 kubelet </span><br><span class="line">    //    支持的三种 podSource 是否都可用</span><br><span class="line">    if allSourcesReady &#123;</span><br><span class="line">        for key, unit := range evictUnits &#123;</span><br><span class="line">            if cgc.podStateProvider.IsPodDeleted(key.uid) || (cgc.podStateProvider.IsPodTerminated(key.uid) &amp;&amp; evictTerminatedPods) &#123;</span><br><span class="line">                cgc.removeOldestN(unit, len(unit)) </span><br><span class="line">                delete(evictUnits, key)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、为非 Deleted 状态以及 Terminated 状态的 pod 保留 MaxPerPodContainer 个已经退出的容器</span><br><span class="line">    if gcPolicy.MaxPerPodContainer &gt;= 0 &#123;</span><br><span class="line">        cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、若 kubelet 启动时指定了 --maximum-dead-containers（默认为 -1 即不限制）参数，</span><br><span class="line">    //   此时需要为 node 保留退出的容器数不能超过 --maximum-dead-containers 个</span><br><span class="line">    if gcPolicy.MaxContainers &gt;= 0 &amp;&amp; evictUnits.NumContainers() &gt; gcPolicy.MaxContainers &#123;</span><br><span class="line">        numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()</span><br><span class="line">        if numContainersPerEvictUnit &lt; 1 &#123;</span><br><span class="line">            numContainersPerEvictUnit = 1</span><br><span class="line">        &#125;</span><br><span class="line">        cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)</span><br><span class="line"></span><br><span class="line">        numContainers := evictUnits.NumContainers()</span><br><span class="line">        if numContainers &gt; gcPolicy.MaxContainers &#123;</span><br><span class="line">            flattened := make([]containerGCInfo, 0, numContainers)</span><br><span class="line">            for key := range evictUnits &#123;</span><br><span class="line">                flattened = append(flattened, evictUnits[key]...)</span><br><span class="line">            &#125;</span><br><span class="line">            sort.Sort(byCreated(flattened))</span><br><span class="line"></span><br><span class="line">            cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="cgc-evictSandboxes"><a href="#cgc-evictSandboxes" class="headerlink" title="cgc.evictSandboxes"></a>cgc.evictSandboxes</h5><p><code>cgc.evictSandboxes</code> 方法会回收所有可回收的 sandboxes，其主要逻辑为：</p>
+<ul>
+<li>1、首先获取 node 上所有的 containers 和 sandboxes；</li>
+<li>2、构建 sandboxes 与 pod 的对应关系并将其保存在 sandboxesByPodUID 中；</li>
+<li>3、对 sandboxesByPodUID 列表按创建时间进行排序；</li>
+<li>4、若 sandboxes 所在的 pod 处于 deleted 状态，则删除该 pod 中所有的 sandboxes 否则只保留退出时间最短的一个 sandboxes，deleted 状态在上文 <code>cgc.evictContainers</code> 方法中已经解释过；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kuberuntime/kuberuntime_gc.go:274</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line">func (cgc *containerGC) evictSandboxes(evictTerminatedPods bool) error &#123;</span><br><span class="line">    // 1、获取 node 上所有的 container</span><br><span class="line">    containers, err := cgc.manager.getKubeletContainers(true)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、获取 node 上所有的 sandboxes</span><br><span class="line">    sandboxes, err := cgc.manager.getKubeletSandboxes(true)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、收集所有 container 的 PodSandboxId </span><br><span class="line">    sandboxIDs := sets.NewString()</span><br><span class="line">    for _, container := range containers &#123;</span><br><span class="line">        sandboxIDs.Insert(container.PodSandboxId)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、构建 sandboxes 与 pod 的对应关系并将其保存在 sandboxesByPodUID 中</span><br><span class="line">    sandboxesByPod := make(sandboxesByPodUID)</span><br><span class="line">    for _, sandbox := range sandboxes &#123;</span><br><span class="line">        podUID := types.UID(sandbox.Metadata.Uid)</span><br><span class="line">        sandboxInfo := sandboxGCInfo&#123;</span><br><span class="line">            id:         sandbox.Id,</span><br><span class="line">            createTime: time.Unix(0, sandbox.CreatedAt),</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY &#123;</span><br><span class="line">            sandboxInfo.active = true</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if sandboxIDs.Has(sandbox.Id) &#123;</span><br><span class="line">            sandboxInfo.active = true</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        sandboxesByPod[podUID] = append(sandboxesByPod[podUID], sandboxInfo)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、对 sandboxesByPod 进行排序</span><br><span class="line">    for uid := range sandboxesByPod &#123;</span><br><span class="line">        sort.Sort(sandboxByCreated(sandboxesByPod[uid]))</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、遍历 sandboxesByPod，若 sandboxes 所在的 pod 处于 deleted 状态，</span><br><span class="line">    // 则删除该 pod 中所有的 sandboxes 否则只保留退出时间最短的一个 sandboxes</span><br><span class="line">    for podUID, sandboxes := range sandboxesByPod &#123;</span><br><span class="line">        if cgc.podStateProvider.IsPodDeleted(podUID) || (cgc.podStateProvider.IsPodTerminated(podUID) &amp;&amp; evictTerminatedPods) &#123;</span><br><span class="line">            cgc.removeOldestNSandboxes(sandboxes, len(sandboxes))</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            cgc.removeOldestNSandboxes(sandboxes, len(sandboxes)-1)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="cgc-evictPodLogsDirectories"><a href="#cgc-evictPodLogsDirectories" class="headerlink" title="cgc.evictPodLogsDirectories"></a>cgc.evictPodLogsDirectories</h5><p><code>cgc.evictPodLogsDirectories</code> 方法会回收所有可回收 pod 以及 container 的 log dir，其主要逻辑为：</p>
+<ul>
+<li>1、首先回收 deleted 状态 pod logs dir，遍历 pod logs dir <code>/var/log/pods</code>，<code>/var/log/pods</code> 为 pod logs 的默认目录，pod logs dir 的格式为 <code>/var/log/pods/NAMESPACE_NAME_UID</code>，解析 pod logs dir 获取 pod uid，判断 pod 是否处于 deleted 状态，若处于 deleted 状态则删除其 logs dir；</li>
+<li><p>2、回收 deleted 状态 container logs 链接目录，<code>/var/log/containers</code> 为 container log 的默认目录，其会软链接到 pod 的 log dir 下，例如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/var/log/containers/storage-provisioner_kube-system_storage-provisioner-acc8386e409dfb3cc01618cbd14c373d8ac6d7f0aaad9ced018746f31d0081e2.log -&gt; /var/log/pods/kube-system_storage-provisioner_b448e496-eb5d-4d71-b93f-ff7ff77d2348/storage-provisioner/0.log</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kuberuntime/kuberuntime_gc.go:333</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error &#123;</span><br><span class="line">    osInterface := cgc.manager.osInterface</span><br><span class="line">    // 1、回收 deleted 状态 pod logs dir</span><br><span class="line">    if allSourcesReady &#123;</span><br><span class="line">        dirs, err := osInterface.ReadDir(podLogsRootDirectory)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to read podLogsRootDirectory %q: %v&quot;, podLogsRootDirectory, err)</span><br><span class="line">        &#125;</span><br><span class="line">        for _, dir := range dirs &#123;</span><br><span class="line">            name := dir.Name()</span><br><span class="line">            podUID := parsePodUIDFromLogsDirectory(name)</span><br><span class="line">            if !cgc.podStateProvider.IsPodDeleted(podUID) &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                klog.Errorf(&quot;Failed to remove pod logs directory %q: %v&quot;, name, err)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、回收 deleted 状态 container logs 链接目录</span><br><span class="line">    logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf(&quot;*.%s&quot;, legacyLogSuffix)))</span><br><span class="line">    for _, logSymlink := range logSymlinks &#123;</span><br><span class="line">        if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) &#123;</span><br><span class="line">            err := osInterface.Remove(logSymlink)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                klog.Errorf(&quot;Failed to remove container log dead symlink %q: %v&quot;, logSymlink, err)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="kl-imageManager-GarbageCollect"><a href="#kl-imageManager-GarbageCollect" class="headerlink" title="kl.imageManager.GarbageCollect"></a>kl.imageManager.GarbageCollect</h4><p>上面已经分析了容器回收的主要流程，下面会继续分析镜像回收的流程，<code>kl.imageManager.GarbageCollect</code> 是镜像回收任务启动的方法，镜像回收流程是在 imageManager 中进行的，首先了解下 imageManager 的初始化，imageManager 也是在 <code>NewMainKubelet</code> 方法中进行初始化的。</p>
+<p><code>k8s.io/kubernetes/pkg/kubelet/kubelet.go</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">func NewMainKubelet()&#123;</span><br><span class="line">    ......    </span><br><span class="line">    // 初始化时需要指定三个参数，三个参数已经在上文中提到过</span><br><span class="line">    imageGCPolicy := images.ImageGCPolicy&#123;</span><br><span class="line">        MinAge:               kubeCfg.ImageMinimumGCAge.Duration,</span><br><span class="line">        HighThresholdPercent: int(kubeCfg.ImageGCHighThresholdPercent),</span><br><span class="line">        LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, fmt.Errorf(&quot;failed to initialize image manager: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    klet.imageManager = imageManager</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>kl.imageManager.GarbageCollect</code> 方法的主要逻辑为：</p>
+<ul>
+<li>1、首先调用 <code>im.statsProvider.ImageFsStats</code> 获取容器镜像存储目录挂载点文件系统的磁盘信息；</li>
+<li>2、获取挂载点的 available 和 capacity 信息并计算其使用率；</li>
+<li>3、若使用率大于 <code>HighThresholdPercent</code>，首先根据 <code>LowThresholdPercent</code> 值计算需要释放的磁盘量，然后调用 <code>im.freeSpace</code> 释放未使用的 image 直到满足磁盘空闲率；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/images/image_gc_manager.go:269</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">func (im *realImageGCManager) GarbageCollect() error &#123;</span><br><span class="line">    // 1、获取容器镜像存储目录挂载点文件系统的磁盘信息</span><br><span class="line">    fsStats, err := im.statsProvider.ImageFsStats()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var capacity, available int64</span><br><span class="line">    if fsStats.CapacityBytes != nil &#123;</span><br><span class="line">        capacity = int64(*fsStats.CapacityBytes)</span><br><span class="line">    &#125;</span><br><span class="line">    if fsStats.AvailableBytes != nil &#123;</span><br><span class="line">        available = int64(*fsStats.AvailableBytes)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if available &gt; capacity &#123;</span><br><span class="line">        available = capacity</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if capacity == 0 &#123;</span><br><span class="line">        err := goerrors.New(&quot;invalid capacity 0 on image filesystem&quot;)</span><br><span class="line">        im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、若使用率大于 HighThresholdPercent，此时需要回收镜像</span><br><span class="line">    usagePercent := 100 - int(available*100/capacity)</span><br><span class="line">    if usagePercent &gt;= im.policy.HighThresholdPercent &#123;</span><br><span class="line">        // 3、计算需要释放的磁盘量</span><br><span class="line">        amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available</span><br><span class="line">        </span><br><span class="line">        // 4、调用 im.freeSpace 回收未使用的镜像信息</span><br><span class="line">        freed, err := im.freeSpace(amountToFree, time.Now())</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if freed &lt; amountToFree &#123;</span><br><span class="line">            err := fmt.Errorf(&quot;failed to garbage collect required amount of images. Wanted to free %d bytes, but freed %d bytes&quot;, amountToFree, freed)</span><br><span class="line">            im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="im-freeSpace"><a href="#im-freeSpace" class="headerlink" title="im.freeSpace"></a>im.freeSpace</h5><p><code>im.freeSpace</code> 是回收未使用镜像的方法，其主要逻辑为：</p>
+<ul>
+<li>1、首先调用 <code>im.detectImages</code> 获取已经使用的 images 列表作为 imagesInUse；</li>
+<li>2、遍历 <code>im.imageRecords</code> 根据 imagesInUse 获取所有未使用的 images 信息，<code>im.imageRecords</code> 记录 node 上所有 images 的信息；</li>
+<li>3、根据使用时间对未使用的 images 列表进行排序；</li>
+<li>4、遍历未使用的 images 列表然后调用 <code>im.runtime.RemoveImage</code> 删除镜像，直到回收完所有未使用 images 或者满足空闲率；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/kubelet/images/image_gc_manager.go:328</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line">func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) &#123;</span><br><span class="line">    // 1、获取已经使用的 images 列表</span><br><span class="line">    imagesInUse, err := im.detectImages(freeTime)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return 0, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    im.imageRecordsLock.Lock()</span><br><span class="line">    defer im.imageRecordsLock.Unlock()</span><br><span class="line"></span><br><span class="line">    // 2、获取所有未使用的 images 信息</span><br><span class="line">    images := make([]evictionInfo, 0, len(im.imageRecords))</span><br><span class="line">    for image, record := range im.imageRecords &#123;</span><br><span class="line">        if isImageUsed(image, imagesInUse) &#123;</span><br><span class="line">            klog.V(5).Infof(&quot;Image ID %s is being used&quot;, image)</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        images = append(images, evictionInfo&#123;</span><br><span class="line">            id:          image,</span><br><span class="line">            imageRecord: *record,</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    // 3、按镜像使用时间进行排序</span><br><span class="line">    sort.Sort(byLastUsedAndDetected(images))</span><br><span class="line">    // 4、回收未使用的镜像</span><br><span class="line">    var deletionErrors []error</span><br><span class="line">    spaceFreed := int64(0)</span><br><span class="line">    for _, image := range images &#123;</span><br><span class="line">        if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if freeTime.Sub(image.firstDetected) &lt; im.policy.MinAge &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 5、调用 im.runtime.RemoveImage 删除镜像</span><br><span class="line">        err := im.runtime.RemoveImage(container.ImageSpec&#123;Image: image.id&#125;)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            deletionErrors = append(deletionErrors, err)</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        delete(im.imageRecords, image.id)</span><br><span class="line">        spaceFreed += image.size</span><br><span class="line">        if spaceFreed &gt;= bytesToFree &#123;</span><br><span class="line">            break</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if len(deletionErrors) &gt; 0 &#123;</span><br><span class="line">        return spaceFreed, fmt.Errorf(&quot;wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %v&quot;, bytesToFree, spaceFreed,   errors.NewAggregate(deletionErrors))</span><br><span class="line">    &#125;</span><br><span class="line">    return spaceFreed, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要分析了 kubelet 中垃圾回收机制的实现，kubelet 中会定期回收 node 上已经退出的容器已经当 node 磁盘资源不足时回收不再使用的镜像来释放磁盘资源，容器以及镜像回收策略主要是通过 kubelet 中几个参数的阈值进行控制的。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kubelet/" rel="tag"># kubelet</a>
+          
+            <a href="/tags/GarbageCollect/" rel="tag"># GarbageCollect</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/01/21/kubelet_qos/" rel="next" title="kubernetes 中 Qos 的设计与实现">
+                <i class="fa fa-chevron-left"></i> kubernetes 中 Qos 的设计与实现
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kubelet-GarbageCollect-源码分析"><span class="nav-number">1.</span> <span class="nav-text">kubelet GarbageCollect 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#k-StartGarbageCollection"><span class="nav-number">1.1.</span> <span class="nav-text">k.StartGarbageCollection</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#kl-containerGC-GarbageCollect"><span class="nav-number">1.2.</span> <span class="nav-text">kl.containerGC.GarbageCollect</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#cgc-runtime-GarbageCollect"><span class="nav-number">1.2.1.</span> <span class="nav-text">cgc.runtime.GarbageCollect</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#cgc-evictContainers"><span class="nav-number">1.2.2.</span> <span class="nav-text">cgc.evictContainers</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#cgc-evictSandboxes"><span class="nav-number">1.2.3.</span> <span class="nav-text">cgc.evictSandboxes</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#cgc-evictPodLogsDirectories"><span class="nav-number">1.2.4.</span> <span class="nav-text">cgc.evictPodLogsDirectories</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#kl-imageManager-GarbageCollect"><span class="nav-number">1.3.</span> <span class="nav-text">kl.imageManager.GarbageCollect</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#im-freeSpace"><span class="nav-number">1.3.1.</span> <span class="nav-text">im.freeSpace</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">2.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
