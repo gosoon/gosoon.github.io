@@ -304,12 +304,12 @@
   
   
 
-  <article class="post post-type-node status" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/06/09/node_status/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -328,7 +328,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/06/09/node_status/" itemprop="url">kubelet 状态上报的方式</a></h1>
+                <a class="post-title-link" href="/2019/10/24/kube_scheduler_preempt/" itemprop="url">kube-scheduler 优先级与抢占机制源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -340,8 +340,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-09T20:37:30+08:00">
-                2019-06-09
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-24T14:35:30+08:00">
+                2019-10-24
               </time>
             
 
@@ -359,8 +359,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/06/09/node_status/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/06/09/node_status/" itemprop="commentCount"></span>
+                <a href="/2019/10/24/kube_scheduler_preempt/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/24/kube_scheduler_preempt/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -390,11 +390,11 @@
       
         
           
-           分布式系统中服务端会通过心跳机制确认客户端是否存活，在 k8s 中，kubelet 也会定时上报心跳到 apiserver，以此判断该 node 是否存活，若 node 超过一定时间没有上报心跳，其状态会被置为 NotReady，宿主上容器的状态也会被置为 Nodelost 或者 Unknown 
+          前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/06/09/node_status/#more" rel="contents">
+            <a class="btn" href="/2019/10/24/kube_scheduler_preempt/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -447,12 +447,12 @@
   
   
 
-  <article class="post post-type-client-go" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/05/17/client-go_informer/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -471,7 +471,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/05/17/client-go_informer/" itemprop="url">kubernetes 中 informer 的使用</a></h1>
+                <a class="post-title-link" href="/2019/10/22/kube_scheduler_algorithm/" itemprop="url">kube-scheduler predicates 与 priorities 调度算法源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -483,8 +483,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-05-17T11:00:30+08:00">
-                2019-05-17
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-22T19:30:30+08:00">
+                2019-10-22
               </time>
             
 
@@ -502,8 +502,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/05/17/client-go_informer/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/05/17/client-go_informer/" itemprop="commentCount"></span>
+                <a href="/2019/10/22/kube_scheduler_algorithm/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/22/kube_scheduler_algorithm/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -533,11 +533,15 @@
       
         
           
-          一、kubernetes 集群的几种访问方式在实际开发过程中，若想要获取 kubernetes 中某个资源（比如 pod）的所有对象，可以使用 kubectl、k8s REST API、client-go(ClientSet、Dynamic Client、RESTClient 三种方式) 等多种方式
+          在上篇文章kube-scheduler 源码分析中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。
+
+kubernetes 版本: v1.16
+
+predi
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/05/17/client-go_informer/#more" rel="contents">
+            <a class="btn" href="/2019/10/22/kube_scheduler_algorithm/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -590,12 +594,12 @@
   
   
 
-  <article class="post post-type-kubectl plugin" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/05/16/kubectl_plugin/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -614,7 +618,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/05/16/kubectl_plugin/" itemprop="url">使用插件扩展 kubectl</a></h1>
+                <a class="post-title-link" href="/2019/10/21/kube_scheduler_process/" itemprop="url">kube-scheduler 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -626,8 +630,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-05-16T11:20:30+08:00">
-                2019-05-16
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-21T17:30:30+08:00">
+                2019-10-21
               </time>
             
 
@@ -645,8 +649,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/05/16/kubectl_plugin/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/05/16/kubectl_plugin/" itemprop="commentCount"></span>
+                <a href="/2019/10/21/kube_scheduler_process/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/21/kube_scheduler_process/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -676,11 +680,11 @@
       
         
           
-          由于笔者所维护的集群规模较大，经常需要使用 kubectl 来排查一些问题，但是 kubectl 功能有限，有些操作还是需要写一个脚本对 kubectl 做一些封装才能达到目的。比如我经常做的一个操作就是排查一下线上哪些宿主的 cpu/memory request 使用率超过某个阈值，kubectl
+          kube-scheduler 的设计Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podLis
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/05/16/kubectl_plugin/#more" rel="contents">
+            <a class="btn" href="/2019/10/21/kube_scheduler_process/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -733,12 +737,12 @@
   
   
 
-  <article class="post post-type-kubernetes" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-improvements" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/04/22/k8s_dashboard_prometheus/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -757,7 +761,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/04/22/k8s_dashboard_prometheus/" itemprop="url">部署 kubernetes 可视化监控组件</a></h1>
+                <a class="post-title-link" href="/2019/10/12/k8s_improvements/" itemprop="url">大规模场景下 kubernetes 集群的性能优化</a></h1>
         
 
         <div class="post-meta">
@@ -769,8 +773,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-22T22:43:30+08:00">
-                2019-04-22
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-12T16:00:30+08:00">
+                2019-10-12
               </time>
             
 
@@ -788,8 +792,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/04/22/k8s_dashboard_prometheus/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/04/22/k8s_dashboard_prometheus/" itemprop="commentCount"></span>
+                <a href="/2019/10/12/k8s_improvements/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/12/k8s_improvements/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -819,11 +823,20 @@
       
         
           
-          随着 kubernetes 的大规模使用，对 kubernetes 组件及其上运行服务的监控也是非常重要的一个环节，目前开源的监控组件有很多种，例如 cAdvisor、Heapster、metrics-server、kube-state-metrics、Prometheus 等，对监控数据的可视化查
+          一、etcd 优化
+1、etcd 采用本地 ssd 盘作为后端存储存储
+
+2、etcd 独立部署在非 k8s node 上
+
+3、etcd 快照(snap)与预写式日志(wal)分盘存储
+
+
+etcd 详细的优化操作可以参考上篇文章：etcd 性能测试与调优。
+二、apiserver 的优化1、参数
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/04/22/k8s_dashboard_prometheus/#more" rel="contents">
+            <a class="btn" href="/2019/10/12/k8s_improvements/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -876,12 +889,12 @@
   
   
 
-  <article class="post post-type-metrics-server" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-etcd" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/04/14/k8s_metrics_server/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -900,7 +913,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/04/14/k8s_metrics_server/" itemprop="url">kubernetes 指标采集组件 metrics-server 的部署</a></h1>
+                <a class="post-title-link" href="/2019/10/08/etcd_improvements/" itemprop="url">etcd 性能测试与调优</a></h1>
         
 
         <div class="post-meta">
@@ -912,8 +925,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-14T21:27:30+08:00">
-                2019-04-14
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-08T14:50:30+08:00">
+                2019-10-08
               </time>
             
 
@@ -931,8 +944,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/04/14/k8s_metrics_server/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/04/14/k8s_metrics_server/" itemprop="commentCount"></span>
+                <a href="/2019/10/08/etcd_improvements/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/08/etcd_improvements/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -962,728 +975,13 @@
       
         
           
-          metrics-server 是一个采集集群中指标的组件，类似于 cadvisor，在 v1.8 版本中引入，官方将其作为 heapster 的替代者，metric-server 属于 core metrics(核心指标)，提供 API metrics.k8s.io，仅可以查看 node、pod 当
+          etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。
+etcd 性能优化
+官方文档原文：https://github.com/etcd-io/etcd/blob/master/Docume
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/04/14/k8s_metrics_server/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-component-HA" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/03/13/k8s_leader_election/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/03/13/k8s_leader_election/" itemprop="url">kubernets 中组件高可用的实现方式</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-13T07:49:30+08:00">
-                2019-03-13
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/03/13/k8s_leader_election/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/03/13/k8s_leader_election/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 k
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/03/13/k8s_leader_election/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-v1.12" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/03/05/k8s_v1.12/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/03/05/k8s_v1.12/" itemprop="url">kubernetes 集群升级至 v1.12 需要注意的几个问题</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-05T18:30:30+08:00">
-                2019-03-05
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/03/05/k8s_v1.12/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/03/05/k8s_v1.12/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/03/05/k8s_v1.12/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-k8s-events" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/02/26/k8s_events/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/02/26/k8s_events/" itemprop="url">kubernets 中事件处理机制</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-02-26T20:49:30+08:00">
-                2019-02-26
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/02/26/k8s_events/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/02/26/k8s_events/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          当集群中的 node 或 pod 异常时，大部分用户会使用 kubectl 查看对应的 events，那么 events 是从何而来的？其实 k8s 中的各个组件会将运行时产生的各种事件汇报到 apiserver，对于 k8s 中的可描述资源，使用 kubectl describe 都可以看到其相关
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/02/26/k8s_events/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-wait" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/02/16/k8s-crontab/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/02/16/k8s-crontab/" itemprop="url">k8s 中定时任务的实现</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-02-16T21:59:30+08:00">
-                2019-02-16
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/02/16/k8s-crontab/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/02/16/k8s-crontab/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          k8s 中有许多优秀的包都可以在平时的开发中借鉴与使用，比如，任务的定时轮询、高可用的实现、日志处理、缓存使用等都是独立的包，可以直接引用。本篇文章会介绍 k8s 中定时任务的实现，k8s 中定时任务都是通过 wait 包实现的，wait 包在 k8s 的多个组件中都有用到，以下是 wait 包在 
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/02/16/k8s-crontab/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-audit" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/01/30/k8s-audit-webhook/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/01/30/k8s-audit-webhook/" itemprop="url">kubernetes 审计日志功能</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-01-30T16:26:30+08:00">
-                2019-01-30
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/01/30/k8s-audit-webhook/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/01/30/k8s-audit-webhook/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          审计日志可以记录所有对 apiserver 接口的调用，让我们能够非常清晰的知道集群到底发生了什么事情，通过记录的日志可以查到所发生的事件、操作的用户和时间。kubernetes 在 v1.7 中支持了日志审计功能（Alpha），在 v1.8 中为 Beta 版本，v1.12 为 GA 版本。
-
-k
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/01/30/k8s-audit-webhook/#more" rel="contents">
+            <a class="btn" href="/2019/10/08/etcd_improvements/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1732,7 +1030,7 @@ k
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 

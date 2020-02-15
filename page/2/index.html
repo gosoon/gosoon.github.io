@@ -304,12 +304,12 @@
   
   
 
-  <article class="post post-type-deployment controller" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-garbage collector controller" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -328,7 +328,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/11/28/deployment_controller/" itemprop="url">deployment controller 源码分析</a></h1>
+                <a class="post-title-link" href="/2019/12/28/garbagecollector_controller/" itemprop="url">garbage collector controller 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -340,8 +340,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-28T14:30:30+08:00">
-                2019-11-28
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-28T20:23:30+08:00">
+                2019-12-28
               </time>
             
 
@@ -359,8 +359,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/11/28/deployment_controller/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/28/deployment_controller/" itemprop="commentCount"></span>
+                <a href="/2019/12/28/garbagecollector_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/28/garbagecollector_controller/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -390,12 +390,11 @@
       
         
           
-          在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。
-deplo
+          在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/11/28/deployment_controller/#more" rel="contents">
+            <a class="btn" href="/2019/12/28/garbagecollector_controller/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -448,12 +447,12 @@ deplo
   
   
 
-  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-statusManager" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/25/kubelet_status_manager/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -472,7 +471,7 @@ deplo
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/11/18/kube_proxy_ipvs/" itemprop="url">kube-proxy ipvs 模式源码分析</a></h1>
+                <a class="post-title-link" href="/2019/12/25/kubelet_status_manager/" itemprop="url">kubelet statusManager 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -484,8 +483,8 @@ deplo
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-18T11:40:30+08:00">
-                2019-11-18
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-25T15:22:30+08:00">
+                2019-12-25
               </time>
             
 
@@ -503,8 +502,8 @@ deplo
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/11/18/kube_proxy_ipvs/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/18/kube_proxy_ipvs/" itemprop="commentCount"></span>
+                <a href="/2019/12/25/kubelet_status_manager/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/25/kubelet_status_manager/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -534,12 +533,11 @@ deplo
       
         
           
-          前几篇文章已经分析了 service 的原理以及 kube-proxy  iptables 模式的原理与实现，本篇文章会继续分析 kube-proxy ipvs 模式的原理与实现。
-ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一部
+          本篇文章没有接上篇继续更新 kube-controller-manager，kube-controller-manager 的源码阅读笔记也会继续更新，笔者会同时阅读多个组件的源码，阅读笔记也会按组件进行交叉更新，交叉更新的目的一是为了加深印象避免阅读完后又很快忘记，二是某些代码的功能难以理解，避免
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/11/18/kube_proxy_ipvs/#more" rel="contents">
+            <a class="btn" href="/2019/12/25/kubelet_status_manager/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -592,12 +590,12 @@ ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一
   
   
 
-  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-daemonset controller" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -616,7 +614,7 @@ ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/11/06/kube_proxy_iptables/" itemprop="url">kube-proxy iptables 模式源码分析</a></h1>
+                <a class="post-title-link" href="/2019/12/18/daemonset_controller/" itemprop="url">daemonset controller 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -628,8 +626,8 @@ ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-06T19:50:30+08:00">
-                2019-11-06
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-18T10:50:30+08:00">
+                2019-12-18
               </time>
             
 
@@ -647,8 +645,8 @@ ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/11/06/kube_proxy_iptables/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/06/kube_proxy_iptables/" itemprop="commentCount"></span>
+                <a href="/2019/12/18/daemonset_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/18/daemonset_controller/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -678,14 +676,11 @@ ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一
       
         
           
-          iptables 的功能在前面的文章中已经介绍过  iptable 的一些基本信息，本文会深入介绍 kube-proxy iptables 模式下的工作原理，本文中多处会与 iptables 的知识相关联，若没有 iptables 基础，请先自行补充。
-iptables 的功能：
-
-流量转发：DNA
+          在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node 上，在实际场景中，一般会将
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/11/06/kube_proxy_iptables/#more" rel="contents">
+            <a class="btn" href="/2019/12/18/daemonset_controller/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -738,12 +733,12 @@ iptables 的功能：
   
   
 
-  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-statefulset controller" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -762,7 +757,7 @@ iptables 的功能：
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/11/01/kube_proxy_process/" itemprop="url">kube-proxy 源码分析</a></h1>
+                <a class="post-title-link" href="/2019/12/11/statefulset_controller/" itemprop="url">statefulset controller 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -774,8 +769,8 @@ iptables 的功能：
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-01T17:40:30+08:00">
-                2019-11-01
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-11T20:40:30+08:00">
+                2019-12-11
               </time>
             
 
@@ -793,8 +788,8 @@ iptables 的功能：
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/11/01/kube_proxy_process/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/01/kube_proxy_process/" itemprop="commentCount"></span>
+                <a href="/2019/12/11/statefulset_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/11/statefulset_controller/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -824,15 +819,11 @@ iptables 的功能：
       
         
           
-          上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。
-
-kubernetes 版本: v1.16
-
-kube-proxy 启动流程前面的文章已经说过 kub
+          Statefulset 的基本功能statefulset 旨在与有状态的应用及分布式系统一起使用，statefulset 中的每个 pod 拥有一个唯一的身份标识，并且所有 pod 名都是按照 {0..N-1} 的顺序进行编号。本文会主要分析 statefulset controller 的设计与实
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/11/01/kube_proxy_process/#more" rel="contents">
+            <a class="btn" href="/2019/12/11/statefulset_controller/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -885,12 +876,12 @@ kube-proxy 启动流程前面的文章已经说过 kub
   
   
 
-  <article class="post post-type-kubernetes service" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-replicaset controller" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -909,7 +900,7 @@ kube-proxy 启动流程前面的文章已经说过 kub
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/10/31/k8s_service_theory/" itemprop="url">kubernetes service 原理解析</a></h1>
+                <a class="post-title-link" href="/2019/12/08/replicaset_controller/" itemprop="url">replicaset controller 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -921,8 +912,8 @@ kube-proxy 启动流程前面的文章已经说过 kub
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-31T10:30:30+08:00">
-                2019-10-31
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-08T17:00:30+08:00">
+                2019-12-08
               </time>
             
 
@@ -940,8 +931,8 @@ kube-proxy 启动流程前面的文章已经说过 kub
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/10/31/k8s_service_theory/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/31/k8s_service_theory/" itemprop="commentCount"></span>
+                <a href="/2019/12/08/replicaset_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/08/replicaset_controller/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -971,741 +962,11 @@ kube-proxy 启动流程前面的文章已经说过 kub
       
         
           
-          为什么需要 service在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 s
+          在前面的文章中已经介绍了 deployment controller 的设计与实现，deployment 控制的是 replicaset，而 replicaset 控制 pod 的创建与删除，deployment 通过控制 replicaset 实现了滚动更新、回滚等操作。而 replicaset 
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/10/31/k8s_service_theory/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/10/24/kube_scheduler_preempt/" itemprop="url">kube-scheduler 优先级与抢占机制源码分析</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-24T14:35:30+08:00">
-                2019-10-24
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/10/24/kube_scheduler_preempt/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/24/kube_scheduler_preempt/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8 中引入的，v1.11 中该
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/10/24/kube_scheduler_preempt/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/10/22/kube_scheduler_algorithm/" itemprop="url">kube-scheduler predicates 与 priorities 调度算法源码分析</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-22T19:30:30+08:00">
-                2019-10-22
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/10/22/kube_scheduler_algorithm/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/22/kube_scheduler_algorithm/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          在上篇文章kube-scheduler 源码分析中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。
-
-kubernetes 版本: v1.16
-
-predi
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/10/22/kube_scheduler_algorithm/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/10/21/kube_scheduler_process/" itemprop="url">kube-scheduler 源码分析</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-21T17:30:30+08:00">
-                2019-10-21
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/10/21/kube_scheduler_process/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/21/kube_scheduler_process/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          kube-scheduler 的设计Kube-scheduler 是 kubernetes 的核心组件之一，也是所有核心组件之间功能比较单一的，其代码也相对容易理解。kube-scheduler 的目的就是为每一个 pod 选择一个合适的 node，整体流程可以概括为三步，获取未调度的 podLis
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/10/21/kube_scheduler_process/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-improvements" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/10/12/k8s_improvements/" itemprop="url">大规模场景下 kubernetes 集群的性能优化</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-12T16:00:30+08:00">
-                2019-10-12
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/10/12/k8s_improvements/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/12/k8s_improvements/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          一、etcd 优化
-1、etcd 采用本地 ssd 盘作为后端存储存储
-
-2、etcd 独立部署在非 k8s node 上
-
-3、etcd 快照(snap)与预写式日志(wal)分盘存储
-
-
-etcd 详细的优化操作可以参考上篇文章：etcd 性能测试与调优。
-二、apiserver 的优化1、参数
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/10/12/k8s_improvements/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-etcd" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/10/08/etcd_improvements/" itemprop="url">etcd 性能测试与调优</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-08T14:50:30+08:00">
-                2019-10-08
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/10/08/etcd_improvements/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/08/etcd_improvements/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。
-etcd 性能优化
-官方文档原文：https://github.com/etcd-io/etcd/blob/master/Docume
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/10/08/etcd_improvements/#more" rel="contents">
+            <a class="btn" href="/2019/12/08/replicaset_controller/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1754,7 +1015,7 @@ etcd 性能优化
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 

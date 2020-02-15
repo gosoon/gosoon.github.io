@@ -85,7 +85,7 @@
 <meta name="keywords" content="kubernetes tianfeiyu">
 <meta property="og:type" content="website">
 <meta property="og:title" content="田飞雨">
-<meta property="og:url" content="https://blog.tianfeiyu.com/index.html">
+<meta property="og:url" content="https://blog.tianfeiyu.com/page/8/index.html">
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="专注 k8s 云原生实践">
 <meta property="og:locale" content="zh-Hans">
@@ -122,7 +122,7 @@
 
 
 
-  <link rel="canonical" href="https://blog.tianfeiyu.com/">
+  <link rel="canonical" href="https://blog.tianfeiyu.com/page/8/">
 
 
 
@@ -304,12 +304,12 @@
   
   
 
-  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-component-HA" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/03/13/k8s_leader_election/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -328,7 +328,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2020/02/06/kubelet_garbage_collect/" itemprop="url">kubelet 中垃圾回收机制的设计与实现</a></h1>
+                <a class="post-title-link" href="/2019/03/13/k8s_leader_election/" itemprop="url">kubernets 中组件高可用的实现方式</a></h1>
         
 
         <div class="post-meta">
@@ -340,8 +340,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-02-06T16:03:00+08:00">
-                2020-02-06
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-13T07:49:30+08:00">
+                2019-03-13
               </time>
             
 
@@ -359,8 +359,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2020/02/06/kubelet_garbage_collect/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2020/02/06/kubelet_garbage_collect/" itemprop="commentCount"></span>
+                <a href="/2019/03/13/k8s_leader_election/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/03/13/k8s_leader_election/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -390,14 +390,11 @@
       
         
           
-          kubernetes 中的垃圾回收机制主要有两部分组成：
-
-一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象；
-二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用
+          生产环境中为了保障业务的稳定性，集群都需要高可用部署，k8s 中 apiserver 是无状态的，可以横向扩容保证其高可用，kube-controller-manager 和 kube-scheduler 两个组件通过 leader 选举保障高可用，即正常情况下 kube-scheduler 或 k
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2020/02/06/kubelet_garbage_collect/#more" rel="contents">
+            <a class="btn" href="/2019/03/13/k8s_leader_election/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -450,12 +447,12 @@
   
   
 
-  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-v1.12" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/03/05/k8s_v1.12/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -474,7 +471,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2020/01/21/kubelet_qos/" itemprop="url">kubernetes 中 Qos 的设计与实现</a></h1>
+                <a class="post-title-link" href="/2019/03/05/k8s_v1.12/" itemprop="url">kubernetes 集群升级至 v1.12 需要注意的几个问题</a></h1>
         
 
         <div class="post-meta">
@@ -486,8 +483,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-01-21T16:28:30+08:00">
-                2020-01-21
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-05T18:30:30+08:00">
+                2019-03-05
               </time>
             
 
@@ -505,8 +502,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2020/01/21/kubelet_qos/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2020/01/21/kubelet_qos/" itemprop="commentCount"></span>
+                <a href="/2019/03/05/k8s_v1.12/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/03/05/k8s_v1.12/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -536,13 +533,11 @@
       
         
           
-          kubernetes 中的 QosQoS(Quality of Service) 即服务质量，QoS 是一种控制机制，它提供了针对不同用户或者不同数据流采用相应不同的优先级，或者是根据应用程序的要求，保证数据流的性能达到一定的水准。kubernetes 中有三种 Qos，分别为：
-
-1、Guaran
+          最近我们生产环境的集群开始升级至 v1.12 版本了，之前的版本是 v1.8，由于跨了多个版本，风险还是比较大的，官方的建议也是一个一个版本升级，k8s 每三个月出一个版本，集群上了规模后升级太麻烦，鉴于我们真正使用 k8s 中的功能还是比较少的，耦合性没有那么大，所以风险还是相对可控，测试环境运行
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2020/01/21/kubelet_qos/#more" rel="contents">
+            <a class="btn" href="/2019/03/05/k8s_v1.12/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -595,12 +590,12 @@
   
   
 
-  <article class="post post-type-node controller" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-k8s-events" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/02/26/k8s_events/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -619,7 +614,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2020/01/09/nodelifecycle_controller/" itemprop="url">NodeController 源码分析</a></h1>
+                <a class="post-title-link" href="/2019/02/26/k8s_events/" itemprop="url">kubernets 中事件处理机制</a></h1>
         
 
         <div class="post-meta">
@@ -631,8 +626,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-01-09T20:18:30+08:00">
-                2020-01-09
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-02-26T20:49:30+08:00">
+                2019-02-26
               </time>
             
 
@@ -650,8 +645,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2020/01/09/nodelifecycle_controller/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2020/01/09/nodelifecycle_controller/" itemprop="commentCount"></span>
+                <a href="/2019/02/26/k8s_events/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/02/26/k8s_events/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -681,12 +676,11 @@
       
         
           
-          在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍 NodeLifecycleController。
-NodeLifecycleC
+          当集群中的 node 或 pod 异常时，大部分用户会使用 kubectl 查看对应的 events，那么 events 是从何而来的？其实 k8s 中的各个组件会将运行时产生的各种事件汇报到 apiserver，对于 k8s 中的可描述资源，使用 kubectl describe 都可以看到其相关
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2020/01/09/nodelifecycle_controller/#more" rel="contents">
+            <a class="btn" href="/2019/02/26/k8s_events/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -739,12 +733,12 @@ NodeLifecycleC
   
   
 
-  <article class="post post-type-kubelet" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-wait" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/01/03/kubelet_init/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/02/16/k8s-crontab/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -763,7 +757,7 @@ NodeLifecycleC
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2020/01/03/kubelet_init/" itemprop="url">kubelet 启动流程分析</a></h1>
+                <a class="post-title-link" href="/2019/02/16/k8s-crontab/" itemprop="url">k8s 中定时任务的实现</a></h1>
         
 
         <div class="post-meta">
@@ -775,8 +769,8 @@ NodeLifecycleC
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-01-03T20:22:30+08:00">
-                2020-01-03
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-02-16T21:59:30+08:00">
+                2019-02-16
               </time>
             
 
@@ -794,8 +788,8 @@ NodeLifecycleC
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2020/01/03/kubelet_init/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2020/01/03/kubelet_init/" itemprop="commentCount"></span>
+                <a href="/2019/02/16/k8s-crontab/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/02/16/k8s-crontab/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -825,12 +819,11 @@ NodeLifecycleC
       
         
           
-          本来这篇文章会继续讲述 kubelet 中的主要模块，但由于网友反馈能不能先从 kubelet 的启动流程开始，kubelet 的启动流程在很久之前基于 v1.12 写过一篇文章，对比了 v1.16 中的启动流程变化不大，但之前的文章写的比较简洁，本文会重新分析 kubelet 的启动流程。
-Kub
+          k8s 中有许多优秀的包都可以在平时的开发中借鉴与使用，比如，任务的定时轮询、高可用的实现、日志处理、缓存使用等都是独立的包，可以直接引用。本篇文章会介绍 k8s 中定时任务的实现，k8s 中定时任务都是通过 wait 包实现的，wait 包在 k8s 的多个组件中都有用到，以下是 wait 包在 
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2020/01/03/kubelet_init/#more" rel="contents">
+            <a class="btn" href="/2019/02/16/k8s-crontab/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -883,12 +876,12 @@ Kub
   
   
 
-  <article class="post post-type-job controller" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-audit" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/31/job_controller/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/01/30/k8s-audit-webhook/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -907,7 +900,7 @@ Kub
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/12/31/job_controller/" itemprop="url">job controller 源码分析</a></h1>
+                <a class="post-title-link" href="/2019/01/30/k8s-audit-webhook/" itemprop="url">kubernetes 审计日志功能</a></h1>
         
 
         <div class="post-meta">
@@ -919,8 +912,8 @@ Kub
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-31T15:31:30+08:00">
-                2019-12-31
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-01-30T16:26:30+08:00">
+                2019-01-30
               </time>
             
 
@@ -938,8 +931,8 @@ Kub
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/12/31/job_controller/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/31/job_controller/" itemprop="commentCount"></span>
+                <a href="/2019/01/30/k8s-audit-webhook/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/01/30/k8s-audit-webhook/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -969,11 +962,13 @@ Kub
       
         
           
-          job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchj
+          审计日志可以记录所有对 apiserver 接口的调用，让我们能够非常清晰的知道集群到底发生了什么事情，通过记录的日志可以查到所发生的事件、操作的用户和时间。kubernetes 在 v1.7 中支持了日志审计功能（Alpha），在 v1.8 中为 Beta 版本，v1.12 为 GA 版本。
+
+k
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/12/31/job_controller/#more" rel="contents">
+            <a class="btn" href="/2019/01/30/k8s-audit-webhook/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1022,7 +1017,7 @@ Kub
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/7/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><span class="page-number current">8</span><a class="page-number" href="/page/9/">9</a><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/9/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 

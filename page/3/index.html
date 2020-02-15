@@ -304,12 +304,12 @@
   
   
 
-  <article class="post post-type-release version" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-deployment controller" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/09/26/k8s_release_version/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -328,7 +328,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/09/26/k8s_release_version/" itemprop="url">kubernetes 版本多久该升级一次</a></h1>
+                <a class="post-title-link" href="/2019/11/28/deployment_controller/" itemprop="url">deployment controller 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -340,8 +340,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-09-26T15:13:30+08:00">
-                2019-09-26
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-28T14:30:30+08:00">
+                2019-11-28
               </time>
             
 
@@ -359,8 +359,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/09/26/k8s_release_version/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/09/26/k8s_release_version/" itemprop="commentCount"></span>
+                <a href="/2019/11/28/deployment_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/28/deployment_controller/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -390,12 +390,12 @@
       
         
           
-          kubernetes  社区每三个月发布一个新版本，可以说发布新版本的速度非常快，当然，在生产环境中版本升级的速度可能跟不上新版本发布的速度，那么确保目前使用的版本还处于社区的维护阶段就非常重要了，kubernetes 官方对各个版本支持的时间是多长呢？
-kubernetes 发行版通常支持9个月，
+          在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment controller。
+deplo
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/09/26/k8s_release_version/#more" rel="contents">
+            <a class="btn" href="/2019/11/28/deployment_controller/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -448,12 +448,12 @@ kubernetes 发行版通常支持9个月，
   
   
 
-  <article class="post post-type-kind" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/09/06/kind_deploy/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -472,7 +472,7 @@ kubernetes 发行版通常支持9个月，
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/09/06/kind_deploy/" itemprop="url">使用 kind 部署单机版 kubernetes 集群</a></h1>
+                <a class="post-title-link" href="/2019/11/18/kube_proxy_ipvs/" itemprop="url">kube-proxy ipvs 模式源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -484,8 +484,8 @@ kubernetes 发行版通常支持9个月，
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-09-06T10:30:30+08:00">
-                2019-09-06
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-18T11:40:30+08:00">
+                2019-11-18
               </time>
             
 
@@ -503,8 +503,8 @@ kubernetes 发行版通常支持9个月，
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/09/06/kind_deploy/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/09/06/kind_deploy/" itemprop="commentCount"></span>
+                <a href="/2019/11/18/kube_proxy_ipvs/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/18/kube_proxy_ipvs/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -534,13 +534,12 @@ kubernetes 发行版通常支持9个月，
       
         
           
-          kubernetes 从一发布开始其学习门槛就比较高，首先就是部署难，用户要想学习 kubernetes 必须要过部署这一关，社区也推出了多个部署工具帮助简化集群的部署，社区中推出的部署工具主要目标有两大类，部署测试环境与生产环境，本节主要讲述测试环境的部署，目前社区已经有多套部署方案了：
-
-htt
+          前几篇文章已经分析了 service 的原理以及 kube-proxy  iptables 模式的原理与实现，本篇文章会继续分析 kube-proxy ipvs 模式的原理与实现。
+ipvsipvs (IP Virtual Server) 是基于 Netfilter 的，作为 linux 内核的一部
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/09/06/kind_deploy/#more" rel="contents">
+            <a class="btn" href="/2019/11/18/kube_proxy_ipvs/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -593,12 +592,12 @@ htt
   
   
 
-  <article class="post post-type-kubernetes-operator" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/09/01/kube_on_kube_operator_3/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -617,7 +616,7 @@ htt
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/09/01/kube_on_kube_operator_3/" itemprop="url">kube-on-kube-operator 开发(三)</a></h1>
+                <a class="post-title-link" href="/2019/11/06/kube_proxy_iptables/" itemprop="url">kube-proxy iptables 模式源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -629,8 +628,8 @@ htt
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-09-01T17:05:30+08:00">
-                2019-09-01
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-06T19:50:30+08:00">
+                2019-11-06
               </time>
             
 
@@ -648,8 +647,8 @@ htt
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/09/01/kube_on_kube_operator_3/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/09/01/kube_on_kube_operator_3/" itemprop="commentCount"></span>
+                <a href="/2019/11/06/kube_proxy_iptables/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/06/kube_proxy_iptables/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -679,19 +678,14 @@ htt
       
         
           
-          
-kube-on-kube-operator 开发(一)
+          iptables 的功能在前面的文章中已经介绍过  iptable 的一些基本信息，本文会深入介绍 kube-proxy iptables 模式下的工作原理，本文中多处会与 iptables 的知识相关联，若没有 iptables 基础，请先自行补充。
+iptables 的功能：
 
-kube-on-kube-operator 开发(二)
-
-
-本文是介绍 kubernetes-operator 开发的第三篇，前几篇已经提到过 kubernetes-operator 的主要目标是实现以下三种场景中的集群管理：
-
-kube-
+流量转发：DNA
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/09/01/kube_on_kube_operator_3/#more" rel="contents">
+            <a class="btn" href="/2019/11/06/kube_proxy_iptables/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -744,12 +738,12 @@ kube-
   
   
 
-  <article class="post post-type-Authentication,Authorization,RBAC" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kube-proxy" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/08/18/k8s_auth_rbac/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -768,7 +762,7 @@ kube-
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/08/18/k8s_auth_rbac/" itemprop="url">浅析 kubernetes 的认证与鉴权机制</a></h1>
+                <a class="post-title-link" href="/2019/11/01/kube_proxy_process/" itemprop="url">kube-proxy 源码分析</a></h1>
         
 
         <div class="post-meta">
@@ -780,8 +774,8 @@ kube-
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-18T21:20:30+08:00">
-                2019-08-18
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-11-01T17:40:30+08:00">
+                2019-11-01
               </time>
             
 
@@ -799,8 +793,8 @@ kube-
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/08/18/k8s_auth_rbac/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/18/k8s_auth_rbac/" itemprop="commentCount"></span>
+                <a href="/2019/11/01/kube_proxy_process/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/11/01/kube_proxy_process/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -830,11 +824,15 @@ kube-
       
         
           
-          笔者最初接触 kubernetes 时使用的是 v1.4 版本，集群间的通信仅使用 8080 端口，认证与鉴权机制还未得到完善，到后来开始使用 static token 作为认证机制，直到 v1.6 时才开始使用 TLS 认证。随着社区的发展，kubernetes 的认证与鉴权机制已经越来越完善，新
+          上篇文章 kubernetes service 原理解析 已经分析了 service 原理以 kube-proxy 中三种模式的原理，本篇文章会从源码角度分析 kube-proxy 的设计与实现。
+
+kubernetes 版本: v1.16
+
+kube-proxy 启动流程前面的文章已经说过 kub
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/08/18/k8s_auth_rbac/#more" rel="contents">
+            <a class="btn" href="/2019/11/01/kube_proxy_process/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -887,12 +885,12 @@ kube-
   
   
 
-  <article class="post post-type-kubernetes-operator" itemscope="" itemtype="http://schema.org/Article">
+  <article class="post post-type-kubernetes service" itemscope="" itemtype="http://schema.org/Article">
   
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/08/07/kube_on_kube_operator_2/">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/">
 
     <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
       <meta itemprop="name" content="tianfeiyu">
@@ -911,7 +909,7 @@ kube-
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/08/07/kube_on_kube_operator_2/" itemprop="url">kube-on-kube-operator 开发(二)</a></h1>
+                <a class="post-title-link" href="/2019/10/31/k8s_service_theory/" itemprop="url">kubernetes service 原理解析</a></h1>
         
 
         <div class="post-meta">
@@ -923,8 +921,8 @@ kube-
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-07T17:47:30+08:00">
-                2019-08-07
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-31T10:30:30+08:00">
+                2019-10-31
               </time>
             
 
@@ -942,8 +940,8 @@ kube-
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/08/07/kube_on_kube_operator_2/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/07/kube_on_kube_operator_2/" itemprop="commentCount"></span>
+                <a href="/2019/10/31/k8s_service_theory/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/31/k8s_service_theory/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -973,727 +971,11 @@ kube-
       
         
           
-          本文主要讲述 kubernetes-operator 的开发过程，kubernetes-operator 已经开发了一个多月，其核心功能已经实现，其中的架构以及功能设计主要来自于一些生产环境的经验以及自己从事 kubernetes 运维开发两年多的一些工作经验，如有问题望指正。
-kubernetes
+          为什么需要 service在 kubernetes  中，当创建带有多个副本的 deployment 时，kubernetes 会创建出多个 pod，此时即一个服务后端有多个容器，那么在 kubernetes  中负载均衡怎么做，容器漂移后 ip 也会发生变化，如何做服务发现以及会话保持？这就是 s
           ...
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/08/07/kube_on_kube_operator_2/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-code-generator" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/08/06/code_generator/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/08/06/code_generator/" itemprop="url">使用 code-generator 为 CustomResources 生成代码</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-06T20:50:30+08:00">
-                2019-08-06
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/08/06/code_generator/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/06/code_generator/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          kubernetes 项目中有相当一部分代码是自动生成的，主要是 API 的定义和调用方法，kubernetes 项目下 k8s.io/kubernetes/hack/ 目录中以 update 开头的大部分脚本都是用来生成代码的。code-generator 是官方提供的代码生成工具，在实现自定义 
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/08/06/code_generator/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-kubernetes-operator" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/08/05/kube_on_kube_operator_1/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/08/05/kube_on_kube_operator_1/" itemprop="url">kube-on-kube-operator 开发(一)</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-08-05T16:37:30+08:00">
-                2019-08-05
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/08/05/kube_on_kube_operator_1/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/08/05/kube_on_kube_operator_1/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          kubernetes 已经成为容器时代的分布式操作系统内核，目前也是所有公有云提供商的标配，在国内，阿里云、腾讯云、华为云这样的公有云大厂商都支持一键部署 kubernetes 集群，而 kubernetes 集群自动化管理则是迫切需要解决的问题。对于大部分不熟悉 kubernetes 而要上云的小
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/08/05/kube_on_kube_operator_1/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-HA" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/07/12/k8s_components_ha/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/07/12/k8s_components_ha/" itemprop="url">部署高可用 kubernetes 集群</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-12T16:30:00+08:00">
-                2019-07-12
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/07/12/k8s_components_ha/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/07/12/k8s_components_ha/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          kubernetes 虽然具有故障自愈和容错能力，但某些组件的异常会导致整个集群不可用，生产环境中将其部署为高可用还是非常有必要的，本文会介绍如何构建一个高可用的 Kubernetes 集群。kuber-controller-manager 和 kube-scheduler 的高可用官方已经实现了，
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/07/12/k8s_components_ha/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-crd" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/07/02/k8s_crd_verify/" itemprop="url">kubernetes 自定义资源（CRD）的校验</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-02T11:00:00+08:00">
-                2019-07-02
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/07/02/k8s_crd_verify/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/07/02/k8s_crd_verify/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,Namesp
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/07/02/k8s_crd_verify/#more" rel="contents">
-              阅读全文 &raquo;
-            </a>
-          </div>
-          <!--/noindex-->
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-<!-- 横向广告 -->
-<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-go module" itemscope="" itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/06/22/golang_modules/">
-
-    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="tianfeiyu">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="田飞雨">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/06/22/golang_modules/" itemprop="url">使用 Go Modules 管理依赖</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-22T20:49:30+08:00">
-                2019-06-22
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2019/06/22/golang_modules/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count valine-comment-count" data-xid="/2019/06/22/golang_modules/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-          Go Modules 是 Go 语言的一种依赖管理方式，该  feature 是在 Go 1.11 版本中出现的，由于最近在做的项目中，团队都开始使用 go module 来替代以前的 Godep，Kubernetes 也从 v1.15 开始采用 go module 来进行包管理，所以有必要了解一下
-          ...
-          <!--noindex-->
-          <div class="post-button text-center">
-            <a class="btn" href="/2019/06/22/golang_modules/#more" rel="contents">
+            <a class="btn" href="/2019/10/31/k8s_service_theory/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1742,7 +1024,7 @@ kubernetes
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right"></i></a>
   </nav>
 
 
