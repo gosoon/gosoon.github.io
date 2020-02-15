@@ -1,0 +1,558 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>田飞雨</title>
+  <icon>https://blog.tianfeiyu.com/icon.png</icon>
+  <subtitle>专注 k8s 云原生实践</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="https://blog.tianfeiyu.com/"/>
+  <updated>2020-02-06T08:17:56.008Z</updated>
+  <id>https://blog.tianfeiyu.com/</id>
+  
+  <author>
+    <name>tianfeiyu</name>
+    
+  </author>
+  
+  <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>kubelet 中垃圾回收机制的设计与实现</title>
+    <link href="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/"/>
+    <id>https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/</id>
+    <published>2020-02-06T08:03:00.000Z</published>
+    <updated>2020-02-06T08:17:56.008Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;kubernetes 中的垃圾回收机制主要有两部分组成：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubelet" scheme="https://blog.tianfeiyu.com/tags/kubelet/"/>
+    
+      <category term="GarbageCollect" scheme="https://blog.tianfeiyu.com/tags/GarbageCollect/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kubernetes 中 Qos 的设计与实现</title>
+    <link href="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/"/>
+    <id>https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/</id>
+    <published>2020-01-21T08:28:30.000Z</published>
+    <updated>2020-01-21T08:42:57.018Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;kubernetes-中的-Qos&quot;&gt;&lt;a href=&quot;#kubernetes-中的-Qos&quot; class=&quot;headerlink&quot; title=&quot;kubernetes 中的 Qos&quot;&gt;&lt;/a&gt;kubernetes 中的
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubelet" scheme="https://blog.tianfeiyu.com/tags/kubelet/"/>
+    
+      <category term="qos" scheme="https://blog.tianfeiyu.com/tags/qos/"/>
+    
+      <category term="cgroup" scheme="https://blog.tianfeiyu.com/tags/cgroup/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>NodeController 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/"/>
+    <id>https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/</id>
+    <published>2020-01-09T12:18:30.000Z</published>
+    <updated>2020-01-13T06:20:49.277Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在早期的版本中 NodeController 只有一种，v1.16 版本中 NodeController 已经分为了 NodeIpamController 与 NodeLifecycleController，本文主要介绍
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="node controller" scheme="https://blog.tianfeiyu.com/tags/node-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kubelet 启动流程分析</title>
+    <link href="https://blog.tianfeiyu.com/2020/01/03/kubelet_init/"/>
+    <id>https://blog.tianfeiyu.com/2020/01/03/kubelet_init/</id>
+    <published>2020-01-03T12:22:30.000Z</published>
+    <updated>2020-01-03T12:34:16.221Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;本来这篇文章会继续讲述 kubelet 中的主要模块，但由于网友反馈能不能先从 kubelet 的启动流程开始，kubelet 的启动流程在很久之前基于 v1.12 写过一篇文章，对比了 v1.16 中的启动流程变化不大，但之前的文章写的比较简洁，本文会重新分析
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubelet" scheme="https://blog.tianfeiyu.com/tags/kubelet/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>job controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/31/job_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/31/job_controller/</id>
+    <published>2019-12-31T07:31:30.000Z</published>
+    <updated>2020-01-03T09:37:56.246Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="job controller" scheme="https://blog.tianfeiyu.com/tags/job-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>garbage collector controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/</id>
+    <published>2019-12-28T12:23:30.000Z</published>
+    <updated>2019-12-31T05:49:55.630Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="garbage collector controller" scheme="https://blog.tianfeiyu.com/tags/garbage-collector-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kubelet statusManager 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/25/kubelet_status_manager/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/25/kubelet_status_manager/</id>
+    <published>2019-12-25T07:22:30.000Z</published>
+    <updated>2020-01-01T08:31:07.142Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;本篇文章没有接上篇继续更新 kube-controller-manager，kube-controller-manager
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubelet" scheme="https://blog.tianfeiyu.com/tags/kubelet/"/>
+    
+      <category term="statusManager" scheme="https://blog.tianfeiyu.com/tags/statusManager/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>daemonset controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/</id>
+    <published>2019-12-18T02:50:30.000Z</published>
+    <updated>2019-12-18T03:00:40.766Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在前面的文章中已经分析过 deployment、statefulset 两个重要对象了，本文会继续分析 kubernetes 中另一个重要的对象 daemonset，在 kubernetes 中 daemonset 类似于 linux 上的守护进程会运行在每一个 node
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="daemonset controller" scheme="https://blog.tianfeiyu.com/tags/daemonset-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>statefulset controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/</id>
+    <published>2019-12-11T12:40:30.000Z</published>
+    <updated>2020-01-13T02:43:20.872Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;Statefulset-的基本功能&quot;&gt;&lt;a href=&quot;#Statefulset-的基本功能&quot; class=&quot;headerlink&quot; title=&quot;Statefulset 的基本功能&quot;&gt;&lt;/a&gt;Statefulset
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="statefulset controller" scheme="https://blog.tianfeiyu.com/tags/statefulset-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>replicaset controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/</id>
+    <published>2019-12-08T09:00:30.000Z</published>
+    <updated>2019-12-09T01:26:42.388Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在前面的文章中已经介绍了 deployment controller 的设计与实现，deployment 控制的是 replicaset，而 replicaset 控制 pod 的创建与删除，deployment 通过控制 replicaset
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="replicaset controller" scheme="https://blog.tianfeiyu.com/tags/replicaset-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>deployment controller 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/"/>
+    <id>https://blog.tianfeiyu.com/2019/11/28/deployment_controller/</id>
+    <published>2019-11-28T06:30:30.000Z</published>
+    <updated>2019-12-12T09:04:22.392Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
+    
+      <category term="deployment controller" scheme="https://blog.tianfeiyu.com/tags/deployment-controller/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-proxy ipvs 模式源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/"/>
+    <id>https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/</id>
+    <published>2019-11-18T03:40:30.000Z</published>
+    <updated>2019-11-18T06:15:54.021Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;前几篇文章已经分析了 service 的原理以及 kube-proxy  iptables 模式的原理与实现，本篇文章会继续分析 kube-proxy ipvs 模式的原理与实现。&lt;/p&gt;
+&lt;h3 id=&quot;ipvs&quot;&gt;&lt;a href=&quot;#ipvs&quot;
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
+    
+      <category term="ipvs" scheme="https://blog.tianfeiyu.com/tags/ipvs/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-proxy iptables 模式源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/"/>
+    <id>https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/</id>
+    <published>2019-11-06T11:50:30.000Z</published>
+    <updated>2019-11-17T09:18:20.886Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;iptables-的功能&quot;&gt;&lt;a href=&quot;#iptables-的功能&quot; class=&quot;headerlink&quot; title=&quot;iptables 的功能&quot;&gt;&lt;/a&gt;iptables 的功能&lt;/h3&gt;&lt;p&gt;在前面的文章中已经介绍过  iptable
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
+    
+      <category term="iptables" scheme="https://blog.tianfeiyu.com/tags/iptables/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-proxy 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/"/>
+    <id>https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/</id>
+    <published>2019-11-01T09:40:30.000Z</published>
+    <updated>2019-11-12T06:23:53.424Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;上篇文章 &lt;a href=&quot;https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/&quot;&gt;kubernetes service 原理解析&lt;/a&gt; 已经分析了 service 原理以 kube-proxy
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kubernetes service 原理解析</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/</id>
+    <published>2019-10-31T02:30:30.000Z</published>
+    <updated>2019-11-12T03:17:09.229Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;为什么需要-service&quot;&gt;&lt;a href=&quot;#为什么需要-service&quot; class=&quot;headerlink&quot; title=&quot;为什么需要 service&quot;&gt;&lt;/a&gt;为什么需要 service&lt;/h3&gt;&lt;p&gt;在 kubernetes 
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubernetes service" scheme="https://blog.tianfeiyu.com/tags/kubernetes-service/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-scheduler 优先级与抢占机制源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/</id>
+    <published>2019-10-24T06:35:30.000Z</published>
+    <updated>2019-11-12T03:13:56.107Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
+    
+      <category term="preempt" scheme="https://blog.tianfeiyu.com/tags/preempt/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-scheduler predicates 与 priorities 调度算法源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/</id>
+    <published>2019-10-22T11:30:30.000Z</published>
+    <updated>2019-10-23T02:23:44.799Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在上篇文章&lt;a href=&quot;http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/&quot;&gt;kube-scheduler 源码分析&lt;/a&gt;中已经介绍了 kube-scheduler
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
+    
+      <category term="algorithm" scheme="https://blog.tianfeiyu.com/tags/algorithm/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>kube-scheduler 源码分析</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/</id>
+    <published>2019-10-21T09:30:30.000Z</published>
+    <updated>2019-10-21T09:49:12.782Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;kube-scheduler-的设计&quot;&gt;&lt;a href=&quot;#kube-scheduler-的设计&quot; class=&quot;headerlink&quot; title=&quot;kube-scheduler 的设计&quot;&gt;&lt;/a&gt;kube-scheduler
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>大规模场景下 kubernetes 集群的性能优化</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/</id>
+    <published>2019-10-12T08:00:30.000Z</published>
+    <updated>2020-01-06T03:38:05.545Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;一、etcd-优化&quot;&gt;&lt;a href=&quot;#一、etcd-优化&quot; class=&quot;headerlink&quot; title=&quot;一、etcd 优化&quot;&gt;&lt;/a&gt;一、etcd 优化&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;1、etcd 采用本地 ssd
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="improvements" scheme="https://blog.tianfeiyu.com/tags/improvements/"/>
+    
+      <category term="kubernetes" scheme="https://blog.tianfeiyu.com/tags/kubernetes/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>etcd 性能测试与调优</title>
+    <link href="https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/"/>
+    <id>https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/</id>
+    <published>2019-10-08T06:50:30.000Z</published>
+    <updated>2019-10-08T08:11:13.643Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。&lt;/p&gt;
+&lt;h3 id=&quot;etcd-性能优化&quot;&gt;&lt;a href=&quot;#etcd-性能优化&quot;
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="etcd" scheme="https://blog.tianfeiyu.com/tags/etcd/"/>
+    
+      <category term="improvements" scheme="https://blog.tianfeiyu.com/tags/improvements/"/>
+    
+  </entry>
+  
+</feed>
