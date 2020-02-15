@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-scheduler,algorithm,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="在上篇文章kube-scheduler 源码分析中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。  kubernetes 版本: v1.16  predicates 调度算法源码分析predicates 算法主要是对集群中的 node 进行过滤，选出符合">
+<meta name="keywords" content="kube-scheduler,algorithm">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-scheduler predicates 与 priorities 调度算法源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在上篇文章kube-scheduler 源码分析中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。  kubernetes 版本: v1.16  predicates 调度算法源码分析predicates 算法主要是对集群中的 node 进行过滤，选出符合">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-10-23T02:23:44.799Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-scheduler predicates 与 priorities 调度算法源码分析">
+<meta name="twitter:description" content="在上篇文章kube-scheduler 源码分析中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。  kubernetes 版本: v1.16  predicates 调度算法源码分析predicates 算法主要是对集群中的 node 进行过滤，选出符合">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">
+
+
+
+
+
+
+  <title>kube-scheduler predicates 与 priorities 调度算法源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kube-scheduler" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-scheduler predicates 与 priorities 调度算法源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-22T19:30:30+08:00">
+                2019-10-22
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/10/22/kube_scheduler_algorithm/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/10/22/kube_scheduler_algorithm/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在上篇文章<a href="http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/">kube-scheduler 源码分析</a>中已经介绍了 kube-scheduler 的设计以及从源码角度分析了其执行流程，这篇文章会专注介绍调度过程中 predicates 和 priorities 这两个调度策略主要发生作用的阶段。</p>
+<blockquote>
+<p>kubernetes 版本: v1.16</p>
+</blockquote>
+<h3 id="predicates-调度算法源码分析"><a href="#predicates-调度算法源码分析" class="headerlink" title="predicates 调度算法源码分析"></a>predicates 调度算法源码分析</h3><p>predicates 算法主要是对集群中的 node 进行过滤，选出符合当前 pod 运行的 nodes。</p>
+<h4 id="调度算法说明"><a href="#调度算法说明" class="headerlink" title="调度算法说明"></a>调度算法说明</h4><p>上节已经提到默认的调度算法在<code>pkg/scheduler/algorithmprovider/defaults/defaults.go</code>中定义了：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func defaultPredicates() sets.String &#123;</span><br><span class="line">    return sets.NewString(</span><br><span class="line">        predicates.NoVolumeZoneConflictPred,</span><br><span class="line">        predicates.MaxEBSVolumeCountPred,</span><br><span class="line">        predicates.MaxGCEPDVolumeCountPred,</span><br><span class="line">        predicates.MaxAzureDiskVolumeCountPred,</span><br><span class="line">        predicates.MaxCSIVolumeCountPred,</span><br><span class="line">        predicates.MatchInterPodAffinityPred,</span><br><span class="line">        predicates.NoDiskConflictPred,</span><br><span class="line">        predicates.GeneralPred,</span><br><span class="line">        predicates.CheckNodeMemoryPressurePred,</span><br><span class="line">        predicates.CheckNodeDiskPressurePred,</span><br><span class="line">        predicates.CheckNodePIDPressurePred,</span><br><span class="line">        predicates.CheckNodeConditionPred,</span><br><span class="line">        predicates.PodToleratesNodeTaintsPred,</span><br><span class="line">        predicates.CheckVolumeBindingPred,</span><br><span class="line">    )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>下面是对默认调度算法的一些说明：</p>
+<table>
+<thead>
+<tr>
+<th>predicates 算法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GeneralPred</td>
+<td>GeneralPred 包含 PodFitsResources、PodFitsHost,、PodFitsHostPorts、PodMatchNodeSelector 四种算法</td>
+</tr>
+<tr>
+<td>NoDiskConflictPred</td>
+<td>检查多个 Pod 声明挂载的持久化 Volume 是否有冲突</td>
+</tr>
+<tr>
+<td>MaxGCEPDVolumeCountPred</td>
+<td>检查 GCE 持久化 Volume 是否超过了一定数目</td>
+</tr>
+<tr>
+<td>MaxAzureDiskVolumeCountPred</td>
+<td>检查 Azure 持久化 Volume 是否超过了一定数目</td>
+</tr>
+<tr>
+<td>MaxCSIVolumeCountPred</td>
+<td>检查 CSI 持久化 Volume 是否超过了一定数目（已废弃）</td>
+</tr>
+<tr>
+<td>MaxEBSVolumeCountPred</td>
+<td>检查 EBS 持久化 Volume 是否超过了一定数目</td>
+</tr>
+<tr>
+<td>NoVolumeZoneConflictPred</td>
+<td>检查持久化 Volume 的 Zone（高可用域）标签是否与节点的 Zone 标签相匹配</td>
+</tr>
+<tr>
+<td>CheckVolumeBindingPred</td>
+<td>检查该 Pod 对应 PV 的 nodeAffinity 字段是否跟某个节点的标签相匹配，Local Persistent Volume(本地持久化卷)必须使用 nodeAffinity 来跟某个具体的节点绑定</td>
+</tr>
+<tr>
+<td>PodToleratesNodeTaintsPred</td>
+<td>检查 Node 的 Taint 机制，只有当 Pod 的 Toleration 字段与 Node 的 Taint 字段能够匹配时，这个 Pod 才能被调度到该节点上</td>
+</tr>
+<tr>
+<td>MatchInterPodAffinityPred</td>
+<td>检查待调度 Pod 与 Node 上的已有 Pod 之间的亲密（affinity）和反亲密（anti-affinity）关系</td>
+</tr>
+<tr>
+<td>CheckNodeConditionPred</td>
+<td>检查 NodeCondition</td>
+</tr>
+<tr>
+<td>CheckNodePIDPressurePred</td>
+<td>检查 NodePIDPressure</td>
+</tr>
+<tr>
+<td>CheckNodeDiskPressurePred</td>
+<td>检查 NodeDiskPressure</td>
+</tr>
+<tr>
+<td>CheckNodeMemoryPressurePred</td>
+<td>检查 NodeMemoryPressure</td>
+</tr>
+</tbody>
+</table>
+<p>默认的 predicates 调度算法主要分为五种类型：</p>
+<p>1、第一种类型叫作 GeneralPredicates，包含 PodFitsResources、PodFitsHost、PodFitsHostPorts、PodMatchNodeSelector 四种策略，其具体含义如下所示：</p>
+<ul>
+<li>PodFitsHost：检查宿主机的名字是否跟 Pod 的 spec.nodeName 一致</li>
+<li>PodFitsHostPorts：检查 Pod 申请的宿主机端口（spec.nodePort）是不是跟已经被使用的端口有冲突</li>
+<li>PodMatchNodeSelector：检查 Pod 的 nodeSelector 或者 nodeAffinity 指定的节点是否与节点匹配等</li>
+<li>PodFitsResources：检查主机的资源是否满足 Pod 的需求，根据实际已经分配（Request）的资源量做调度       </li>
+</ul>
+<p>kubelet 在启动 Pod 前，会执行一个 Admit 操作来进行二次确认，这里二次确认的规则就是执行一遍 GeneralPredicates。</p>
+<p>2、第二种类型是与 Volume 相关的过滤规则，主要有NoDiskConflictPred、MaxGCEPDVolumeCountPred、MaxAzureDiskVolumeCountPred、MaxCSIVolumeCountPred、MaxEBSVolumeCountPred、NoVolumeZoneConflictPred、CheckVolumeBindingPred。</p>
+<p>3、第三种类型是宿主机相关的过滤规则，主要是 PodToleratesNodeTaintsPred。</p>
+<p>4、第四种类型是 Pod 相关的过滤规则，主要是 MatchInterPodAffinityPred。</p>
+<p>5、第五种类型是新增的过滤规则，与宿主机的运行状况有关，主要有 CheckNodeCondition、 CheckNodeMemoryPressure、CheckNodePIDPressure、CheckNodeDiskPressure 四种。若启用了 <code>TaintNodesByCondition FeatureGates</code> 则在 predicates 算法中会将该四种算法移除，<code>TaintNodesByCondition</code> 基于 <a href="https://kubernetes.io/docs/concepts/architecture/nodes/#condition" target="_blank" rel="noopener">node conditions</a> 当 node 出现 pressure 时自动为 node 打上 taints 标签，该功能在 v1.8 引入，v1.12 成为 beta 版本，目前 v1.16 中也是 beta 版本，但在 v1.13 中该功能已默认启用。</p>
+<p>predicates 调度算法也有一个顺序，要不然在一台资源已经严重不足的宿主机上，上来就开始计算 PodAffinityPredicate 是没有实际意义的，其默认顺序如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/algorithm/predicates/predicates.go:146</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">var (</span><br><span class="line">    predicatesOrdering = []string&#123;CheckNodeConditionPred, CheckNodeUnschedulablePred,</span><br><span class="line">        GeneralPred, HostNamePred, PodFitsHostPortsPred,</span><br><span class="line">        MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,</span><br><span class="line">        PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,</span><br><span class="line">        CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,</span><br><span class="line">        MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,</span><br><span class="line">        CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, EvenPodsSpreadPred, MatchInterPodAffinityPred&#125;</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h4 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h4><p>上节中已经说到调用预选以及优选算法的逻辑在 <code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:189</code>中，</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (result ScheduleResult, err error) &#123;</span><br><span class="line">    ......</span><br><span class="line">		</span><br><span class="line">    // 执行 predicates 策略</span><br><span class="line">    filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod)</span><br><span class="line">    </span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 执行 priorities 策略</span><br><span class="line">    priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework,        pluginContext)</span><br><span class="line">    </span><br><span class="line">    ......</span><br><span class="line">    </span><br><span class="line">    return</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>findNodesThatFit()</code> 是 predicates 策略的实际调用方法，其基本流程如下：</p>
+<ul>
+<li>设定最多需要检查的节点数，作为预选节点数组的容量，避免总节点过多影响调度效率</li>
+<li>通过<code>NodeTree()</code>不断获取下一个节点来判断该节点是否满足 pod 的调度条件</li>
+<li>通过之前注册的各种 predicates 函数来判断当前节点是否符合 pod 的调度条件</li>
+<li>最后返回满足调度条件的 node 列表，供下一步的优选操作</li>
+</ul>
+<p><code>checkNode()</code>是一个校验 node 是否符合要求的函数，其实际调用到的核心函数是<code>podFitsOnNode()</code>，再通过<code>workqueue()</code> 并发执行<code>checkNode()</code> 函数，<code>workqueue()</code> 会启动 16 个 goroutine 来并行计算需要筛选的 node 列表，其主要流程如下：</p>
+<ul>
+<li>通过 cache 中的 <code>NodeTree()</code> 不断获取下一个 node</li>
+<li>将当前 node 和 pod 传入<code>podFitsOnNode()</code> 方法中来判断当前 node 是否符合要求</li>
+<li>如果当前 node 符合要求就将当前 node 加入预选节点的数组中<code>filtered</code></li>
+<li>如果当前 node 不满足要求，则加入到失败的数组中，并记录原因</li>
+<li>通过<code>workqueue.ParallelizeUntil()</code>并发执行<code>checkNode()</code>函数，一旦找到足够的可行节点数后就停止筛选更多节点 </li>
+<li>若配置了 extender 则再次进行过滤已筛选出的 node</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:464</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) &#123;</span><br><span class="line">	var filtered []*v1.Node</span><br><span class="line">	failedPredicateMap := FailedPredicateMap&#123;&#125;</span><br><span class="line">	filteredNodesStatuses := framework.NodeToStatusMap&#123;&#125;</span><br><span class="line"></span><br><span class="line">	if len(g.predicates) == 0 &#123;</span><br><span class="line">		filtered = g.cache.ListNodes()</span><br><span class="line">	&#125; else &#123;</span><br><span class="line">		allNodes := int32(g.cache.NodeTree().NumNodes())</span><br><span class="line">		// 1.设定最多需要检查的节点数</span><br><span class="line">		numNodesToFind := g.numFeasibleNodesToFind(allNodes)</span><br><span class="line"></span><br><span class="line">		filtered = make([]*v1.Node, numNodesToFind)</span><br><span class="line">		......</span><br><span class="line">		</span><br><span class="line">		// 2.获取该 pod 的 meta 值 </span><br><span class="line">		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)</span><br><span class="line"></span><br><span class="line">		// 3.checkNode 为执行预选算法的函数</span><br><span class="line">		checkNode := func(i int) &#123;</span><br><span class="line">			nodeName := g.cache.NodeTree().Next()</span><br><span class="line"></span><br><span class="line">			// 4.podFitsOnNode 最终执行预选算法的函数 </span><br><span class="line">			fits, failedPredicates, status, err := g.podFitsOnNode(</span><br><span class="line">				......</span><br><span class="line">			)</span><br><span class="line">			if err != nil &#123;</span><br><span class="line">				......</span><br><span class="line">			&#125;</span><br><span class="line">			if fits &#123;</span><br><span class="line">				length := atomic.AddInt32(&amp;filteredLen, 1)</span><br><span class="line">				if length &gt; numNodesToFind &#123;</span><br><span class="line">					cancel()</span><br><span class="line">					atomic.AddInt32(&amp;filteredLen, -1)</span><br><span class="line">				&#125; else &#123;</span><br><span class="line">					filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()</span><br><span class="line">				&#125;</span><br><span class="line">			&#125; else &#123;</span><br><span class="line">				......</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		// 5.启动 16 个 goroutine 并发执行 checkNode 函数</span><br><span class="line">		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)</span><br><span class="line"></span><br><span class="line">		filtered = filtered[:filteredLen]</span><br><span class="line">		if len(errs) &gt; 0 &#123;</span><br><span class="line">			......</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	// 6.若配置了 extender 则再次进行过滤</span><br><span class="line">	if len(filtered) &gt; 0 &amp;&amp; len(g.extenders) != 0 &#123;</span><br><span class="line">		......</span><br><span class="line">	&#125;</span><br><span class="line">	return filtered, failedPredicateMap, filteredNodesStatuses, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>然后继续看如何设定最多需要检查的节点数，此过程由<code>numFeasibleNodesToFind()</code>进行处理，基本流程如下：</p>
+<ul>
+<li>如果总的 node 节点小于<code>minFeasibleNodesToFind</code>(默认为100)则直接返回总节点数</li>
+<li>如果节点数超过 100，则取指定百分比 <code>percentageOfNodesToScore</code>(默认值为 50)的节点数 ，当该百分比后的数目仍小于<code>minFeasibleNodesToFind</code>，则返回<code>minFeasibleNodesToFind</code></li>
+<li>如果百分比后的数目大于<code>minFeasibleNodesToFind</code>，则返回该百分比的节点数</li>
+</ul>
+<p>所以当节点数小于 100 时直接返回，大于 100 时只返回其总数的 50%。<code>percentageOfNodesToScore</code> 参数在 v1.12 引入，默认值为 50，kube-scheduler 在启动时可以设定该参数的值。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:441</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) &#123;</span><br><span class="line">    if numAllNodes &lt; minFeasibleNodesToFind || g.percentageOfNodesToScore &gt;= 100 &#123;</span><br><span class="line">        return numAllNodes</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    adaptivePercentage := g.percentageOfNodesToScore</span><br><span class="line">    if adaptivePercentage &lt;= 0 &#123;</span><br><span class="line">        adaptivePercentage = schedulerapi.DefaultPercentageOfNodesToScore - numAllNodes/125</span><br><span class="line">        if adaptivePercentage &lt; minFeasibleNodesPercentageToFind &#123;</span><br><span class="line">            adaptivePercentage = minFeasibleNodesPercentageToFind</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    numNodes = numAllNodes * adaptivePercentage / 100</span><br><span class="line">    if numNodes &lt; minFeasibleNodesToFind &#123;</span><br><span class="line">        return minFeasibleNodesToFind</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return numNodes</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>pridicates 调度算法的核心是 <code>podFitsOnNode()</code> ，scheduler 的抢占机制也会执行该函数，<code>podFitsOnNode()</code>基本流程如下：</p>
+<ul>
+<li>遍历已经注册好的预选策略<code>predicates.Ordering()</code>，按顺序执行对应的策略函数</li>
+<li>遍历执行每个策略函数，并返回是否合适，预选失败的原因和错误</li>
+<li>如果预选函数执行失败，则加入预选失败的数组中，直接返回，后面的预选函数不会再执行</li>
+<li>如果该 node 上存在 nominated pod 则执行两次预选函数</li>
+</ul>
+<p>因为引入了抢占机制，此处主要说明一下执行两次预选函数的原因：</p>
+<p>第一次循环，若该 pod 为抢占者(<code>nominatedPods</code>)，调度器会假设该 pod 已经运行在这个节点上，然后更新<code>meta</code>和<code>nodeInfo</code>，<code>nominatedPods</code>是指执行了抢占机制且已经分配到了 node(<code>pod.Status.NominatedNodeName</code> 已被设定) 但是还没有真正运行起来的 pod，然后再执行所有的预选函数。</p>
+<p>第二次循环，不将<code>nominatedPods</code>加入到 node 内。</p>
+<p>而只有这两遍 predicates 算法都能通过时，这个 pod 和 node 才会被认为是可以绑定(bind)的。这样做是因为考虑到 pod affinity 等策略的执行，如果当前的 pod 与<code>nominatedPods</code>有依赖关系就会有问题，因为<code>nominatedPods</code>不能保证一定可以调度且在已指定的 node 运行成功，也可能出现被其他高优先级的 pod 抢占等问题，关于抢占问题下篇会详细介绍。</p>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:610</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line">func (g *genericScheduler) podFitsOnNode(......) (bool, []predicates.PredicateFailureReason, *framework.Status, error) &#123;</span><br><span class="line">    var failedPredicates []predicates.PredicateFailureReason</span><br><span class="line">    var status *framework.Status</span><br><span class="line"></span><br><span class="line">    podsAdded := false</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; 2; i++ &#123;</span><br><span class="line">        metaToUse := meta</span><br><span class="line">        nodeInfoToUse := info</span><br><span class="line">        if i == 0 &#123;</span><br><span class="line">            // 1.第一次循环加入 NominatedPods，计算 meta, nodeInfo</span><br><span class="line">            podsAdded, metaToUse, nodeInfoToUse = addNominatedPods(pod, meta, info, queue)</span><br><span class="line">        &#125; else if !podsAdded || len(failedPredicates) != 0 &#123;</span><br><span class="line">            break</span><br><span class="line">        &#125;</span><br><span class="line">        // 2.按顺序执行所有预选函数</span><br><span class="line">        for _, predicateKey := range predicates.Ordering() &#123;</span><br><span class="line">            var (</span><br><span class="line">                fit     bool</span><br><span class="line">                reasons []predicates.PredicateFailureReason</span><br><span class="line">                err     error</span><br><span class="line">            )</span><br><span class="line">            if predicate, exist := predicateFuncs[predicateKey]; exist &#123;</span><br><span class="line">                fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)</span><br><span class="line">                if err != nil &#123;</span><br><span class="line">                    return false, []predicates.PredicateFailureReason&#123;&#125;, nil, err</span><br><span class="line">                &#125;</span><br><span class="line">								</span><br><span class="line">                // 3.任何一个预选函数执行失败则直接返回</span><br><span class="line">                if !fit &#123;</span><br><span class="line">                    failedPredicates = append(failedPredicates, reasons...)                   </span><br><span class="line">                    if !alwaysCheckAllPredicates &#123;</span><br><span class="line">                        klog.V(5).Infoln(&quot;since alwaysCheckAllPredicates has not been set, the predicate &quot; +</span><br><span class="line">                            &quot;evaluation is short circuited and there are chances &quot; +</span><br><span class="line">                            &quot;of other predicates failing as well.&quot;)</span><br><span class="line">                        break</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        // 4.执行 Filter Plugin</span><br><span class="line">        status = g.framework.RunFilterPlugins(pluginContext, pod, info.Node().Name)</span><br><span class="line">        if !status.IsSuccess() &amp;&amp; !status.IsUnschedulable() &#123;</span><br><span class="line">            return false, failedPredicates, status, status.AsError()</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return len(failedPredicates) == 0 &amp;&amp; status.IsSuccess(), failedPredicates, status, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>至此，关于 predicates 调度算法的执行过程已经分析完。</p>
+<h3 id="priorities-调度算法源码分析"><a href="#priorities-调度算法源码分析" class="headerlink" title="priorities 调度算法源码分析"></a>priorities 调度算法源码分析</h3><p>priorities  调度算法是在 pridicates 算法后执行的，主要功能是对已经过滤出的 nodes 进行打分并选出最佳的一个 node。</p>
+<h4 id="调度算法说明-1"><a href="#调度算法说明-1" class="headerlink" title="调度算法说明"></a>调度算法说明</h4><p>默认的调度算法在<code>pkg/scheduler/algorithmprovider/defaults/defaults.go</code>中定义了：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">func defaultPriorities() sets.String &#123;</span><br><span class="line">    return sets.NewString(</span><br><span class="line">        priorities.SelectorSpreadPriority,</span><br><span class="line">        priorities.InterPodAffinityPriority,</span><br><span class="line">        priorities.LeastRequestedPriority,</span><br><span class="line">        priorities.BalancedResourceAllocation,</span><br><span class="line">        priorities.NodePreferAvoidPodsPriority,</span><br><span class="line">        priorities.NodeAffinityPriority,</span><br><span class="line">        priorities.TaintTolerationPriority,</span><br><span class="line">        priorities.ImageLocalityPriority,</span><br><span class="line">    )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>默认调度算法的一些说明：</p>
+<table>
+<thead>
+<tr>
+<th>priorities 算法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SelectorSpreadPriority</td>
+<td>按 service，rs，statefulset 归属计算 Node 上分布最少的同类 Pod数量，数量越少得分越高，默认权重为1</td>
+</tr>
+<tr>
+<td>InterPodAffinityPriority</td>
+<td>pod 亲和性选择策略，默认权重为1</td>
+</tr>
+<tr>
+<td>LeastRequestedPriority</td>
+<td>选择空闲资源（CPU 和 Memory）最多的节点，默认权重为1，其计算方式为：score = (cpu((capacity-sum(requested))10/capacity) + memory((capacity-sum(requested))10/capacity))/2</td>
+</tr>
+<tr>
+<td>BalancedResourceAllocation</td>
+<td>CPU、Memory 以及 Volume 资源分配最均衡的节点，默认权重为1，其计算方式为：score = 10 - variance(cpuFraction,memoryFraction,volumeFraction)*10</td>
+</tr>
+<tr>
+<td>NodePreferAvoidPodsPriority</td>
+<td>判断 node annotation 是否有scheduler.alpha.kubernetes.io/preferAvoidPods 标签，类似于 taints 机制，过滤标签中定义类型的 pod，默认权重为10000</td>
+</tr>
+<tr>
+<td>NodeAffinityPriority</td>
+<td>节点亲和性选择策略，默认权重为1</td>
+</tr>
+<tr>
+<td>TaintTolerationPriority</td>
+<td>Pod 是否容忍节点上的 Taint，优先调度到标记了 Taint 的节点，默认权重为1</td>
+</tr>
+<tr>
+<td>ImageLocalityPriority</td>
+<td>待调度 Pod 需要使用的镜像是否存在于该节点，默认权重为1</td>
+</tr>
+</tbody>
+</table>
+<h4 id="源码分析-1"><a href="#源码分析-1" class="headerlink" title="源码分析"></a>源码分析</h4><p>执行 priorities 调度算法的逻辑是在 <code>PrioritizeNodes()</code>函数中，其目的是执行每个 priority 函数为 node 打分，分数为 0-10，其功能主要有：</p>
+<ul>
+<li><code>PrioritizeNodes()</code> 通过并行运行各个优先级函数来对节点进行打分</li>
+<li>每个优先级函数会给节点打分，打分范围为 0-10 分，0 表示优先级最低的节点，10表示优先级最高的节点</li>
+<li>每个优先级函数有各自的权重</li>
+<li>优先级函数返回的节点分数乘以权重以获得加权分数</li>
+<li>最后计算所有节点的总加权分数</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/scheduler/core/generic_scheduler.go:691</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><span class="line">func PrioritizeNodes(......) (schedulerapi.HostPriorityList, error) &#123;</span><br><span class="line">    // 1.检查是否有自定义配置</span><br><span class="line">    if len(priorityConfigs) == 0 &amp;&amp; len(extenders) == 0 &#123;</span><br><span class="line">        result := make(schedulerapi.HostPriorityList, 0, len(nodes))</span><br><span class="line">        for i := range nodes &#123;</span><br><span class="line">            hostPriority, err := EqualPriorityMap(pod, meta, nodeNameToInfo[nodes[i].Name])</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                return nil, err</span><br><span class="line">            &#125;</span><br><span class="line">            result = append(result, hostPriority)</span><br><span class="line">        &#125;</span><br><span class="line">        return result, nil</span><br><span class="line">    &#125;</span><br><span class="line">	......</span><br><span class="line"></span><br><span class="line">    results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    // 2.使用 workqueue 启动 16 个 goroutine 并发为 node 打分</span><br><span class="line">    workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) &#123;</span><br><span class="line">        nodeInfo := nodeNameToInfo[nodes[index].Name]</span><br><span class="line">        for i := range priorityConfigs &#123;</span><br><span class="line">            if priorityConfigs[i].Function != nil &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            var err error</span><br><span class="line">            results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                appendError(err)</span><br><span class="line">                results[i][index].Host = nodes[index].Name</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    // 3.执行自定义配置</span><br><span class="line">    for i := range priorityConfigs &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    wg.Wait()</span><br><span class="line">    if len(errs) != 0 &#123;</span><br><span class="line">        return schedulerapi.HostPriorityList&#123;&#125;, errors.NewAggregate(errs)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4.运行 Score plugins</span><br><span class="line">    scoresMap, scoreStatus := framework.RunScorePlugins(pluginContext, pod, nodes)</span><br><span class="line">    if !scoreStatus.IsSuccess() &#123;</span><br><span class="line">        return schedulerapi.HostPriorityList&#123;&#125;, scoreStatus.AsError()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    result := make(schedulerapi.HostPriorityList, 0, len(nodes))</span><br><span class="line">    // 5.为每个 node 汇总分数</span><br><span class="line">    for i := range nodes &#123;</span><br><span class="line">        result = append(result, schedulerapi.HostPriority&#123;Host: nodes[i].Name, Score: 0&#125;)</span><br><span class="line">        for j := range priorityConfigs &#123;</span><br><span class="line">            result[i].Score += results[j][i].Score * priorityConfigs[j].Weight</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        for j := range scoresMap &#123;</span><br><span class="line">            result[i].Score += scoresMap[j][i].Score</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 6.执行 extender </span><br><span class="line">    if len(extenders) != 0 &amp;&amp; nodes != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    return result, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要讲述了 kube-scheduler 中的 predicates 调度算法与 priorities 调度算法的执行流程，可以看到 kube-scheduler 中有许多的调度策略，但是想要添加自己的策略并不容易，scheduler 目前已经朝着提升性能与扩展性的方向演进了，其调度部分进行性能优化的一个最根本原则就是尽最大可能将集群信息 cache 化，以便从根本上提高 predicates 和 priorities 调度算法的执行效率。第二个就是在 bind 阶段进行异步处理，只会更新其 cache 里的 pod 和 node 的信息，这种基于“乐观”假设的 API 对象更新方式，在 kubernetes 里被称作 assume，如果这次异步的 bind 过程失败了，其实也没有太大关系，等 scheduler cache 同步之后一切又恢复正常了。除了上述的“cache 化”和“乐观绑定”，还有一个重要的设计，那就是“无锁化”，predicates 调度算法与 priorities 调度算法的执行都是并行的，只有在调度队列和 scheduler cache 进行操作时，才需要加锁，而对调度队列的操作并不影响主流程。</p>
+<p>参考：</p>
+<p><a href="https://kubernetes.io/docs/concepts/configuration/scheduling-framework/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/configuration/scheduling-framework/</a></p>
+<p><a href="https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md" target="_blank" rel="noopener">predicates-ordering.md</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-scheduler/" rel="tag"># kube-scheduler</a>
+          
+            <a href="/tags/algorithm/" rel="tag"># algorithm</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/10/21/kube_scheduler_process/" rel="next" title="kube-scheduler 源码分析">
+                <i class="fa fa-chevron-left"></i> kube-scheduler 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/10/24/kube_scheduler_preempt/" rel="prev" title="kube-scheduler 优先级与抢占机制源码分析">
+                kube-scheduler 优先级与抢占机制源码分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#predicates-调度算法源码分析"><span class="nav-number">1.</span> <span class="nav-text">predicates 调度算法源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#调度算法说明"><span class="nav-number">1.1.</span> <span class="nav-text">调度算法说明</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#源码分析"><span class="nav-number">1.2.</span> <span class="nav-text">源码分析</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#priorities-调度算法源码分析"><span class="nav-number">2.</span> <span class="nav-text">priorities 调度算法源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#调度算法说明-1"><span class="nav-number">2.1.</span> <span class="nav-text">调度算法说明</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#源码分析-1"><span class="nav-number">2.2.</span> <span class="nav-text">源码分析</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

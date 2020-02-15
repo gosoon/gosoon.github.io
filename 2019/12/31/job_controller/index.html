@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,job controller,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。 job 的基本功能创建">
+<meta name="keywords" content="kube-controller-manager,job controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="job controller 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/12/31/job_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。 job 的基本功能创建">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2020-01-03T09:37:56.246Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="job controller 源码分析">
+<meta name="twitter:description" content="job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。 job 的基本功能创建">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/12/31/job_controller/">
+
+
+
+
+
+
+  <title>job controller 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-job controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/31/job_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">job controller 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-31T15:31:30+08:00">
+                2019-12-31
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/12/31/job_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/31/job_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>job 在 kubernetes 中主要用来处理离线任务，job 直接管理 pod，可以创建一个或多个 pod 并会确保指定数量的 pod 运行完成。kubernetes 中有两种类型的 job，分别为 cronjob 和 batchjob，cronjob 类似于定时任务是定时触发的而 batchjob 创建后会直接运行，本文主要介绍 batchjob，下面简称为 job。</p>
+<h3 id="job-的基本功能"><a href="#job-的基本功能" class="headerlink" title="job 的基本功能"></a>job 的基本功能</h3><h4 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h4><p>job 的一个示例如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: batch/v1</span><br><span class="line">kind: Job</span><br><span class="line">metadata:</span><br><span class="line">  name: pi</span><br><span class="line">spec:</span><br><span class="line">  backoffLimit: 6                // 标记为 failed 前的重试次数，默认为 6</span><br><span class="line">  completions: 4                 // 要完成job 的 pod 数，若没有设定该值则默认等于 parallelism 的值</span><br><span class="line">  parallelism: 2                 // 任意时间最多可以启动多少个 pod 同时运行，默认为 1</span><br><span class="line">  activeDeadlineSeconds: 120     // job 运行时间</span><br><span class="line">  ttlSecondsAfterFinished: 60    // job 在运行完成后 60 秒就会自动删除掉</span><br><span class="line">  template:</span><br><span class="line">    spec:</span><br><span class="line">      containers:</span><br><span class="line">      - command:</span><br><span class="line">        - sh</span><br><span class="line">        - -c</span><br><span class="line">        - &apos;echo &apos;&apos;scale=5000; 4*a(1)&apos;&apos; | bc -l &apos;</span><br><span class="line">        image: resouer/ubuntu-bc</span><br><span class="line">        name: pi</span><br><span class="line">      restartPolicy: Never</span><br></pre></td></tr></table></figure>
+<h4 id="扩缩容"><a href="#扩缩容" class="headerlink" title="扩缩容"></a>扩缩容</h4><p>job 不支持运行时扩缩容，job 在创建后其 <code>spec.completions</code> 字段也不支持修改。</p>
+<h4 id="删除"><a href="#删除" class="headerlink" title="删除"></a>删除</h4><p>通常系统中已执行完成的 job 不再需要，将它们保留在系统中会占用一定的资源，需要进行回收，pod 在执行完任务后会进入到 <code>Completed</code> 状态，删除 job 也会清除其创建的 pod。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get pod</span><br><span class="line">pi-gdrwr                            0/1     Completed   0          10m</span><br><span class="line">pi-rjphf                            0/1     Completed   0          10m</span><br><span class="line"></span><br><span class="line">$ kubectl delete job pi</span><br></pre></td></tr></table></figure>
+<h5 id="自动清理机制"><a href="#自动清理机制" class="headerlink" title="自动清理机制"></a>自动清理机制</h5><p>每次 job 执行完成后手动回收非常麻烦，k8s 在 v1.12 版本中加入了 <code>TTLAfterFinished</code> feature-gates，启用该特性后会启动一个 TTL 控制器，在创建 job 时指定后可在 job 运行完成后自动回收相关联的 pod，如上文中的 yaml 所示，创建 job 时指定了 <code>ttlSecondsAfterFinished: 60</code>，job 在执行完成后停留 60s 会被自动回收， 若 <code>ttlSecondsAfterFinished</code> 设置为 0 则表示在 job 执行完成后立刻回收。当 TTL 控制器清理 job 时，它将级联删除 job，即 pod 和 job 一起被删除。不过该特性截止目前还是 Alpha 版本，请谨慎使用。</p>
+<h3 id="job-controller-源码分析"><a href="#job-controller-源码分析" class="headerlink" title="job controller 源码分析"></a>job controller 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>在上节介绍了 job 的基本操作后，本节会继续深入源码了解其背后的设计与实现。</p>
+<h4 id="startJobController"><a href="#startJobController" class="headerlink" title="startJobController"></a>startJobController</h4><p>首先还是直接看 jobController 的启动方法 <code>startJobController</code>，该方法中调用 <code>NewJobController</code> 初始化 jobController 然后调用 <code>Run</code> 方法启动 jobController。从初始化流程中可以看到 JobController 监听 pod 和 job 两种资源，其中 <code>ConcurrentJobSyncs</code> 默认值为 5。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/batch.go:33</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">func startJobController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    if !ctx.AvailableResources[schema.GroupVersionResource&#123;Group: &quot;batch&quot;, Version: &quot;v1&quot;, Resource: &quot;jobs&quot;&#125;] &#123;</span><br><span class="line">        return nil, false, nil</span><br><span class="line">    &#125;</span><br><span class="line">    go job.NewJobController(</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.InformerFactory.Batch().V1().Jobs(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;job-controller&quot;),</span><br><span class="line">    ).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Run"><a href="#Run" class="headerlink" title="Run"></a>Run</h4><p>以下是 jobController 的 <code>Run</code> 方法，其中核心逻辑是调用 <code>jm.worker</code> 执行 syncLoop 操作，worker 方法是 <code>syncJob</code> 方法的别名，最终调用的是 <code>syncJob</code>。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/job/job_controller.go:139</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func (jm *JobController) Run(workers int, stopCh &lt;-chan struct&#123;&#125;) &#123;</span><br><span class="line">    defer utilruntime.HandleCrash()</span><br><span class="line">    defer jm.queue.ShutDown()</span><br><span class="line"></span><br><span class="line">    klog.Infof(&quot;Starting job controller&quot;)</span><br><span class="line">    defer klog.Infof(&quot;Shutting down job controller&quot;)</span><br><span class="line"></span><br><span class="line">    if !cache.WaitForNamedCacheSync(&quot;job&quot;, stopCh, jm.podStoreSynced, jm.jobStoreSynced) &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; workers; i++ &#123;</span><br><span class="line">        go wait.Until(jm.worker, time.Second, stopCh)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &lt;-stopCh</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="syncJob"><a href="#syncJob" class="headerlink" title="syncJob"></a>syncJob</h4><p><code>syncJob</code> 是 jobController 的核心方法，其主要逻辑为：</p>
+<ul>
+<li>1、从 lister 中获取 job 对象；</li>
+<li><p>2、判断 job 是否已经执行完成，当 job 的 <code>.status.conditions</code> 中有 <code>Complete</code> 或 <code>Failed</code> 的 type 且对应的 status 为 true 时表示该 job 已经执行完成，例如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">status:</span><br><span class="line">  completionTime: &quot;2019-12-18T14:16:47Z&quot;</span><br><span class="line">  conditions:</span><br><span class="line">  - lastProbeTime: &quot;2019-12-18T14:16:47Z&quot;</span><br><span class="line">    lastTransitionTime: &quot;2019-12-18T14:16:47Z&quot;</span><br><span class="line">    status: &quot;True&quot;				// status 为 true</span><br><span class="line">    type: Complete          			// Complete</span><br><span class="line">  startTime: &quot;2019-12-18T14:15:35Z&quot;</span><br><span class="line">  succeeded: 2</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>3、获取 job 重试的次数；</p>
+</li>
+<li>4、调用 <code>jm.expectations.SatisfiedExpectations</code> 判断 job 是否需能进行 sync 操作，Expectations 机制在之前写的” ReplicaSetController 源码分析“一文中详细讲解过，其主要判断条件如下：<ul>
+<li>1、该 key 在 ControllerExpectations 中的 adds 和 dels 都 &lt;= 0，即调用 apiserver 的创建和删除接口没有失败过；</li>
+<li>2、该 key 在 ControllerExpectations 中已经超过 5min 没有更新了；</li>
+<li>3、该 key 在 ControllerExpectations 中不存在，即该对象是新创建的；</li>
+<li>4、调用 <code>GetExpectations</code> 方法失败，内部错误；</li>
+</ul>
+</li>
+<li>5、调用 <code>jm.getPodsForJob</code> 通过 selector 获取 job 关联的 pod，若有孤儿 pod 的 label 与 job 的能匹配则进行关联，若已关联的 pod label 有变化则解除与 job 的关联关系；</li>
+<li>6、分别计算 <code>active</code>、<code>succeeded</code>、<code>failed</code> 状态的 pod 数；</li>
+<li>7、判断 job 是否为首次启动，若首次启动其 <code>job.Status.StartTime</code> 为空，此时首先设置 startTime，然后检查是否有 <code>job.Spec.ActiveDeadlineSeconds</code> 是否为空，若不为空则将其再加入到延迟队列中，等待 <code>ActiveDeadlineSeconds</code> 时间后会再次触发 sync 操作；</li>
+<li>8、判断 job 的重试次数是否超过了 <code>job.Spec.BackoffLimit</code>(默认是6次)，有两个判断方法一是 job 的重试次数以及 job 的状态，二是当 job 的 <code>restartPolicy</code> 为 <code>OnFailure</code> 时 container 的重启次数，两者任一个符合都说明 job 处于 failed 状态且原因为 <code>BackoffLimitExceeded</code>；</li>
+<li>9、判断 job 的运行时间是否达到 <code>job.Spec.ActiveDeadlineSeconds</code> 中设定的值，若已达到则说明 job 此时处于 failed 状态且原因为 <code>DeadlineExceeded</code>；</li>
+<li>10、根据以上判断如果 job 处于 failed 状态，则调用 <code>jm.deleteJobPods</code> 并发删除所有 active pods ；</li>
+<li>11、若非 failed 状态，根据 <code>jobNeedsSync</code> 判断是否要进行同步，若需要同步则调用 <code>jm.manageJob</code> 进行同步；</li>
+<li>12、通过检查 <code>job.Spec.Completions</code> 判断 job 是否已经运行完成，若 <code>job.Spec.Completions</code> 字段没有设置值则只要有一个 pod 运行完成该 job 就为 <code>Completed</code> 状态，若设置了 <code>job.Spec.Completions</code> 会通过判断已经运行完成状态的 pod 即 <code>succeeded</code> pod 数是否大于等于该值；</li>
+<li>13、通过以上判断若 job 运行完成了，则更新 <code>job.Status.Conditions</code> 和 <code>job.Status.CompletionTime</code> 字段；</li>
+<li>14、如果 job 的 status 有变化，将 job 的 status 更新到 apiserver；</li>
+</ul>
+<p>在 <code>syncJob</code> 中又调用了 <code>jm.manageJob</code> 处理非 failed 状态下的 <code>sync</code> 操作，下面主要分析一下该方法。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/job/job_controller.go:436</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br></pre></td><td class="code"><pre><span class="line">func (jm *JobController) syncJob(key string) (bool, error) &#123;</span><br><span class="line">    // 1、计算每次 sync 的运行时间</span><br><span class="line">    startTime := time.Now()</span><br><span class="line">    defer func() &#123;</span><br><span class="line">        klog.V(4).Infof(&quot;Finished syncing job %q (%v)&quot;, key, time.Since(startTime))</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    ns, name, err := cache.SplitMetaNamespaceKey(key)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, err</span><br><span class="line">    &#125;</span><br><span class="line">    if len(ns) == 0 || len(name) == 0 &#123;</span><br><span class="line">        return false, fmt.Errorf(&quot;invalid job key %q: either namespace or name is missing&quot;, key)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、从 lister 中获取 job 对象</span><br><span class="line">    sharedJob, err := jm.jobLister.Jobs(ns).Get(name)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if errors.IsNotFound(err) &#123;</span><br><span class="line">            klog.V(4).Infof(&quot;Job has been deleted: %v&quot;, key)</span><br><span class="line">            jm.expectations.DeleteExpectations(key)</span><br><span class="line">            return true, nil</span><br><span class="line">        &#125;</span><br><span class="line">        return false, err</span><br><span class="line">    &#125;</span><br><span class="line">    job := *sharedJob</span><br><span class="line"></span><br><span class="line">    // 3、判断 job 是否已经执行完成</span><br><span class="line">    if IsJobFinished(&amp;job) &#123;</span><br><span class="line">        return true, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、获取 job 重试的次数</span><br><span class="line">    previousRetry := jm.queue.NumRequeues(key)</span><br><span class="line"></span><br><span class="line">    // 5、判断 job 是否能进行 sync 操作</span><br><span class="line">    jobNeedsSync := jm.expectations.SatisfiedExpectations(key)</span><br><span class="line"></span><br><span class="line">    // 6、获取 job 关联的所有 pod</span><br><span class="line">    pods, err := jm.getPodsForJob(&amp;job)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return false, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 7、分别计算 active、succeeded、failed 状态的 pod 数</span><br><span class="line">    activePods := controller.FilterActivePods(pods)</span><br><span class="line">    active := int32(len(activePods))</span><br><span class="line">    succeeded, failed := getStatus(pods)</span><br><span class="line">    conditions := len(job.Status.Conditions)</span><br><span class="line"></span><br><span class="line">    // 8、判断 job 是否为首次启动</span><br><span class="line">    if job.Status.StartTime == nil &#123;</span><br><span class="line">        now := metav1.Now()</span><br><span class="line">        job.Status.StartTime = &amp;now</span><br><span class="line">        // 9、判断是否设定了 ActiveDeadlineSeconds 值</span><br><span class="line">        if job.Spec.ActiveDeadlineSeconds != nil &#123;</span><br><span class="line">            klog.V(4).Infof(&quot;Job %s have ActiveDeadlineSeconds will sync after %d seconds&quot;,</span><br><span class="line">                key, *job.Spec.ActiveDeadlineSeconds)</span><br><span class="line">            jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var manageJobErr error</span><br><span class="line">    jobFailed := false</span><br><span class="line">    var failureReason string</span><br><span class="line">    var failureMessage string</span><br><span class="line"></span><br><span class="line">    // 10、判断 job 的重启次数是否已达到上限，即处于 BackoffLimitExceeded</span><br><span class="line">    jobHaveNewFailure := failed &gt; job.Status.Failed</span><br><span class="line">    exceedsBackoffLimit := jobHaveNewFailure &amp;&amp; (active != *job.Spec.Parallelism) &amp;&amp;</span><br><span class="line">        (int32(previousRetry)+1 &gt; *job.Spec.BackoffLimit)</span><br><span class="line"></span><br><span class="line">    if exceedsBackoffLimit || pastBackoffLimitOnFailure(&amp;job, pods) &#123;</span><br><span class="line">        jobFailed = true</span><br><span class="line">        failureReason = &quot;BackoffLimitExceeded&quot;</span><br><span class="line">        failureMessage = &quot;Job has reached the specified backoff limit&quot;</span><br><span class="line">    &#125; else if pastActiveDeadline(&amp;job) &#123;</span><br><span class="line">        jobFailed = true</span><br><span class="line">        failureReason = &quot;DeadlineExceeded&quot;</span><br><span class="line">        failureMessage = &quot;Job was active longer than specified deadline&quot;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 11、如果处于 failed 状态，则调用 jm.deleteJobPods 并发删除所有 active pods</span><br><span class="line">    if jobFailed &#123;</span><br><span class="line">        errCh := make(chan error, active)</span><br><span class="line">        jm.deleteJobPods(&amp;job, activePods, errCh)</span><br><span class="line">        select &#123;</span><br><span class="line">        case manageJobErr = &lt;-errCh:</span><br><span class="line">            if manageJobErr != nil &#123;</span><br><span class="line">                break</span><br><span class="line">            &#125;</span><br><span class="line">        default:</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        failed += active</span><br><span class="line">        active = 0</span><br><span class="line">        job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, failureReason, failureMessage))</span><br><span class="line">        jm.recorder.Event(&amp;job, v1.EventTypeWarning, failureReason, failureMessage)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line"></span><br><span class="line">        // 12、若非 failed 状态，根据 jobNeedsSync 判断是否要进行同步</span><br><span class="line">        if jobNeedsSync &amp;&amp; job.DeletionTimestamp == nil &#123;</span><br><span class="line">            active, manageJobErr = jm.manageJob(activePods, succeeded, &amp;job)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 13、检查 job.Spec.Completions 判断 job 是否已经运行完成</span><br><span class="line">        completions := succeeded</span><br><span class="line">        complete := false</span><br><span class="line">        if job.Spec.Completions == nil &#123;</span><br><span class="line">            if succeeded &gt; 0 &amp;&amp; active == 0 &#123;</span><br><span class="line">                complete = true</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            if completions &gt;= *job.Spec.Completions &#123;</span><br><span class="line">                complete = true</span><br><span class="line">                if active &gt; 0 &#123;</span><br><span class="line">                    jm.recorder.Event(&amp;job, v1.EventTypeWarning, &quot;TooManyActivePods&quot;, &quot;Too many active pods running after completion count reached&quot;)</span><br><span class="line">                &#125;</span><br><span class="line">                if completions &gt; *job.Spec.Completions &#123;</span><br><span class="line">                    jm.recorder.Event(&amp;job, v1.EventTypeWarning, &quot;TooManySucceededPods&quot;, &quot;Too many succeeded pods running after completion count        reached&quot;)</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 14、若 job 运行完成了，则更新 job.Status.Conditions 和 job.Status.CompletionTime 字段</span><br><span class="line">        if complete &#123;</span><br><span class="line">            job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, &quot;&quot;, &quot;&quot;))</span><br><span class="line">            now := metav1.Now()</span><br><span class="line">            job.Status.CompletionTime = &amp;now</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    forget := false</span><br><span class="line">    if job.Status.Succeeded &lt; succeeded &#123;</span><br><span class="line">        forget = true</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 15、如果 job 的 status 有变化，将 job 的 status 更新到 apiserver</span><br><span class="line">    if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || len(job.Status.Conditions) != conditions &#123;</span><br><span class="line">        job.Status.Active = active</span><br><span class="line">        job.Status.Succeeded = succeeded</span><br><span class="line">        job.Status.Failed = failed</span><br><span class="line"></span><br><span class="line">        if err := jm.updateHandler(&amp;job); err != nil &#123;</span><br><span class="line">            return forget, err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if jobHaveNewFailure &amp;&amp; !IsJobFinished(&amp;job) &#123;</span><br><span class="line">            return forget, fmt.Errorf(&quot;failed pod(s) detected for job key %q&quot;, key)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        forget = true</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return forget, manageJobErr</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="jm-manageJob"><a href="#jm-manageJob" class="headerlink" title="jm.manageJob"></a>jm.manageJob</h5><p><code>jm.manageJob</code>它主要做的事情就是根据 job 配置的并发数来确认当前处于 active 的 pods 数量是否合理，如果不合理的话则进行调整，其主要逻辑为：</p>
+<ul>
+<li>1、首先获取 job 的 active pods 数与可运行的 pod 数即 <code>job.Spec.Parallelism</code>；</li>
+<li><p>2、判断如果处于 active 状态的 pods 数大于 job 设置的并发数 <code>job.Spec.Parallelism</code>，则并发删除多余的 active pods，需要删除的 active pods 是有一定的优先级的，删除的优先级为：</p>
+<ul>
+<li>1、判断是否绑定了 node：Unassigned &lt; assigned；</li>
+<li>2、判断 pod phase：PodPending &lt; PodUnknown &lt; PodRunning；</li>
+<li>3、判断 pod 状态：Not ready &lt; ready；</li>
+<li>4、若 pod 都为 ready，则按运行时间排序，运行时间最短会被删除：empty time &lt; less time &lt; more time；</li>
+<li>5、根据 pod 重启次数排序：higher restart counts &lt; lower restart counts；</li>
+<li>6、按 pod 创建时间进行排序：Empty creation time pods &lt; newer pods &lt; older pods；</li>
+</ul>
+</li>
+<li><p>3、若处于 active 状态的 pods 数小于 job 设置的并发数，则需要根据 job 的配置计算 pod 的 diff 数并进行创建，计算方法与 <code>completions</code>、<code>parallelism</code> 以及 <code>succeeded</code> 的 pods 数有关，计算出 diff 数后会进行批量创建，创建的 pod 数依次为 1、2、4、8……，呈指数级增长，job 创建 pod 的方式与 rs 创建 pod 是类似的，但是此处并没有限制在一个 syncLoop 中创建 pod 的上限值，创建完 pod 后会将结果记录在 job 的 <code>expectations</code> 中，此处并非所有的 pod 都能创建成功，若超时错误会直接忽略，因其他错误创建失败的 pod 会记录在 <code>expectations</code> 中，<code>expectations</code> 机制的主要目的是减少不必要的 sync 操作，至于其详细的说明可以参考之前写的 ” ReplicaSetController 源码分析“ 一文；</p>
+</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/job/job_controller.go:684</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br></pre></td><td class="code"><pre><span class="line">func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *batch.Job) (int32, error) &#123;</span><br><span class="line">    // 1、获取 job 的 active pods 数与可运行的 pod 数</span><br><span class="line">    var activeLock sync.Mutex</span><br><span class="line">    active := int32(len(activePods))</span><br><span class="line">    parallelism := *job.Spec.Parallelism</span><br><span class="line">    jobKey, err := controller.KeyFunc(job)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        utilruntime.HandleError(fmt.Errorf(&quot;Couldn&apos;t get key for job %#v: %v&quot;, job, err))</span><br><span class="line">        return 0, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var errCh chan error</span><br><span class="line">    // 2、如果处于 active 状态的 pods 数大于 job 设置的并发数</span><br><span class="line">    if active &gt; parallelism &#123;</span><br><span class="line">        diff := active - parallelism</span><br><span class="line">        errCh = make(chan error, diff)</span><br><span class="line">        jm.expectations.ExpectDeletions(jobKey, int(diff))</span><br><span class="line">        klog.V(4).Infof(&quot;Too many pods running job %q, need %d, deleting %d&quot;, jobKey, parallelism, diff)</span><br><span class="line"></span><br><span class="line">        // 3、对 activePods 按以上 6 种策略进行排序</span><br><span class="line">        sort.Sort(controller.ActivePods(activePods))</span><br><span class="line"></span><br><span class="line">        // 4、并发删除多余的 active pods</span><br><span class="line">        active -= diff</span><br><span class="line">        wait := sync.WaitGroup&#123;&#125;</span><br><span class="line">        wait.Add(int(diff))</span><br><span class="line">        for i := int32(0); i &lt; diff; i++ &#123;</span><br><span class="line">            go func(ix int32) &#123;</span><br><span class="line">                defer wait.Done()</span><br><span class="line">                if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil &#123;</span><br><span class="line">                    defer utilruntime.HandleError(err)</span><br><span class="line"></span><br><span class="line">                    klog.V(2).Infof(&quot;Failed to delete %v, decrementing expectations for job %q/%q&quot;, activePods[ix].Name, job.Namespace, job.Name)</span><br><span class="line">                    jm.expectations.DeletionObserved(jobKey)</span><br><span class="line">                    activeLock.Lock()</span><br><span class="line">                    active++</span><br><span class="line">                    activeLock.Unlock()</span><br><span class="line">                    errCh &lt;- err</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;(i)</span><br><span class="line">        &#125;</span><br><span class="line">        wait.Wait()</span><br><span class="line"></span><br><span class="line">    // 5、若处于 active 状态的 pods 数小于 job 设置的并发数，则需要创建出新的 pod</span><br><span class="line">    &#125; else if active &lt; parallelism &#123;</span><br><span class="line">    		// 6、首先计算出 diff 数</span><br><span class="line">    		// 若 job.Spec.Completions == nil &amp;&amp; succeeded pods &gt; 0, 则diff = 0;</span><br><span class="line">    		// 若 job.Spec.Completions == nil &amp;&amp; succeeded pods = 0，则diff = Parallelism;</span><br><span class="line">    		// 若 job.Spec.Completions != nil 则diff等于(job.Spec.Completions - succeeded - active)和 parallelism 中的最小值(非负值)；</span><br><span class="line">        wantActive := int32(0)</span><br><span class="line">        if job.Spec.Completions == nil &#123;</span><br><span class="line">            if succeeded &gt; 0 &#123;</span><br><span class="line">                wantActive = active</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                wantActive = parallelism</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            wantActive = *job.Spec.Completions - succeeded</span><br><span class="line">            if wantActive &gt; parallelism &#123;</span><br><span class="line">                wantActive = parallelism</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        diff := wantActive - active</span><br><span class="line">        if diff &lt; 0 &#123;</span><br><span class="line">            utilruntime.HandleError(fmt.Errorf(&quot;More active than wanted: job %q, want %d, have %d&quot;, jobKey, wantActive, active))</span><br><span class="line">            diff = 0</span><br><span class="line">        &#125;</span><br><span class="line">        if diff == 0 &#123;</span><br><span class="line">            return active, nil</span><br><span class="line">        &#125;</span><br><span class="line">        jm.expectations.ExpectCreations(jobKey, int(diff))</span><br><span class="line">        errCh = make(chan error, diff)</span><br><span class="line">        klog.V(4).Infof(&quot;Too few pods running job %q, need %d, creating %d&quot;, jobKey, wantActive, diff)</span><br><span class="line">        active += diff</span><br><span class="line">        wait := sync.WaitGroup&#123;&#125;</span><br><span class="line"></span><br><span class="line">        // 7、批量创建 pod，呈指数级增长</span><br><span class="line">        for batchSize := int32(integer.IntMin(int(diff), controller.SlowStartInitialBatchSize)); diff &gt; 0; batchSize = integer.Int32Min(2*batchSize,     diff) &#123;</span><br><span class="line">            errorCount := len(errCh)</span><br><span class="line">            wait.Add(int(batchSize))</span><br><span class="line">            for i := int32(0); i &lt; batchSize; i++ &#123;</span><br><span class="line">                go func() &#123;</span><br><span class="line">                    defer wait.Done()</span><br><span class="line">                    err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &amp;job.Spec.Template, job, metav1.NewControllerRef(job,                controllerKind))</span><br><span class="line">                    // 8、调用 apiserver 创建时忽略 Timeout 错误</span><br><span class="line">                    if err != nil &amp;&amp; errors.IsTimeout(err) &#123;</span><br><span class="line">                        return</span><br><span class="line">                    &#125;</span><br><span class="line">                    if err != nil &#123;</span><br><span class="line">                        defer utilruntime.HandleError(err)</span><br><span class="line">                        klog.V(2).Infof(&quot;Failed creation, decrementing expectations for job %q/%q&quot;, job.Namespace, job.Name)</span><br><span class="line">                        jm.expectations.CreationObserved(jobKey)</span><br><span class="line">                        activeLock.Lock()</span><br><span class="line">                        active--</span><br><span class="line">                        activeLock.Unlock()</span><br><span class="line">                        errCh &lt;- err</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;()</span><br><span class="line">            &#125;</span><br><span class="line">            wait.Wait()</span><br><span class="line"></span><br><span class="line">            // 9、若有创建失败的操作记录在 expectations 中</span><br><span class="line">            skippedPods := diff - batchSize</span><br><span class="line">            if errorCount &lt; len(errCh) &amp;&amp; skippedPods &gt; 0 &#123;</span><br><span class="line">                klog.V(2).Infof(&quot;Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q&quot;, skippedPods, job.Namespace, job.Name)</span><br><span class="line">                active -= skippedPods</span><br><span class="line">                for i := int32(0); i &lt; skippedPods; i++ &#123;</span><br><span class="line">                    jm.expectations.CreationObserved(jobKey)</span><br><span class="line">                &#125;</span><br><span class="line">                break</span><br><span class="line">            &#125;</span><br><span class="line">            diff -= batchSize</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    select &#123;</span><br><span class="line">    case err := &lt;-errCh:</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return active, err</span><br><span class="line">        &#125;</span><br><span class="line">    default:</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return active, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>以上就是 jobController 源码中主要的逻辑，从上文分析可以看到 jobController 的代码比较清晰，若看过前面写的几个 controller 分析会发现每个 controller 在功能实现上有很多类似的地方。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/job-controller/" rel="tag"># job controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/28/garbagecollector_controller/" rel="next" title="garbage collector controller 源码分析">
+                <i class="fa fa-chevron-left"></i> garbage collector controller 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2020/01/03/kubelet_init/" rel="prev" title="kubelet 启动流程分析">
+                kubelet 启动流程分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#job-的基本功能"><span class="nav-number">1.</span> <span class="nav-text">job 的基本功能</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#创建"><span class="nav-number">1.1.</span> <span class="nav-text">创建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#扩缩容"><span class="nav-number">1.2.</span> <span class="nav-text">扩缩容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#删除"><span class="nav-number">1.3.</span> <span class="nav-text">删除</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#自动清理机制"><span class="nav-number">1.3.1.</span> <span class="nav-text">自动清理机制</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#job-controller-源码分析"><span class="nav-number">2.</span> <span class="nav-text">job controller 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#startJobController"><span class="nav-number">2.1.</span> <span class="nav-text">startJobController</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Run"><span class="nav-number">2.2.</span> <span class="nav-text">Run</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#syncJob"><span class="nav-number">2.3.</span> <span class="nav-text">syncJob</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#jm-manageJob"><span class="nav-number">2.3.1.</span> <span class="nav-text">jm.manageJob</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="crd,admission control,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
+<meta name="keywords" content="crd,admission control">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes 自定义资源（CRD）的校验">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/1562032999173.jpg">
+<meta property="og:updated_time" content="2019-09-18T05:53:44.408Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernetes 自定义资源（CRD）的校验">
+<meta name="twitter:description" content="在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota 等都是 apiserver">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/1562032999173.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/">
+
+
+
+
+
+
+  <title>kubernetes 自定义资源（CRD）的校验 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-crd" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/07/02/k8s_crd_verify/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernetes 自定义资源（CRD）的校验</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-02T11:00:00+08:00">
+                2019-07-02
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/07/02/k8s_crd_verify/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/07/02/k8s_crd_verify/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在以前的版本若要对 apiserver 的请求做一些访问控制，必须修改 apiserver 的源代码然后重新编译部署，非常麻烦也不灵活，apiserver 也支持一些动态的准入控制器，在 apiserver 配置中看到的<code>ServiceAccount,NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota</code> 等都是 apiserver 的准入控制器，但这些都是 kubernetes 中默认内置的。在 v1.9 中，kubernetes 的动态准入控制器功能中支持了  Admission Webhooks，即用户可以以插件的方式对 apiserver 的请求做一些访问控制，要使用该功能需要自己写一个 admission webhook，apiserver 会在请求通过认证和授权之后、对象被持久化之前拦截该请求，然后调用 webhook 已达到准入控制，比如 Istio 中 sidecar 的注入就是通过这种方式实现的，在创建 Pod 阶段 apiserver 会回调 webhook 然后将 Sidecar 代理注入至用户 Pod。 本文主要介绍如何使用 AdmissionWebhook 对 CR 的校验，一般在开发 operator 过程中，都是通过对 CR 的操作实现某个功能的，若 CR 不规范可能会导致某些问题，所以对提交 CR 的校验是不可避免的一个步骤。</p>
+<p>kubernetes 目前提供了两种方式来对 CR 的校验，语法校验(<code>OpenAPI v3 schema</code>） 和语义校验<br>(<code>validatingadmissionwebhook</code>）。</p>
+<p>CRD 的一个示例：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  # name must match the spec fields below, and be in the form: &lt;plural&gt;.&lt;group&gt;</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  # group name to use for REST API: /apis/&lt;group&gt;/&lt;version&gt;</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  # list of versions supported by this CustomResourceDefinition</span><br><span class="line">  versions:</span><br><span class="line">    - name: v1</span><br><span class="line">      # Each version can be enabled/disabled by Served flag.</span><br><span class="line">      served: true</span><br><span class="line">      # One and only one version must be marked as the storage version.</span><br><span class="line">      storage: true</span><br><span class="line">  # either Namespaced or Cluster</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  names:</span><br><span class="line">    # plural name to be used in the URL: /apis/&lt;group&gt;/&lt;version&gt;/&lt;plural&gt;</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    # singular name to be used as an alias on the CLI and for display</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    # kind is normally the CamelCased singular type. Your resource manifests use this.</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">	  # listKind</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    # shortNames allow shorter string to match your resource on the CLI</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br></pre></td></tr></table></figure>
+<p>CRD 的一个对象：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: ecs.yun.com/v1</span><br><span class="line">kind: KubernetesCluster</span><br><span class="line">metadata:</span><br><span class="line">  name: test-cluster</span><br><span class="line">spec:</span><br><span class="line">  clusterType: kubernetes</span><br><span class="line">  serviceCIDR: &apos;&apos;</span><br><span class="line">  masterList:</span><br><span class="line">  - ip: 192.168.1.10</span><br><span class="line">  nodeList:</span><br><span class="line">  - ip: 192.168.1.11</span><br><span class="line">  privateSSHKey: &apos;&apos;</span><br><span class="line">  scaleUp: 0</span><br><span class="line">  scaleDown: 0</span><br></pre></td></tr></table></figure>
+<h4 id="一、OpenAPI-v3-schema"><a href="#一、OpenAPI-v3-schema" class="headerlink" title="一、OpenAPI v3 schema"></a>一、OpenAPI v3 schema</h4><p><a href="https://github.com/OAI/OpenAPI-Specification" target="_blank" rel="noopener">OpenAPI</a> 是针对 REST API 的 API 描述格式，也是一种规范。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apiextensions.k8s.io/v1beta1</span><br><span class="line">kind: CustomResourceDefinition</span><br><span class="line">metadata:</span><br><span class="line">  name: kubernetesclusters.ecs.yun.com</span><br><span class="line">spec:</span><br><span class="line">  group: ecs.yun.com</span><br><span class="line">  versions:</span><br><span class="line">    - name: v1</span><br><span class="line">      served: true</span><br><span class="line">      storage: true</span><br><span class="line">  scope: Namespaced</span><br><span class="line">  names:</span><br><span class="line">    plural: kubernetesclusters</span><br><span class="line">    singular: kubernetescluster</span><br><span class="line">    kind: KubernetesCluster</span><br><span class="line">    listKind: KubernetesClusterList</span><br><span class="line">    shortNames:</span><br><span class="line">    - ecs</span><br><span class="line">  validation:</span><br><span class="line">    openAPIV3Schema:</span><br><span class="line">      properties:</span><br><span class="line">        spec:</span><br><span class="line">	  type: object</span><br><span class="line">          required:</span><br><span class="line">          - clusterType</span><br><span class="line">          - masterList</span><br><span class="line">          - nodeList</span><br><span class="line">          properties:</span><br><span class="line">            clusterType:</span><br><span class="line">              type: string</span><br><span class="line">            scaleUp:</span><br><span class="line">              type: integer</span><br><span class="line">            scaleDown:</span><br><span class="line">              type: integer</span><br><span class="line">              minimum: 0</span><br></pre></td></tr></table></figure>
+<p>上面是使用 OpenAPI v3 检验的一个例子，OpenAPI v3 仅支持一些简单的校验规则，可以校验参数的类型，参数值的类型(支持正则)，是否为必要参数等，但若要使用与、或、非等操作对多个字段同时校验还是做不到的，所以针对一些特定场景的校验需要使用 admission webhook。 </p>
+<h4 id="二、Admission-Webhooks"><a href="#二、Admission-Webhooks" class="headerlink" title="二、Admission Webhooks"></a>二、Admission Webhooks</h4><p>admission control 在 apiserver 中进行配置的，使用<code>--enable-admission-plugins</code> 或 <code>--admission-control</code>进行启用，admission control 配置的控制器列表是有顺序的，越靠前的越先执行，一旦某个控制器返回的结果是reject 的，那么整个准入控制阶段立刻结束，所以这里的配置顺序是有序的，建议使用官方的顺序配置。</p>
+<p>在 v1.9 中，admission webhook 是通过在 <code>--admission-control</code> 中配置 <code>ValidatingAdmissionWebhook</code> 或 <code>MutatingAdmissionWebhook</code> 来支持使用的，两者区别如下：</p>
+<ul>
+<li>MutatingAdmissionWebhook：允许在 webhook 中对 object 进行 mutate 修改，但匹配到的 webhook <strong>串行</strong>执行，因为每个 webhook 都可能会 mutate object。</li>
+<li>ValidatingAdmissionWebhook: 不允许在 webhook 中对 Object 进行 mutate 修改，仅返回 true 或 false。</li>
+</ul>
+<p>启用 admission webhook 后，每次对 CR 做 CRUD 操作时，请求就会被 apiserver 拦住，至于 CRUD 中哪些请求被拦住都是提前在 WebhookConfiguration 中配置的，然后会调用 AdmissionWebhook 进行检查是否 Admit 通过。</p>
+<p><img src="http://cdn.tianfeiyu.com/1562032999173.jpg" alt="kubernetes API request lifecycle"></p>
+<h4 id="三、启用-Admission-Webhooks-功能"><a href="#三、启用-Admission-Webhooks-功能" class="headerlink" title="三、启用 Admission Webhooks 功能"></a>三、启用 Admission Webhooks 功能</h4><blockquote>
+<p>kubernetes 版本 &gt;= v1.9</p>
+</blockquote>
+<p>1、在 apiserver 中开启 admission webhooks</p>
+<p>在 v1.9 版本中使用的是：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota</span><br></pre></td></tr></table></figure>
+<p>在 v1.10 以后会弃用 <code>--admission-control</code>，取而代之的是  <code>--enable-admission-plugins</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">--enable-admission-plugins=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota</span><br></pre></td></tr></table></figure>
+<p>启用之后在 api-resources 可以看到：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># kubectl api-resources | grep admissionregistration</span><br><span class="line">mutatingwebhookconfigurations                  admissionregistration.k8s.io   false        MutatingWebhookConfiguration</span><br><span class="line">validatingwebhookconfigurations                admissionregistration.k8s.io   false        ValidatingWebhookConfiguration</span><br></pre></td></tr></table></figure>
+<p>2、启用 <code>admissionregistration.k8s.io/v1alpha1</code> API</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">//  检查 API 是否已启用</span><br><span class="line">$ kubectl api-versions | grep admissionregistration.k8s.io</span><br></pre></td></tr></table></figure>
+<p>若不存在则需要在 apiserver 的配置中添加<code>--runtime-config=admissionregistration.k8s.io/v1alpha1</code>。</p>
+<h4 id="四、编写-Admission-Webhook-Server"><a href="#四、编写-Admission-Webhook-Server" class="headerlink" title="四、编写 Admission Webhook Server"></a>四、编写 Admission Webhook Server</h4><p>webhook 其实就是一个 RESTful API 里面加上自己的一些校验逻辑。</p>
+<p>可以参考官方的示例：<br><a href="https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go</a><br>或者<br><a href="https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/e2e/apimachinery/webhook.go" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/e2e/apimachinery/webhook.go</a></p>
+<blockquote>
+<p>完整代码参考：<a href="https://github.com/gosoon/admission-webhook" target="_blank" rel="noopener">https://github.com/gosoon/admission-webhook</a></p>
+</blockquote>
+<h4 id="五、部署-Admission-Webhook-Service"><a href="#五、部署-Admission-Webhook-Service" class="headerlink" title="五、部署 Admission Webhook Service"></a>五、部署 Admission Webhook Service</h4><p>由于 apiserver 调用 webhook 时强制使用 TLS 认证，所以 WebhookConfiguration 中一定要配置 caBundle，也就是需要自己生成一套私有证书。</p>
+<p>生成证书的方式比较多，以下使用 openssl 生成，脚本如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line"></span><br><span class="line"># Generate the CA cert and private key</span><br><span class="line">openssl req -nodes -new -x509 -days 365 -keyout ca.key -out ca.crt -subj &quot;/CN=admission-webhook CA&quot;</span><br><span class="line"></span><br><span class="line"># Generate the private key for the webhook server</span><br><span class="line">openssl genrsa -out admission-webhook-tls.key 2048</span><br><span class="line"></span><br><span class="line"># Generate a Certificate Signing Request (CSR) for the private key, and sign it with the private key of the CA.</span><br><span class="line">openssl req -new -key admission-webhook-tls.key -subj &quot;/CN=admission-webhook.ecs-system.svc&quot; \</span><br><span class="line">    | openssl x509 -days 365 -req -CA ca.crt -CAkey ca.key -CAcreateserial -out admission-webhook-tls.crt</span><br><span class="line"></span><br><span class="line"># Generate pem</span><br><span class="line">openssl base64 -A &lt; ca.crt &gt; ca.pem</span><br></pre></td></tr></table></figure>
+<p>生成证书后将 ca.pem 中的内容复制到 caBundle 处。</p>
+<p>ValidatingWebhook yaml 文件如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: admissionregistration.k8s.io/v1beta1</span><br><span class="line">kind: ValidatingWebhookConfiguration</span><br><span class="line">metadata:</span><br><span class="line">  name: admission-webhook</span><br><span class="line">webhooks:</span><br><span class="line">  - name: admission-webhook.ecs-system.svc  # 必须为 &lt;svc_name&gt;.&lt;svc_namespace&gt;.svc.</span><br><span class="line">    failurePolicy: Ignore</span><br><span class="line">    clientConfig:</span><br><span class="line">      service:</span><br><span class="line">        name: admission-webhook</span><br><span class="line">        namespace: ecs-system</span><br><span class="line">        path: /ecs/operator/cluster  # webhook controller</span><br><span class="line">      caBundle: xxx</span><br><span class="line">    rules:</span><br><span class="line">      - operations:   # 需要校验的方法</span><br><span class="line">        - CREATE</span><br><span class="line">        - UPDATE</span><br><span class="line">        apiGroups:    # api group</span><br><span class="line">        - ecs.yun.com</span><br><span class="line">        apiVersions:  # version</span><br><span class="line">        - v1</span><br><span class="line">        resources:    # resource</span><br><span class="line">        - kubernetesclusters</span><br></pre></td></tr></table></figure>
+<p>注意 <code>failurePolicy</code> 可以为 <code>Ignore</code>或者<code>Fail</code>，意味着如果和 webhook 通信出现问题导致调用失败，将根据 <code>failurePolicy</code>决定忽略失败（admit）还是准入失败(reject)。</p>
+<p>最后将 webhook 部署在集群中。</p>
+<p>参考：<br><a href="https://github.com/gosoon/admission-webhook" target="_blank" rel="noopener">https://github.com/gosoon/admission-webhook</a><br><a href="https://banzaicloud.com/blog/k8s-admission-webhooks/" target="_blank" rel="noopener">https://banzaicloud.com/blog/k8s-admission-webhooks/</a><br><a href="http://blog.fatedier.com/2019/03/20/k8s-crd/" target="_blank" rel="noopener">http://blog.fatedier.com/2019/03/20/k8s-crd/</a><br><a href="https://my.oschina.net/jxcdwangtao/blog/1591681" target="_blank" rel="noopener">https://my.oschina.net/jxcdwangtao/blog/1591681</a><br><a href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/</a><br><a href="https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#is-there-a-recommended-set-of-admission-controllers-to-use" target="_blank" rel="noopener">https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#is-there-a-recommended-set-of-admission-controllers-to-use</a><br><a href="https://istio.io/zh/help/ops/setup/validation/" target="_blank" rel="noopener">https://istio.io/zh/help/ops/setup/validation/</a><br><a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/" target="_blank" rel="noopener">https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/crd/" rel="tag"># crd</a>
+          
+            <a href="/tags/admission-control/" rel="tag"># admission control</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/06/22/golang_modules/" rel="next" title="使用 Go Modules 管理依赖">
+                <i class="fa fa-chevron-left"></i> 使用 Go Modules 管理依赖
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/07/12/k8s_components_ha/" rel="prev" title="部署高可用 kubernetes 集群">
+                部署高可用 kubernetes 集群 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、OpenAPI-v3-schema"><span class="nav-number">1.</span> <span class="nav-text">一、OpenAPI v3 schema</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Admission-Webhooks"><span class="nav-number">2.</span> <span class="nav-text">二、Admission Webhooks</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、启用-Admission-Webhooks-功能"><span class="nav-number">3.</span> <span class="nav-text">三、启用 Admission Webhooks 功能</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、编写-Admission-Webhook-Server"><span class="nav-number">4.</span> <span class="nav-text">四、编写 Admission Webhook Server</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、部署-Admission-Webhook-Service"><span class="nav-number">5.</span> <span class="nav-text">五、部署 Admission Webhook Service</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

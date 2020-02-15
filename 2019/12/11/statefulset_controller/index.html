@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-controller-manager,statefulset controller,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="Statefulset 的基本功能statefulset 旨在与有状态的应用及分布式系统一起使用，statefulset 中的每个 pod 拥有一个唯一的身份标识，并且所有 pod 名都是按照 {0..N-1} 的顺序进行编号。本文会主要分析 statefulset controller 的设计与实现，在分析源码前先介绍一下 statefulset 的基本使用。 创建对于一个拥有 N 个副本的 s">
+<meta name="keywords" content="kube-controller-manager,statefulset controller">
+<meta property="og:type" content="article">
+<meta property="og:title" content="statefulset controller 源码分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="Statefulset 的基本功能statefulset 旨在与有状态的应用及分布式系统一起使用，statefulset 中的每个 pod 拥有一个唯一的身份标识，并且所有 pod 名都是按照 {0..N-1} 的顺序进行编号。本文会主要分析 statefulset controller 的设计与实现，在分析源码前先介绍一下 statefulset 的基本使用。 创建对于一个拥有 N 个副本的 s">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/format-sts.png">
+<meta property="og:updated_time" content="2020-01-13T02:43:20.872Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="statefulset controller 源码分析">
+<meta name="twitter:description" content="Statefulset 的基本功能statefulset 旨在与有状态的应用及分布式系统一起使用，statefulset 中的每个 pod 拥有一个唯一的身份标识，并且所有 pod 名都是按照 {0..N-1} 的顺序进行编号。本文会主要分析 statefulset controller 的设计与实现，在分析源码前先介绍一下 statefulset 的基本使用。 创建对于一个拥有 N 个副本的 s">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/format-sts.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/">
+
+
+
+
+
+
+  <title>statefulset controller 源码分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-statefulset controller" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">statefulset controller 源码分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-12-11T20:40:30+08:00">
+                2019-12-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/12/11/statefulset_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2019/12/11/statefulset_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="Statefulset-的基本功能"><a href="#Statefulset-的基本功能" class="headerlink" title="Statefulset 的基本功能"></a>Statefulset 的基本功能</h3><p>statefulset 旨在与有状态的应用及分布式系统一起使用，statefulset 中的每个 pod 拥有一个唯一的身份标识，并且所有 pod 名都是按照 {0..N-1} 的顺序进行编号。本文会主要分析 statefulset controller 的设计与实现，在分析源码前先介绍一下 statefulset 的基本使用。</p>
+<h4 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h4><p>对于一个拥有 N 个副本的 statefulset，pod 是按照 {0..N-1}的序号顺序创建的，并且会等待前一个 pod 变为 <code>Running &amp; Ready</code> 后才会启动下一个 pod。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl create -f sts.yaml</span><br><span class="line"></span><br><span class="line">$ kubectl get pod -o wide -w</span><br><span class="line">NAME    READY   STATUS              RESTARTS   AGE   IP       NODE</span><br><span class="line">web-0   0/1     ContainerCreating   0          20s   &lt;none&gt;   minikube</span><br><span class="line">web-0   1/1     Running             0          3m1s   10.1.0.8   minikube</span><br><span class="line"></span><br><span class="line">web-1   0/1     Pending             0          0s     &lt;none&gt;     &lt;none&gt;</span><br><span class="line">web-1   0/1     ContainerCreating   0          2s     &lt;none&gt;     minikube</span><br><span class="line">web-1   1/1     Running             0          4s     10.1.0.9   minikube</span><br></pre></td></tr></table></figure>
+<h4 id="扩容"><a href="#扩容" class="headerlink" title="扩容"></a>扩容</h4><p>statefulset 扩容时 pod 也是顺序创建的，编号与前面的 pod 相接。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl scale sts web --replicas=4</span><br><span class="line">statefulset.apps/web scaled</span><br><span class="line"></span><br><span class="line">$ kubectl get pod -o wide -w</span><br><span class="line">......</span><br><span class="line">web-2   0/1     Pending             0          0s     &lt;none&gt;     &lt;none&gt;</span><br><span class="line">web-2   0/1     ContainerCreating   0          1s     &lt;none&gt;     minikube</span><br><span class="line">web-2   1/1     Running             0          4s     10.1.0.10   minikube</span><br><span class="line"></span><br><span class="line">web-3   0/1     Pending             0          0s     &lt;none&gt;      &lt;none&gt;</span><br><span class="line">web-3   0/1     ContainerCreating   0          1s     &lt;none&gt;      minikube</span><br><span class="line">web-3   1/1     Running             0          4s     10.1.0.11   minikube</span><br></pre></td></tr></table></figure>
+<h4 id="缩容"><a href="#缩容" class="headerlink" title="缩容"></a>缩容</h4><p>缩容时控制器会按照与 pod 序号索引相反的顺序每次删除一个 pod，在删除下一个 pod 前会等待上一个被完全删除。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl scale sts web --replicas=2</span><br><span class="line"></span><br><span class="line">$ kubectl get pod -o wide -w</span><br><span class="line">......</span><br><span class="line">web-3   1/1     Terminating         0          8m25s   10.1.0.11   minikube</span><br><span class="line">web-3   0/1     Terminating         0          8m27s   &lt;none&gt;      minikube</span><br><span class="line"></span><br><span class="line">web-2   1/1     Terminating         0          8m31s   10.1.0.10   minikube</span><br><span class="line">web-2   0/1     Terminating         0          8m33s   10.1.0.10   minikube</span><br></pre></td></tr></table></figure>
+<h4 id="更新"><a href="#更新" class="headerlink" title="更新"></a>更新</h4><p>更新策略由 statefulset 中的 <code>spec.updateStrategy.type</code> 字段决定，可以指定为 <code>OnDelete</code> 或者 <code>RollingUpdate</code> , 默认的更新策略为  <code>RollingUpdate</code>。当使用<code>RollingUpdate</code> 更新策略更新所有 pod 时采用与序号索引相反的顺序进行更新，即最先删除序号最大的 pod 并根据更新策略中的 <code>partition</code> 参数来进行分段更新，控制器会更新所有序号大于或等于  <code>partition</code> 的 pod，等该区间内的 pod 更新完成后需要再次设定  <code>partition</code>  的值以此来更新剩余的 pod，最终  <code>partition</code>  被设置为 0 时代表更新完成了所有的 pod。在更新过程中，如果一个序号小于 <code>partition</code> 的 pod 被删除或者终止，controller 依然会使用更新前的配置重新创建。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">// 使用 RollingUpdate 策略更新</span><br><span class="line">$ kubectl patch statefulset web --type=&apos;json&apos; -p=&apos;[&#123;&quot;op&quot;: &quot;replace&quot;, &quot;path&quot;: &quot;/spec/template/spec/containers/0/image&quot;, &quot;value&quot;:&quot;nginx:1.16&quot;&#125;]&apos;</span><br><span class="line"></span><br><span class="line">statefulset.apps/web patched</span><br><span class="line"></span><br><span class="line">$ kubectl rollout status sts/web</span><br><span class="line">Waiting for 1 pods to be ready...</span><br><span class="line">Waiting for partitioned roll out to finish: 1 out of 2 new pods have been updated...</span><br><span class="line">Waiting for 1 pods to be ready...</span><br><span class="line">partitioned roll out complete: 2 new pods have been updated...</span><br></pre></td></tr></table></figure>
+<p>如果 statefulset 的 <code>.spec.updateStrategy.type</code> 字段被设置为 <code>OnDelete</code>，在更新 statefulset 时，statefulset controller 将不会自动更新其 pod。你必须手动删除 pod，此时 statefulset controller 在重新创建 pod 时，使用修改过的 <code>.spec.template</code> 的内容创建新 pod。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">// 使用 OnDelete 方式更新</span><br><span class="line">$ kubectl patch statefulset nginx --type=&apos;json&apos; -p=&apos;[&#123;&quot;op&quot;: &quot;replace&quot;, &quot;path&quot;: &quot;/spec/template/spec/containers/0/image&quot;, &quot;value&quot;:&quot;nginx:1.9&quot;&#125;]&apos;</span><br><span class="line"></span><br><span class="line">// 删除 web-1</span><br><span class="line">$ kubectl delete pod web-1</span><br><span class="line"></span><br><span class="line">// 查看 web-0 与 web-1 的镜像版本，此时发现 web-1 已经变为最新版本 nginx:1.9 了</span><br><span class="line">$ kubectl get pod -l app=nginx -o jsonpath=&apos;&#123;range .items[*]&#125;&#123;.metadata.name&#125;&#123;&quot;\t&quot;&#125;&#123;.spec.containers[0].image&#125;&#123;&quot;\n&quot;&#125;&#123;end&#125;&apos;</span><br><span class="line">web-0	nginx:1.16</span><br><span class="line">web-1	nginx:1.9</span><br></pre></td></tr></table></figure>
+<p>使用滚动更新策略时你必须以某种策略不断更新 <code>partition</code> 值来进行升级，类似于金丝雀部署方式，升级对于 pod 名称来说是逆序。使用非滚动更新方式，需要手动删除对应的 pod，升级可以是无序的。</p>
+<h4 id="回滚"><a href="#回滚" class="headerlink" title="回滚"></a>回滚</h4><p>statefulset 和 deployment 一样也支持回滚操作，statefulset 也保存了历史版本，和 deployment 一样利用<code>.spec.revisionHistoryLimit</code> 字段设置保存多少个历史版本，但 statefulset 的回滚并不是自动进行的，回滚操作也仅仅是进行了一次发布更新，和发布更新的策略一样，更新 statefulset  后需要按照对应的策略手动删除 pod 或者修改 <code>partition</code> 字段以达到回滚 pod 的目的。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">// 查看 sts 的历史版本</span><br><span class="line">$ kubectl rollout history statefulset web</span><br><span class="line">statefulset.apps/web</span><br><span class="line">REVISION</span><br><span class="line">0</span><br><span class="line">0</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line"></span><br><span class="line">$ kubectl get controllerrevision</span><br><span class="line">NAME             CONTROLLER             REVISION   AGE</span><br><span class="line">web-6c4c79564f   statefulset.apps/web   6          11m</span><br><span class="line">web-c47b9997f    statefulset.apps/web   5          4h13m</span><br><span class="line"></span><br><span class="line">// 回滚至最近的一个版本</span><br><span class="line">$ kubectl rollout undo statefulset web --to-revision=5</span><br></pre></td></tr></table></figure>
+<p>因为 statefulset 的使用对象是有状态服务，大部分有状态副本集都会用到持久存储，statefulset 下的每个 pod 正常情况下都会关联一个 pv 对象，对 statefulset 对象回滚非常容易，但其使用的 pv 中保存的数据无法回滚，所以在生产环境中进行回滚时需要谨慎操作，statefulset、pod、pvc 和 pv 关系图如下所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/format-sts.png" alt=""></p>
+<h4 id="删除"><a href="#删除" class="headerlink" title="删除"></a>删除</h4><p>statefulset 同时支持级联和非级联删除。使用非级联方式删除 statefulset 时，statefulset 的 pod 不会被删除。使用级联删除时，statefulset 和它关联的 pod 都会被删除。对于级联与非级联删除，在删除时需要指定删除选项(<code>orphan</code>、<code>background</code> 或者 <code>foreground</code>)进行区分。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">// 1、非级联删除</span><br><span class="line">$ kubectl delete statefulset web --cascade=false</span><br><span class="line"></span><br><span class="line">// 删除 sts 后 pod 依然处于运行中</span><br><span class="line">$ kubectl get pod</span><br><span class="line">NAME    READY   STATUS    RESTARTS   AGE</span><br><span class="line">web-0   1/1     Running   0          4m38s</span><br><span class="line">web-1   1/1     Running   0          17m</span><br><span class="line"></span><br><span class="line">// 重新创建 sts 后，会再次关联所有的 pod</span><br><span class="line">$ kubectl create  -f  sts.yaml</span><br><span class="line"></span><br><span class="line">$ kubectl get sts</span><br><span class="line">NAME   READY   AGE</span><br><span class="line">web    2/2     28s</span><br></pre></td></tr></table></figure>
+<p>在级联删除 statefulset 时，会将所有的 pod 同时删掉，statefulset 控制器会首先进行一个类似缩容的操作，pod 按照和他们序号索引相反的顺序每次终止一个。在终止一个 pod 前，statefulset 控制器会等待 pod 后继者被完全终止。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">// 2、级联删除</span><br><span class="line">$ kubectl delete statefulset web</span><br><span class="line"></span><br><span class="line">$ kubectl get pod -o wide -w</span><br><span class="line">......</span><br><span class="line">web-0   1/1     Terminating   0          17m   10.1.0.18   minikube   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">web-1   1/1     Terminating   0          36m   10.1.0.15   minikube   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">web-1   0/1     Terminating   0          36m   10.1.0.15   minikube   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">web-0   0/1     Terminating   0          17m   10.1.0.18   minikube   &lt;none&gt;           &lt;none&gt;</span><br></pre></td></tr></table></figure>
+<h4 id="Pod-管理策略"><a href="#Pod-管理策略" class="headerlink" title="Pod 管理策略"></a>Pod 管理策略</h4><p>statefulset 的默认管理策略是 <code>OrderedReady</code>，该策略遵循上文展示的顺序性保证。statefulset 还有另外一种管理策略 <code>Parallel</code>，<code>Parallel</code> 管理策略告诉 statefulset 控制器并行的终止所有 pod，在启动或终止另一个 pod 前，不必等待这些 pod 变成 <code>Running &amp; Ready</code> 或者完全终止状态，但是 <code>Parallel</code> 仅仅支持在 <code>OnDelete</code> 策略下生效，下文会在源码中具体分析。</p>
+<h3 id="StatefulSetController-源码分析"><a href="#StatefulSetController-源码分析" class="headerlink" title="StatefulSetController 源码分析"></a>StatefulSetController 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p><code>startStatefulSetController</code> 是 statefulSetController 的启动方法，其中调用 <code>NewStatefulSetController</code> 进行初始化 controller 对象然后调用 <code>Run</code> 方法启动 controller。其中 <code>ConcurrentStatefulSetSyncs</code> 默认值为 5。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-controller-manager/app/apps.go:55</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, error) &#123;</span><br><span class="line">    if !ctx.AvailableResources[schema.GroupVersionResource&#123;Group: &quot;apps&quot;, Version: &quot;v1&quot;, Resource: &quot;statefulsets&quot;&#125;] &#123;</span><br><span class="line">        return nil, false, nil</span><br><span class="line">    &#125;</span><br><span class="line">    go statefulset.NewStatefulSetController(</span><br><span class="line">        ctx.InformerFactory.Core().V1().Pods(),</span><br><span class="line">        ctx.InformerFactory.Apps().V1().StatefulSets(),</span><br><span class="line">        ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),</span><br><span class="line">        ctx.InformerFactory.Apps().V1().ControllerRevisions(),</span><br><span class="line">        ctx.ClientBuilder.ClientOrDie(&quot;statefulset-controller&quot;),</span><br><span class="line">    ).Run(int(ctx.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs), ctx.Stop)</span><br><span class="line">    return nil, true, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当 controller 启动后会通过 informer 同步 cache 并监听 pod 和 statefulset 对象的变更事件，informer 的处理流程此处不再详细讲解，最后会执行 <code>sync</code> 方法，<code>sync</code> 方法是每个 controller 的核心方法，下面直接看 statefulset controller 的 <code>sync</code> 方法。</p>
+<h4 id="sync"><a href="#sync" class="headerlink" title="sync"></a>sync</h4><p>sync 方法的主要逻辑为：</p>
+<ul>
+<li>1、根据 ns/name 获取 sts 对象；</li>
+<li>2、获取 sts 的 selector；</li>
+<li>3、调用 <code>ssc.adoptOrphanRevisions</code> 检查是否有孤儿 <code>controllerrevisions</code> 对象，若有且能匹配 selector 的则添加 ownerReferences 进行关联，已关联但 label 不匹配的则进行释放；</li>
+<li>4、调用 <code>ssc.getPodsForStatefulSet</code> 通过 selector 获取 sts 关联的 pod，若有孤儿 pod 的 label 与 sts 的能匹配则进行关联，若已关联的 pod label 有变化则解除与 sts 的关联关系；</li>
+<li>5、最后调用 <code>ssc.syncStatefulSet</code> 执行真正的 sync 操作；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set.go:408</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">func (ssc *StatefulSetController) sync(key string) error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    namespace, name, err := cache.SplitMetaNamespaceKey(key)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 1、获取 sts 对象</span><br><span class="line">    set, err := ssc.setLister.StatefulSets(namespace).Get(name)</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)</span><br><span class="line">    ......</span><br><span class="line">    </span><br><span class="line">    // 2、关联以及释放 sts 的 controllerrevisions</span><br><span class="line">    if err := ssc.adoptOrphanRevisions(set); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、获取 sts 所关联的 pod </span><br><span class="line">    pods, err := ssc.getPodsForStatefulSet(set, selector)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return ssc.syncStatefulSet(set, pods)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="syncStatefulSet"><a href="#syncStatefulSet" class="headerlink" title="syncStatefulSet"></a>syncStatefulSet</h4><p>在 <code>syncStatefulSet</code> 中仅仅是调用了 <code>ssc.control.UpdateStatefulSet</code> 方法进行处理。<code>ssc.control.UpdateStatefulSet</code> 会调用 <code>defaultStatefulSetControl</code> 的 <code>UpdateStatefulSet</code> 方法，<code>defaultStatefulSetControl</code> 是 statefulset controller 中另外一个对象，主要负责处理 statefulset 的更新。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set.go:448</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error &#123;</span><br><span class="line">    ......</span><br><span class="line">    if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>UpdateStatefulSet</code> 方法的主要逻辑如下所示：</p>
+<ul>
+<li>1、获取历史 revisions；</li>
+<li>2、计算 <code>currentRevision</code> 和 <code>updateRevision</code>，若 sts 处于更新过程中则 <code>currentRevision</code> 和 <code>updateRevision</code> 值不同；</li>
+<li>3、调用 <code>ssc.updateStatefulSet</code> 执行实际的 sync 操作；</li>
+<li>4、调用 <code>ssc.updateStatefulSetStatus</code> 更新 status subResource；</li>
+<li>5、根据 sts 的 <code>spec.revisionHistoryLimit</code>字段清理过期的 <code>controllerrevision</code>；</li>
+</ul>
+<p>在基本操作的回滚阶段提到了过，sts 通过 <code>controllerrevision</code> 保存历史版本，类似于 deployment 的 replicaset，与 replicaset 不同的是 controllerrevision 仅用于回滚阶段，在 sts 的滚动升级过程中是通过 <code>currentRevision</code> 和 <code>updateRevision</code>来进行控制并不会用到 <code>controllerrevision</code>。</p>
+<p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set_control.go:75</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error &#123;</span><br><span class="line"></span><br><span class="line">    // 1、获取历史 revisions </span><br><span class="line">    revisions, err := ssc.ListRevisions(set)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    history.SortControllerRevisions(revisions)</span><br><span class="line"></span><br><span class="line">    // 2、计算 currentRevision 和 updateRevision</span><br><span class="line">    currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、执行实际的 sync 操作</span><br><span class="line">    status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、更新 sts 状态</span><br><span class="line">    err = ssc.updateStatefulSetStatus(set, status)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 5、清理过期的历史版本</span><br><span class="line">    return ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="updateStatefulSet"><a href="#updateStatefulSet" class="headerlink" title="updateStatefulSet"></a>updateStatefulSet</h4><p><code>updateStatefulSet</code> 是 sync 操作中的核心方法，对于 statefulset 的创建、扩缩容、更新、删除等操作都会在这个方法中完成，以下是其主要逻辑：</p>
+<ul>
+<li>1、分别获取 <code>currentRevision</code> 和 <code>updateRevision</code> 对应的的 statefulset object；</li>
+<li>2、构建 status 对象；</li>
+<li>3、将 statefulset 的 pods 按 ord(ord 为 pod name 中的序号)的值分到 replicas 和 condemned 两个数组中，0 &lt;= ord &lt; Spec.Replicas 的放到 replicas 组，ord &gt;= Spec.Replicas 的放到 condemned 组，replicas 组代表可用的 pod，condemned 组是需要删除的 pod；</li>
+<li>4、找出 replicas 和 condemned 组中的 unhealthy pod，healthy pod 指 <code>running &amp; ready</code> 并且不处于删除状态；</li>
+<li>5、判断 sts 是否处于删除状态；</li>
+<li>6、遍历 replicas 数组，确保 replicas 数组中的容器处于 <code>running &amp; ready</code>状态，其中处于 <code>failed</code> 状态的容器删除重建，未创建的容器则直接创建，最后检查 pod 的信息是否与 statefulset 的匹配，若不匹配则更新 pod 的状态。在此过程中每一步操作都会检查 <code>monotonic</code> 的值，即 sts 是否设置了 <code>Parallel</code> 参数，若设置了则循环处理 replicas 中的所有 pod，否则每次处理一个 pod，剩余 pod 则在下一个 syncLoop 继续进行处理；</li>
+<li>7、按 pod 名称逆序删除 <code>condemned</code> 数组中的 pod，删除前也要确保 pod 处于 <code>running &amp; ready</code>状态，在此过程中也会检查 <code>monotonic</code> 的值，以此来判断是顺序删除还是在下一个 syncLoop 中继续进行处理；</li>
+<li>8、判断 sts 的更新策略 <code>.Spec.UpdateStrategy.Type</code>，若为 <code>OnDelete</code> 则直接返回；</li>
+<li>9、此时更新策略为 <code>RollingUpdate</code>，更新序号大于等于 <code>.Spec.UpdateStrategy.RollingUpdate.Partition</code> 的 pod，在 <code>RollingUpdate</code> 时，并不会关注 <code>monotonic</code> 的值，都是顺序进行处理且等待当前 pod 删除成功后才继续删除小于上一个 pod 序号的 pod，所以 <code>Parallel</code> 的策略在滚动更新时无法使用。</li>
+</ul>
+<p><code>updateStatefulSet</code> 这个方法中包含了 statefulset 的创建、删除、扩缩容、更新等操作，在源码层面对于各个功能无法看出明显的界定，没有 deployment sync 方法中写的那么清晰，下面还是按 statefulset 的功能再分析一下具体的操作：</p>
+<ul>
+<li>创建：在创建 sts 后，sts 对象已被保存至 etcd 中，此时 sync 操作仅仅是创建出需要的 pod，即执行到第 6 步就会结束；</li>
+<li>扩缩容：对于扩若容操作仅仅是创建或者删除对应的 pod，在操作前也会判断所有 pod 是否处于 <code>running &amp; ready</code>状态，然后进行对应的创建/删除操作，在上面的步骤中也会执行到第 6 步就结束了；</li>
+<li>更新：可以看出在第六步之后的所有操作就是与更新相关的了，所以更新操作会执行完整个方法，在更新过程中通过 pod 的 <code>currentRevision</code> 和 <code>updateRevision</code> 来计算 <code>currentReplicas</code>、<code>updatedReplicas</code> 的值，最终完成所有 pod 的更新；</li>
+<li>删除：删除操作就比较明显了，会止于第五步，但是在此之前检查 pod 状态以及分组的操作确实是多余的；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/controller/statefulset/stateful_set_control.go:255</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br><span class="line">210</span><br><span class="line">211</span><br><span class="line">212</span><br><span class="line">213</span><br><span class="line">214</span><br><span class="line">215</span><br><span class="line">216</span><br><span class="line">217</span><br><span class="line">218</span><br><span class="line">219</span><br><span class="line">220</span><br><span class="line">221</span><br><span class="line">222</span><br><span class="line">223</span><br><span class="line">224</span><br><span class="line">225</span><br><span class="line">226</span><br><span class="line">227</span><br><span class="line">228</span><br><span class="line">229</span><br><span class="line">230</span><br><span class="line">231</span><br><span class="line">232</span><br><span class="line">233</span><br><span class="line">234</span><br><span class="line">235</span><br><span class="line">236</span><br></pre></td><td class="code"><pre><span class="line">func (ssc *defaultStatefulSetControl) updateStatefulSet(......) (*apps.StatefulSetStatus, error) &#123;</span><br><span class="line">    // 1、分别获取 currentRevision 和 updateRevision 对应的的 statefulset object</span><br><span class="line">    currentSet, err := ApplyRevision(set, currentRevision)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    updateSet, err := ApplyRevision(set, updateRevision)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、计算 status</span><br><span class="line">    status := apps.StatefulSetStatus&#123;&#125;</span><br><span class="line">    status.ObservedGeneration = set.Generation</span><br><span class="line">    status.CurrentRevision = currentRevision.Name</span><br><span class="line">    status.UpdateRevision = updateRevision.Name</span><br><span class="line">    status.CollisionCount = new(int32)</span><br><span class="line">    *status.CollisionCount = collisionCount</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    // 3、将 statefulset 的 pods 按 ord(ord 为 pod name 中的序数)的值</span><br><span class="line">    // 分到 replicas 和 condemned 两个数组中</span><br><span class="line">    replicaCount := int(*set.Spec.Replicas)</span><br><span class="line">    replicas := make([]*v1.Pod, replicaCount)</span><br><span class="line">    condemned := make([]*v1.Pod, 0, len(pods))</span><br><span class="line">    unhealthy := 0</span><br><span class="line">    firstUnhealthyOrdinal := math.MaxInt32</span><br><span class="line">    </span><br><span class="line">    var firstUnhealthyPod *v1.Pod</span><br><span class="line"></span><br><span class="line">    // 4、计算 status 字段中的值，将 pod 分配到 replicas和condemned两个数组中</span><br><span class="line">    for i := range pods &#123;</span><br><span class="line">        status.Replicas++</span><br><span class="line"></span><br><span class="line">        if isRunningAndReady(pods[i]) &#123;</span><br><span class="line">            status.ReadyReplicas++</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if isCreated(pods[i]) &amp;&amp; !isTerminating(pods[i]) &#123;</span><br><span class="line">            if getPodRevision(pods[i]) == currentRevision.Name &#123;</span><br><span class="line">                status.CurrentReplicas++</span><br><span class="line">            &#125;</span><br><span class="line">            if getPodRevision(pods[i]) == updateRevision.Name &#123;</span><br><span class="line">                status.UpdatedReplicas++</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if ord := getOrdinal(pods[i]); 0 &lt;= ord &amp;&amp; ord &lt; replicaCount &#123;</span><br><span class="line">            replicas[ord] = pods[i]</span><br><span class="line">        &#125; else if ord &gt;= replicaCount &#123;</span><br><span class="line">            condemned = append(condemned, pods[i])</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、检查 replicas数组中 [0,set.Spec.Replicas) 下标是否有缺失的 pod，若有缺失的则创建对应的 pod object </span><br><span class="line">	// 在 newVersionedStatefulSetPod 中会判断是使用 currentSet 还是 updateSet 来创建</span><br><span class="line">    for ord := 0; ord &lt; replicaCount; ord++ &#123;</span><br><span class="line">        if replicas[ord] == nil &#123;</span><br><span class="line">            replicas[ord] = newVersionedStatefulSetPod(</span><br><span class="line">                currentSet,</span><br><span class="line">                updateSet,</span><br><span class="line">                currentRevision.Name,</span><br><span class="line">                updateRevision.Name, ord)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、对 condemned 数组进行排序</span><br><span class="line">    sort.Sort(ascendingOrdinal(condemned))</span><br><span class="line"></span><br><span class="line">    // 7、根据 ord 在 replicas 和 condemned 数组中找出 first unhealthy Pod </span><br><span class="line">    for i := range replicas &#123;</span><br><span class="line">        if !isHealthy(replicas[i]) &#123;</span><br><span class="line">            unhealthy++</span><br><span class="line">            if ord := getOrdinal(replicas[i]); ord &lt; firstUnhealthyOrdinal &#123;</span><br><span class="line">                firstUnhealthyOrdinal = ord</span><br><span class="line">                firstUnhealthyPod = replicas[i]</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for i := range condemned &#123;</span><br><span class="line">        if !isHealthy(condemned[i]) &#123;</span><br><span class="line">            unhealthy++</span><br><span class="line">            if ord := getOrdinal(condemned[i]); ord &lt; firstUnhealthyOrdinal &#123;</span><br><span class="line">                firstUnhealthyOrdinal = ord</span><br><span class="line">                firstUnhealthyPod = condemned[i]</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 8、判断是否处于删除中</span><br><span class="line">    if set.DeletionTimestamp != nil &#123;</span><br><span class="line">        return &amp;status, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 9、默认设置为非并行模式</span><br><span class="line">    monotonic := !allowsBurst(set)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    // 10、确保 replicas 数组中所有的 pod 是 running 的</span><br><span class="line">    for i := range replicas &#123;</span><br><span class="line">        // 11、对于 failed 的 pod 删除并重新构建 pod object</span><br><span class="line">        if isFailed(replicas[i]) &#123;</span><br><span class="line">            ......</span><br><span class="line">            if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil &#123;</span><br><span class="line">                return &amp;status, err</span><br><span class="line">            &#125;</span><br><span class="line">            if getPodRevision(replicas[i]) == currentRevision.Name &#123;</span><br><span class="line">                status.CurrentReplicas--</span><br><span class="line">            &#125;</span><br><span class="line">            if getPodRevision(replicas[i]) == updateRevision.Name &#123;</span><br><span class="line">                status.UpdatedReplicas--</span><br><span class="line">            &#125;</span><br><span class="line">            status.Replicas--</span><br><span class="line">            replicas[i] = newVersionedStatefulSetPod(</span><br><span class="line">                currentSet,</span><br><span class="line">                updateSet,</span><br><span class="line">                currentRevision.Name,</span><br><span class="line">                updateRevision.Name,</span><br><span class="line">                i)</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 12、如果 pod.Status.Phase 不为“” 说明该 pod 未创建，则直接重新创建该 pod</span><br><span class="line">        if !isCreated(replicas[i]) &#123;</span><br><span class="line">            if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil &#123;</span><br><span class="line">                return &amp;status, err</span><br><span class="line">            &#125;</span><br><span class="line">            status.Replicas++</span><br><span class="line">            if getPodRevision(replicas[i]) == currentRevision.Name &#123;</span><br><span class="line">                status.CurrentReplicas++</span><br><span class="line">            &#125;</span><br><span class="line">            if getPodRevision(replicas[i]) == updateRevision.Name &#123;</span><br><span class="line">                status.UpdatedReplicas++</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            // 13、如果为Parallel，直接return status结束；如果为OrderedReady，循环处理下一个pod。</span><br><span class="line">            if monotonic &#123;</span><br><span class="line">                return &amp;status, nil</span><br><span class="line">            &#125;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 14、如果pod正在删除(pod.DeletionTimestamp不为nil)，且Spec.PodManagementPolicy不</span><br><span class="line">        // 为Parallel，直接return status结束，结束后会在下一个 syncLoop 继续进行处理，</span><br><span class="line">        // pod 状态的改变会触发下一次 syncLoop</span><br><span class="line">        if isTerminating(replicas[i]) &amp;&amp; monotonic &#123;</span><br><span class="line">            ......</span><br><span class="line">            return &amp;status, nil</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 15、如果pod状态不是Running &amp; Ready，且Spec.PodManagementPolicy不为Parallel，</span><br><span class="line">        // 直接return status结束</span><br><span class="line">        if !isRunningAndReady(replicas[i]) &amp;&amp; monotonic &#123;</span><br><span class="line">            ......</span><br><span class="line">            return &amp;status, nil</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 16、检查 pod 的信息是否与 statefulset 的匹配，若不匹配则更新 pod 的状态</span><br><span class="line">        if identityMatches(set, replicas[i]) &amp;&amp; storageMatches(set, replicas[i]) &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        replica := replicas[i].DeepCopy()</span><br><span class="line">        if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil &#123;</span><br><span class="line">            return &amp;status, err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">		</span><br><span class="line">    // 17、逆序处理 condemned 中的 pod</span><br><span class="line">    for target := len(condemned) - 1; target &gt;= 0; target-- &#123;</span><br><span class="line">    </span><br><span class="line">        // 18、如果pod正在删除，检查 Spec.PodManagementPolicy 的值，如果为Parallel，</span><br><span class="line">        // 循环处理下一个pod 否则直接退出</span><br><span class="line">        if isTerminating(condemned[target]) &#123;</span><br><span class="line">            ......</span><br><span class="line">            if monotonic &#123;</span><br><span class="line">                return &amp;status, nil</span><br><span class="line">            &#125;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        </span><br><span class="line">        // 19、不满足以下条件说明该 pod 是更新前创建的，正处于创建中</span><br><span class="line">        if !isRunningAndReady(condemned[target]) &amp;&amp; monotonic &amp;&amp; condemned[target] != firstUnhealthyPod &#123;</span><br><span class="line">            ......</span><br><span class="line">            return &amp;status, nil</span><br><span class="line">        &#125;</span><br><span class="line">            </span><br><span class="line">        // 20、否则直接删除该 pod</span><br><span class="line">        if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil &#123;</span><br><span class="line">            return &amp;status, err</span><br><span class="line">        &#125;</span><br><span class="line">        if getPodRevision(condemned[target]) == currentRevision.Name &#123;</span><br><span class="line">            status.CurrentReplicas--</span><br><span class="line">        &#125;</span><br><span class="line">        if getPodRevision(condemned[target]) == updateRevision.Name &#123;</span><br><span class="line">            status.UpdatedReplicas--</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        // 21、如果为 OrderedReady 方式则返回否则继续处理下一个 pod</span><br><span class="line">        if monotonic &#123;</span><br><span class="line">            return &amp;status, nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 22、对于 OnDelete 策略直接返回</span><br><span class="line">    if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType &#123;</span><br><span class="line">        return &amp;status, nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 23、若为 RollingUpdate 策略，则倒序处理 replicas数组中下标大于等于		</span><br><span class="line">    // 	   Spec.UpdateStrategy.RollingUpdate.Partition 的 pod</span><br><span class="line">    updateMin := 0</span><br><span class="line">    if set.Spec.UpdateStrategy.RollingUpdate != nil &#123;</span><br><span class="line">        updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    for target := len(replicas) - 1; target &gt;= updateMin; target-- &#123;</span><br><span class="line">        // 24、如果Pod的Revision 不等于 updateRevision，且 pod 没有处于删除状态则直接删除 pod</span><br><span class="line">        if getPodRevision(replicas[target]) != updateRevision.Name &amp;&amp; !isTerminating(replicas[target]) &#123;</span><br><span class="line">            ......</span><br><span class="line">            err := ssc.podControl.DeleteStatefulPod(set, replicas[target])</span><br><span class="line">            status.CurrentReplicas--</span><br><span class="line">            return &amp;status, err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 25、如果 pod 非 healthy 状态直接返回</span><br><span class="line">        if !isHealthy(replicas[target]) &#123;</span><br><span class="line">            return &amp;status, nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return &amp;status, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文分析了 statefulset controller 的主要功能，statefulset  在设计上有很多功能与 deployment 是类似的，但其主要是用来部署有状态应用的，statefulset 中的 pod 名称存在顺序性和唯一性，同时每个 pod 都使用了 pv 和 pvc 来存储状态，在创建、删除、更新操作中都会按照 pod 的顺序进行。</p>
+<p>参考：</p>
+<p><a href="https://github.com/kubernetes/kubernetes/issues/78007" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/78007</a></p>
+<p><a href="https://github.com/kubernetes/kubernetes/issues/67250" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/67250</a></p>
+<p><a href="https://www.cnblogs.com/linuxk/p/9767736.html" target="_blank" rel="noopener">https://www.cnblogs.com/linuxk/p/9767736.html</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-controller-manager/" rel="tag"># kube-controller-manager</a>
+          
+            <a href="/tags/statefulset-controller/" rel="tag"># statefulset controller</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/08/replicaset_controller/" rel="next" title="replicaset controller 源码分析">
+                <i class="fa fa-chevron-left"></i> replicaset controller 源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/12/18/daemonset_controller/" rel="prev" title="daemonset controller 源码分析">
+                daemonset controller 源码分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">49</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Statefulset-的基本功能"><span class="nav-number">1.</span> <span class="nav-text">Statefulset 的基本功能</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#创建"><span class="nav-number">1.1.</span> <span class="nav-text">创建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#扩容"><span class="nav-number">1.2.</span> <span class="nav-text">扩容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#缩容"><span class="nav-number">1.3.</span> <span class="nav-text">缩容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#更新"><span class="nav-number">1.4.</span> <span class="nav-text">更新</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#回滚"><span class="nav-number">1.5.</span> <span class="nav-text">回滚</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#删除"><span class="nav-number">1.6.</span> <span class="nav-text">删除</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Pod-管理策略"><span class="nav-number">1.7.</span> <span class="nav-text">Pod 管理策略</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#StatefulSetController-源码分析"><span class="nav-number">2.</span> <span class="nav-text">StatefulSetController 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#sync"><span class="nav-number">2.1.</span> <span class="nav-text">sync</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#syncStatefulSet"><span class="nav-number">2.2.</span> <span class="nav-text">syncStatefulSet</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#updateStatefulSet"><span class="nav-number">2.3.</span> <span class="nav-text">updateStatefulSet</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
