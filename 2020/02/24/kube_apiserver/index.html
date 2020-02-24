@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-apiserver,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="kube-apiserver 是 kubernetes 中与 etcd 直接交互的一个组件，其控制着 kubernetes 中核心资源的变化。它主要提供了以下几个功能：  提供 Kubernetes API，包括认证授权、数据校验以及集群状态变更等，供客户端及其他组件调用； 代理集群中的一些附加组件组件，如 Kubernetes UI、metrics-server、npd 等； 创建 kubern">
+<meta name="keywords" content="kube-apiserver">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-apiserver 的设计与实现">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="kube-apiserver 是 kubernetes 中与 etcd 直接交互的一个组件，其控制着 kubernetes 中核心资源的变化。它主要提供了以下几个功能：  提供 Kubernetes API，包括认证授权、数据校验以及集群状态变更等，供客户端及其他组件调用； 代理集群中的一些附加组件组件，如 Kubernetes UI、metrics-server、npd 等； 创建 kubern">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/API-server-space-1.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/API-server-flow-2.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/API-server-storage-flow-2.png">
+<meta property="og:updated_time" content="2020-02-24T09:25:46.655Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-apiserver 的设计与实现">
+<meta name="twitter:description" content="kube-apiserver 是 kubernetes 中与 etcd 直接交互的一个组件，其控制着 kubernetes 中核心资源的变化。它主要提供了以下几个功能：  提供 Kubernetes API，包括认证授权、数据校验以及集群状态变更等，供客户端及其他组件调用； 代理集群中的一些附加组件组件，如 Kubernetes UI、metrics-server、npd 等； 创建 kubern">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/API-server-space-1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/">
+
+
+
+
+
+
+  <title>kube-apiserver 的设计与实现 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kube-apiserver" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-apiserver 的设计与实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-02-24T17:03:30+08:00">
+                2020-02-24
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/02/24/kube_apiserver/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/02/24/kube_apiserver/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>kube-apiserver 是 kubernetes 中与 etcd 直接交互的一个组件，其控制着 kubernetes 中核心资源的变化。它主要提供了以下几个功能：</p>
+<ul>
+<li>提供 <a href="https://kubernetes.io/docs/concepts/overview/kubernetes-api/" target="_blank" rel="noopener">Kubernetes API</a>，包括认证授权、数据校验以及集群状态变更等，供客户端及其他组件调用；</li>
+<li>代理集群中的一些附加组件组件，如 Kubernetes UI、metrics-server、npd 等；</li>
+<li>创建 kubernetes 服务，即提供 apiserver 的 Service，kubernetes Service；</li>
+<li>资源在不同版本之间的转换；</li>
+</ul>
+<h3 id="kube-apiserver-处理流程"><a href="#kube-apiserver-处理流程" class="headerlink" title="kube-apiserver 处理流程"></a>kube-apiserver 处理流程</h3><p>kube-apiserver 主要通过对外提供 API 的方式与其他组件进行交互，可以调用 kube-apiserver 的接口 <code>$ curl -k  https://&lt;masterIP&gt;:6443</code>或者通过其提供的 <strong>swagger-ui</strong> 获取到，其主要有以下三种 API：</p>
+<ul>
+<li>core group：主要在 <code>/api/v1</code> 下；</li>
+<li>named groups：其 path 为 <code>/apis/$NAME/$VERSION</code>；</li>
+<li>暴露系统状态的一些 API：如<code>/metrics</code> 、<code>/healthz</code> 等；</li>
+</ul>
+<p>API 的 URL 大致以 <code>/apis/group/version/namespaces/my-ns/myresource</code> 组成，其中 API 的结构大致如下图所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/API-server-space-1.png" alt=""></p>
+<p>了解了 kube-apiserver 的 API 后，下面会介绍 kube-apiserver 如何处理一个 API 请求，一个请求完整的流程如下图所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/API-server-flow-2.png" alt=""></p>
+<p>此处以一次 POST 请求示例说明，当请求到达 kube-apiserver 时，kube-apiserver 首先会执行在 http filter chain 中注册的过滤器链，该过滤器对其执行一系列过滤操作，主要有认证、鉴权等检查操作。当 filter chain 处理完成后，请求会通过 route 进入到对应的 handler 中，handler 中的操作主要是与 etcd 的交互，在 handler 中的主要的操作如下所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/API-server-storage-flow-2.png" alt="API-server-storage-flow-2"></p>
+<p><strong>Decoder</strong></p>
+<p>kubernetes 中的多数 resource 都会有一个 <code>internal version</code>，因为在整个开发过程中一个 resource 可能会对应多个 version，比如 deployment 会有 <code>extensions/v1beta1</code>，<code>apps/v1</code>。 为了避免出现问题，kube-apiserver 必须要知道如何在每一对版本之间进行转换（例如，v1⇔v1alpha1，v1⇔v1beta1，v1beta1⇔v1alpha1），因此其使用了一个特殊的<code>internal version</code>，<code>internal version</code> 作为一个通用的 version 会包含所有 version 的字段，它具有所有 version 的功能。 Decoder 会首先把 creater object 转换到 <code>internal version</code>，然后将其转换为 <code>storage version</code>，<code>storage version</code> 是在 etcd 中存储时的另一个 version。</p>
+<p>在解码时，首先从 HTTP path 中获取期待的 version，然后使用 scheme 以正确的 version 创建一个与之匹配的空对象，并使用 JSON 或 protobuf 解码器进行转换，在转换的第一步中，如果用户省略了某些字段，Decoder 会把其设置为默认值。</p>
+<p><strong>Admission</strong></p>
+<p>在解码完成后，需要通过验证集群的全局约束来检查是否可以创建或更新对象，并根据集群配置设置默认值。在  <code>k8s.io/kubernetes/plugin/pkg/admission</code> 目录下可以看到 kube-apiserver 可以使用的所有全局约束插件，kube-apiserver 在启动时通过设置 <code>--enable-admission-plugins</code> 参数来开启需要使用的插件，通过 <code>ValidatingAdmissionWebhook</code> 或 <code>MutatingAdmissionWebhook</code> 添加的插件也都会在此处进行工作。</p>
+<p><strong>Validation</strong></p>
+<p>主要检查 object 中字段的合法性。</p>
+<p>在 handler 中执行完以上操作后最后会执行与 etcd 相关的操作，POST 操作会将数据写入到 etcd 中，以上在 handler 中的主要处理流程如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">v1beta1 ⇒ internal ⇒    |    ⇒       |    ⇒  v1  ⇒ json/yaml ⇒ etcd</span><br><span class="line">                     admission    validation</span><br></pre></td></tr></table></figure>
+<h3 id="kube-apiserver-中的组件"><a href="#kube-apiserver-中的组件" class="headerlink" title="kube-apiserver  中的组件"></a>kube-apiserver  中的组件</h3><p>kube-apiserver 共由 3 个组件构成（Aggregator、KubeAPIServer、APIExtensionServer），这些组件依次通过 Delegation 处理请求：</p>
+<ul>
+<li><strong>Aggregator</strong>：暴露的功能类似于一个七层负载均衡，将来自用户的请求拦截转发给其他服务器，并且负责整个 APIServer 的 Discovery 功能；</li>
+<li><strong>KubeAPIServer</strong> ：负责对请求的一些通用处理，认证、鉴权等，以及处理各个内建资源的 REST 服务；</li>
+<li><strong>APIExtensionServer</strong>：主要处理 CustomResourceDefinition（CRD）和 CustomResource（CR）的 REST 请求，也是 Delegation 的最后一环，如果对应 CR 不能被处理的话则会返回 404。</li>
+</ul>
+<p>Aggregator 和 APIExtensionsServer 对应两种主要扩展 APIServer 资源的方式，即分别是 AA 和 CRD。</p>
+<h4 id="Aggregator"><a href="#Aggregator" class="headerlink" title="Aggregator"></a>Aggregator</h4><p>Aggregator 通过 APIServices 对象关联到某个 Service 来进行请求的转发，其关联的 Service 类型进一步决定了请求转发形式。Aggregator 包括一个 <code>GenericAPIServer</code> 和维护自身状态的 Controller。其中 <code>GenericAPIServer</code> 主要处理 <code>apiregistration.k8s.io</code> 组下的 APIService 资源请求。</p>
+<p><strong>Aggregator 除了处理资源请求外还包含几个 controller：</strong></p>
+<ul>
+<li>1、<code>apiserviceRegistrationController</code>：负责 APIServices 中资源的注册与删除；</li>
+<li>2、<code>availableConditionController</code>：维护 APIServices 的可用状态，包括其引用 Service 是否可用等；</li>
+<li>3、<code>autoRegistrationController</code>：用于保持 API 中存在的一组特定的 APIServices；</li>
+<li>4、<code>crdRegistrationController</code>：负责将 CRD GroupVersions 自动注册到 APIServices 中；</li>
+<li>5、<code>openAPIAggregationController</code>：将 APIServices 资源的变化同步至提供的 OpenAPI 文档；</li>
+</ul>
+<p>kubernetes 中的一些附加组件，比如 metrics-server 就是通过 Aggregator 的方式进行扩展的，实际环境中可以通过使用 <a href="https://github.com/kubernetes-sigs/apiserver-builder-alpha" target="_blank" rel="noopener">apiserver-builder</a> 工具轻松以 Aggregator 的扩展方式创建自定义资源。</p>
+<h5 id="启用-API-Aggregation"><a href="#启用-API-Aggregation" class="headerlink" title="启用 API Aggregation"></a>启用 API Aggregation</h5><p>在 kube-apiserver 中需要增加以下配置来开启 API Aggregation：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">--proxy-client-cert-file=/etc/kubernetes/certs/proxy.crt</span><br><span class="line">--proxy-client-key-file=/etc/kubernetes/certs/proxy.key</span><br><span class="line">--requestheader-client-ca-file=/etc/kubernetes/certs/proxy-ca.crt</span><br><span class="line">--requestheader-allowed-names=aggregator</span><br><span class="line">--requestheader-extra-headers-prefix=X-Remote-Extra-</span><br><span class="line">--requestheader-group-headers=X-Remote-Group</span><br><span class="line">--requestheader-username-headers=X-Remote-User</span><br></pre></td></tr></table></figure>
+<h4 id="KubeAPIServer"><a href="#KubeAPIServer" class="headerlink" title="KubeAPIServer"></a>KubeAPIServer</h4><p>KubeAPIServer 主要是提供对 API Resource 的操作请求，为 kubernetes 中众多 API 注册路由信息，暴露 RESTful API 并且对外提供 kubernetes service，使集群中以及集群外的服务都可以通过 RESTful API 操作 kubernetes 中的资源。</p>
+<h4 id="APIExtensionServer"><a href="#APIExtensionServer" class="headerlink" title="APIExtensionServer"></a>APIExtensionServer</h4><p>APIExtensionServer 作为 Delegation 链的最后一层，是处理所有用户通过 Custom Resource Definition 定义的资源服务器。</p>
+<p>其中包含的 controller 以及功能如下所示：</p>
+<ul>
+<li>1、<code>openapiController</code>：将 crd 资源的变化同步至提供的 OpenAPI 文档，可通过访问 <code>/openapi/v2</code> 进行查看；</li>
+<li>2、<code>crdController</code>：负责将 crd 信息注册到 apiVersions 和 apiResources 中，两者的信息可通过 <code>$ kubectl api-versions</code> 和  <code>$ kubectl api-resources</code> 查看；</li>
+<li>3、<code>namingController</code>：检查 crd obj 中是否有命名冲突，可在 crd <code>.status.conditions</code> 中查看；</li>
+<li>4、<code>establishingController</code>：检查 crd 是够处于正常状态，可在 crd <code>.status.conditions</code> 中查看；</li>
+<li>5、<code>nonStructuralSchemaController</code>：检查 crd obj  结构是否正常，可在 crd <code>.status.conditions</code> 中查看；</li>
+<li>6、<code>apiApprovalController</code>：检查 crd 是否遵循 kubernetes API 声明策略，可在 crd <code>.status.conditions</code> 中查看；</li>
+<li>7、<code>finalizingController</code>：类似于 finalizes 的功能，与 CRs 的删除有关；</li>
+</ul>
+<h3 id="kube-apiserver-启动流程分析"><a href="#kube-apiserver-启动流程分析" class="headerlink" title="kube-apiserver 启动流程分析"></a>kube-apiserver 启动流程分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>首先分析 kube-apiserver 的启动方式，kube-apiserver 也是通过其 <code>Run</code> 方法启动主逻辑的，在<code>Run</code> 方法调用之前会进行解析命令行参数、设置默认值等。</p>
+<h4 id="Run"><a href="#Run" class="headerlink" title="Run"></a>Run</h4><p><code>Run</code> 方法的主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>CreateServerChain</code> 构建服务调用链并判断是否启动非安全的 http server，http server 链中包含 apiserver 要启动的三个 server，以及为每个 server 注册对应资源的路由；</li>
+<li>2、调用 <code>server.PrepareRun</code> 进行服务运行前的准备，该方法主要完成了健康检查、存活检查和<code>OpenAPI</code>路由的注册工作；</li>
+<li>3、调用 <code>prepared.Run</code> 启动 https server；</li>
+</ul>
+<p>server 的初始化使用委托模式，通过 DelegationTarget 接口，把基本的 API Server、CustomResource、Aggregator 这三种服务采用链式结构串联起来，对外提供服务。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/server.go:147</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func Run(completeOptions completedServerRunOptions, stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">    server, err := CreateServerChain(completeOptions, stopCh)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    prepared, err := server.PrepareRun()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return prepared.Run(stopCh)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="CreateServerChain"><a href="#CreateServerChain" class="headerlink" title="CreateServerChain"></a>CreateServerChain</h4><p><code>CreateServerChain</code> 是完成 server 初始化的方法，里面包含 <code>APIExtensionsServer</code>、<code>KubeAPIServer</code>、<code>AggregatorServer</code> 初始化的所有流程，最终返回 <code>aggregatorapiserver.APIAggregator</code> 实例，初始化流程主要有：http filter chain 的配置、API Group 的注册、http path 与 handler 的关联以及 handler 后端存储 etcd 的配置。其主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>CreateKubeAPIServerConfig</code> 创建 KubeAPIServer 所需要的配置，主要是创建 <code>master.Config</code>，其中会调用 <code>buildGenericConfig</code> 生成 genericConfig，genericConfig 中包含 apiserver 的核心配置；</li>
+<li>2、判断是否启用了扩展的 API server 并调用 <code>createAPIExtensionsConfig</code> 为其创建配置，apiExtensions server 是一个代理服务，用于代理 kubeapiserver 中的其他 server，比如 metric-server；</li>
+<li>3、调用 <code>createAPIExtensionsServer</code> 创建 apiExtensionsServer 实例；</li>
+<li>4、调用 <code>CreateKubeAPIServer</code>初始化 kubeAPIServer；</li>
+<li>5、调用 <code>createAggregatorConfig</code> 为 aggregatorServer 创建配置并调用 <code>createAggregatorServer</code> 初始化 aggregatorServer；</li>
+<li>6、配置并判断是否启动非安全的 http server；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/server.go:165</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line">func CreateServerChain(completedOptions completedServerRunOptions, stopCh &lt;-chan struct&#123;&#125;) (*aggregatorapiserver.APIAggregator, error) &#123;</span><br><span class="line">    nodeTunneler, proxyTransport, err := CreateNodeDialer(completedOptions)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、为 kubeAPIServer 创建配置</span><br><span class="line">    kubeAPIServerConfig, insecureServingInfo, serviceResolver, pluginInitializer, admissionPostStartHook, err :=                                         CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、判断是否配置了 APIExtensionsServer，创建 apiExtensionsConfig </span><br><span class="line">    apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers,        pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount,</span><br><span class="line">        serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig))</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、初始化 APIExtensionsServer</span><br><span class="line">    apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, genericapiserver.NewEmptyDelegate())</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、初始化 KubeAPIServer</span><br><span class="line">    kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer, admissionPostStartHook)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 5、创建 AggregatorConfig</span><br><span class="line">    aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions, kubeAPIServerConfig.          ExtraConfig.VersionedInformers, serviceResolver, proxyTransport, pluginInitializer)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 6、初始化 AggregatorServer</span><br><span class="line">    aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 7、判断是否启动非安全端口的 http server</span><br><span class="line">    if insecureServingInfo != nil &#123;</span><br><span class="line">        insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)</span><br><span class="line">        if err := insecureServingInfo.Serve(insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil &#123;</span><br><span class="line">            return nil, err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return aggregatorServer, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="CreateKubeAPIServerConfig"><a href="#CreateKubeAPIServerConfig" class="headerlink" title="CreateKubeAPIServerConfig"></a>CreateKubeAPIServerConfig</h5><p>在 <code>CreateKubeAPIServerConfig</code> 中主要是调用 <code>buildGenericConfig</code> 创建 genericConfig 以及构建 master.Config 对象。</p>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/server.go:271</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">func CreateKubeAPIServerConfig(</span><br><span class="line">    s completedServerRunOptions,</span><br><span class="line">    nodeTunneler tunneler.Tunneler,</span><br><span class="line">    proxyTransport *http.Transport,</span><br><span class="line">) (......) &#123;</span><br><span class="line"></span><br><span class="line">    // 1、构建 genericConfig</span><br><span class="line">    genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory,    lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)</span><br><span class="line">    if lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 2、初始化所支持的 capabilities</span><br><span class="line">    capabilities.Initialize(capabilities.Capabilities&#123;</span><br><span class="line">        AllowPrivileged: s.AllowPrivileged,</span><br><span class="line">        PrivilegedSources: capabilities.PrivilegedSources&#123;</span><br><span class="line">            HostNetworkSources: []string&#123;&#125;,</span><br><span class="line">            HostPIDSources:     []string&#123;&#125;,</span><br><span class="line">            HostIPCSources:     []string&#123;&#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">        PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    // 3、获取 service ip range 以及 api server service IP</span><br><span class="line">    serviceIPRange, apiServerServiceIP, lastErr := master.DefaultServiceIPRange(s.PrimaryServiceClusterIPRange)</span><br><span class="line">    if lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 4、构建 master.Config 对象</span><br><span class="line">    config = &amp;master.Config&#123;......&#125;</span><br><span class="line">    </span><br><span class="line">    if nodeTunneler != nil &#123;</span><br><span class="line">        config.ExtraConfig.KubeletClientConfig.Dial = nodeTunneler.Dial</span><br><span class="line">    &#125;</span><br><span class="line">    if config.GenericConfig.EgressSelector != nil &#123;</span><br><span class="line">        config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="buildGenericConfig"><a href="#buildGenericConfig" class="headerlink" title="buildGenericConfig"></a>buildGenericConfig</h5><p>主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>genericapiserver.NewConfig</code> 生成默认的 genericConfig，genericConfig 中主要配置了 <code>DefaultBuildHandlerChain</code>，<code>DefaultBuildHandlerChain</code> 中包含了认证、鉴权等一系列 http filter chain；</li>
+<li>2、调用 <code>master.DefaultAPIResourceConfigSource</code> 加载需要启用的 API Resource，集群中所有的 API Resource 可以在代码的 <code>k8s.io/api</code> 目录中看到，随着版本的迭代也会不断变化；</li>
+<li>3、为 genericConfig 中的部分字段设置默认值；</li>
+<li>4、调用 <code>completedStorageFactoryConfig.New</code> 创建 storageFactory，后面会使用 storageFactory 为每种API Resource 创建对应的 RESTStorage；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/server.go:386</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><span class="line">func buildGenericConfig(</span><br><span class="line">    s *options.ServerRunOptions,</span><br><span class="line">    proxyTransport *http.Transport,</span><br><span class="line">) (......) &#123;</span><br><span class="line">    // 1、为 genericConfig 设置默认值</span><br><span class="line">    genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)</span><br><span class="line">    genericConfig.MergedResourceConfig = master.DefaultAPIResourceConfigSource()</span><br><span class="line"></span><br><span class="line">    if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(......)</span><br><span class="line">    genericConfig.OpenAPIConfig.Info.Title = &quot;Kubernetes&quot;</span><br><span class="line">    genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(</span><br><span class="line">        sets.NewString(&quot;watch&quot;, &quot;proxy&quot;),</span><br><span class="line">        sets.NewString(&quot;attach&quot;, &quot;exec&quot;, &quot;proxy&quot;, &quot;log&quot;, &quot;portforward&quot;),</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    kubeVersion := version.Get()</span><br><span class="line">    genericConfig.Version = &amp;kubeVersion</span><br><span class="line"></span><br><span class="line">    storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()</span><br><span class="line">    storageFactoryConfig.ApiResourceConfig = genericConfig.MergedResourceConfig</span><br><span class="line">    completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        lastErr = err</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    // 初始化 storageFactory</span><br><span class="line">    storageFactory, lastErr = completedStorageFactoryConfig.New()</span><br><span class="line">    if lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    if genericConfig.EgressSelector != nil &#123;</span><br><span class="line">        storageFactory.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 2、初始化 RESTOptionsGetter，后期根据其获取操作 Etcd 的句柄，同时添加 etcd 的健康检查方法</span><br><span class="line">    if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、设置使用 protobufs 用来内部交互，并且禁用压缩功能</span><br><span class="line">    genericConfig.LoopbackClientConfig.ContentConfig.ContentType = &quot;application/vnd.kubernetes.protobuf&quot;</span><br><span class="line">    </span><br><span class="line">    genericConfig.LoopbackClientConfig.DisableCompression = true</span><br><span class="line">		</span><br><span class="line">    // 4、创建 clientset</span><br><span class="line">    kubeClientConfig := genericConfig.LoopbackClientConfig</span><br><span class="line">    clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        lastErr = fmt.Errorf(&quot;failed to create real external clientset: %v&quot;, err)</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)</span><br><span class="line"></span><br><span class="line">    // 5、创建认证实例，支持多种认证方式：请求 Header 认证、Auth 文件认证、CA 证书认证、Bearer token 认证、</span><br><span class="line">    // ServiceAccount 认证、BootstrapToken 认证、WebhookToken 认证等</span><br><span class="line">    genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s,                 clientgoExternalClient, versionedInformers)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        lastErr = fmt.Errorf(&quot;invalid authentication config: %v&quot;, err)</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 6、创建鉴权实例，包含：Node、RBAC、Webhook、ABAC、AlwaysAllow、AlwaysDeny</span><br><span class="line">    genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, versionedInformers)</span><br><span class="line">    ......</span><br><span class="line">		</span><br><span class="line">    serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)</span><br><span class="line"></span><br><span class="line">    authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)</span><br><span class="line"></span><br><span class="line">    // 7、审计插件的初始化</span><br><span class="line">    lastErr = s.Audit.ApplyTo(......)</span><br><span class="line">    if lastErr != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 8、准入插件的初始化</span><br><span class="line">    pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        lastErr = fmt.Errorf(&quot;failed to create admission plugin initializer: %v&quot;, err)</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line">    err = s.Admission.ApplyTo(......)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        lastErr = fmt.Errorf(&quot;failed to initialize admission: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上主要分析 KubeAPIServerConfig 的初始化，其他两个 server config 的初始化暂且不详细分析，下面接着继续分析 server 的初始化。</p>
+<h5 id="createAPIExtensionsServer"><a href="#createAPIExtensionsServer" class="headerlink" title="createAPIExtensionsServer"></a>createAPIExtensionsServer</h5><p>APIExtensionsServer 是最先被初始化的，在 <code>createAPIExtensionsServer</code> 中调用 <code>apiextensionsConfig.Complete().New</code> 来完成 server 的初始化，其主要逻辑为：</p>
+<ul>
+<li>1、首先调用 <code>c.GenericConfig.New</code> 按照<code>go-restful</code>的模式初始化 Container，在 <code>c.GenericConfig.New</code> 中会调用 <code>NewAPIServerHandler</code> 初始化 handler，APIServerHandler 包含了 API Server 使用的多种http.Handler 类型，包括 <code>go-restful</code> 以及 <code>non-go-restful</code>，以及在以上两者之间选择的 Director 对象，<code>go-restful</code> 用于处理已经注册的 handler，<code>non-go-restful</code> 用来处理不存在的 handler，API URI 处理的选择过程为：<code>FullHandlerChain-&gt; Director -&gt;{GoRestfulContainer， NonGoRestfulMux}</code>。在 <code>c.GenericConfig.New</code> 中还会调用 <code>installAPI</code>来添加包括 <code>/</code>、<code>/debug/*</code>、<code>/metrics</code>、<code>/version</code> 等路由信息。三种 server 在初始化时首先都会调用 <code>c.GenericConfig.New</code> 来初始化一个 genericServer，然后进行 API 的注册；</li>
+<li>2、调用 <code>s.GenericAPIServer.InstallAPIGroup</code> 在路由中注册 API Resources，此方法的调用链非常深，主要是为了将需要暴露的 API Resource 注册到 server 中，以便能通过 http 接口进行 resource 的 REST 操作，其他几种 server 在初始化时也都会执行对应的 <code>InstallAPI</code>；</li>
+<li>3、初始化 server 中需要使用的 controller，主要有 <code>openapiController</code>、<code>crdController</code>、<code>namingController</code>、<code>establishingController</code>、<code>nonStructuralSchemaController</code>、<code>apiApprovalController</code>、<code>finalizingControlle</code>r；</li>
+<li>4、将需要启动的 controller 以及 informer 添加到 PostStartHook 中；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/apiextensions.go:94</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*  apiextensionsapiserver.CustomResourceDefinitions, error) &#123;</span><br><span class="line">    return apiextensionsConfig.Complete().New(delegateAPIServer)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:132</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br></pre></td><td class="code"><pre><span class="line">func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) &#123;</span><br><span class="line">    // 1、初始化 genericServer</span><br><span class="line">    genericServer, err := c.GenericConfig.New(&quot;apiextensions-apiserver&quot;, delegationTarget)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    s := &amp;CustomResourceDefinitions&#123;</span><br><span class="line">        GenericAPIServer: genericServer,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、初始化 APIGroup Info，APIGroup 指该 server 需要暴露的 API</span><br><span class="line">    apiResourceConfig := c.GenericConfig.MergedResourceConfig</span><br><span class="line">    apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Scheme, metav1.ParameterCodec, Codecs)</span><br><span class="line">    if apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) &#123;</span><br><span class="line">        storage := map[string]rest.Storage&#123;&#125;</span><br><span class="line">        customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)</span><br><span class="line">        storage[&quot;customresourcedefinitions&quot;] = customResourceDefintionStorage</span><br><span class="line">        storage[&quot;customresourcedefinitions/status&quot;] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)</span><br><span class="line"></span><br><span class="line">        apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = storage</span><br><span class="line">    &#125;</span><br><span class="line">    if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、注册 APIGroup</span><br><span class="line">    if err := s.GenericAPIServer.InstallAPIGroup(&amp;apiGroupInfo); err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、初始化需要使用的 controller</span><br><span class="line">    crdClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, fmt.Errorf(&quot;failed to create clientset: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    s.Informers = internalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)</span><br><span class="line">		</span><br><span class="line">    ......</span><br><span class="line">    establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().InternalVersion().                    CustomResourceDefinitions(), crdClient.Apiextensions())</span><br><span class="line">    crdHandler, err := NewCustomResourceDefinitionHandler(......)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(&quot;/apis&quot;, crdHandler)</span><br><span class="line">    s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix(&quot;/apis/&quot;, crdHandler)</span><br><span class="line"></span><br><span class="line">    crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),                 versionDiscoveryHandler, groupDiscoveryHandler)</span><br><span class="line">    namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())</span><br><span class="line">    nonStructuralSchemaController := nonstructuralschema.NewConditionController(s.Informers.Apiextensions().InternalVersion().         CustomResourceDefinitions(), crdClient.Apiextensions())</span><br><span class="line">    apiApprovalController := apiapproval.NewKubernetesAPIApprovalPolicyConformantConditionController(s.Informers.Apiextensions().      InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())</span><br><span class="line">    finalizingController := finalizer.NewCRDFinalizer(</span><br><span class="line">        s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),</span><br><span class="line">        crdClient.Apiextensions(),</span><br><span class="line">        crdHandler,</span><br><span class="line">    )</span><br><span class="line">    var openapiController *openapicontroller.Controller</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePublishOpenAPI) &#123;</span><br><span class="line">        openapiController = openapicontroller.NewController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions())</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、将 informer 以及 controller 添加到 PostStartHook 中</span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;start-apiextensions-informers&quot;, func(context genericapiserver.PostStartHookContext) error &#123;</span><br><span class="line">        s.Informers.Start(context.StopCh)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;start-apiextensions-controllers&quot;, func(context genericapiserver.PostStartHookContext) error &#123;</span><br><span class="line">        ......</span><br><span class="line">        go crdController.Run(context.StopCh)</span><br><span class="line">        go namingController.Run(context.StopCh)</span><br><span class="line">        go establishingController.Run(context.StopCh)</span><br><span class="line">        go nonStructuralSchemaController.Run(5, context.StopCh)</span><br><span class="line">        go apiApprovalController.Run(5, context.StopCh)</span><br><span class="line">        go finalizingController.Run(5, context.StopCh)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;crd-informer-synced&quot;, func(context genericapiserver.PostStartHookContext) error &#123;</span><br><span class="line">        return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) &#123;</span><br><span class="line">            return s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions().Informer().HasSynced(), nil</span><br><span class="line">        &#125;, context.StopCh)</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    return s, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上是 APIExtensionsServer 的初始化流程，其中最核心方法是 <code>s.GenericAPIServer.InstallAPIGroup</code>，也就是 API 的注册过程，三种 server 中 API 的注册过程都是其核心。</p>
+<h5 id="CreateKubeAPIServer"><a href="#CreateKubeAPIServer" class="headerlink" title="CreateKubeAPIServer"></a>CreateKubeAPIServer</h5><p>本节继续分析 KubeAPIServer 的初始化，在<code>CreateKubeAPIServer</code> 中调用了 <code>kubeAPIServerConfig.Complete().New</code> 来完成相关的初始化操作。</p>
+<h5 id="kubeAPIServerConfig-Complete-New"><a href="#kubeAPIServerConfig-Complete-New" class="headerlink" title="kubeAPIServerConfig.Complete().New"></a>kubeAPIServerConfig.Complete().New</h5><p>主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>c.GenericConfig.New</code> 初始化 GenericAPIServer，其主要实现在上文已经分析过；</li>
+<li>2、判断是否支持 logs 相关的路由，如果支持，则添加 <code>/logs</code> 路由；</li>
+<li>3、调用 <code>m.InstallLegacyAPI</code> 将核心 API Resource 添加到路由中，对应到 apiserver 就是以 <code>/api</code> 开头的 resource；</li>
+<li>4、调用 <code>m.InstallAPIs</code> 将扩展的 API Resource 添加到路由中，在 apiserver 中即是以 <code>/apis</code> 开头的 resource；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/server.go:214</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">func CreateKubeAPIServer(......) (*master.Master, error) &#123;</span><br><span class="line">    kubeAPIServer, err := kubeAPIServerConfig.Complete().New(delegateAPIServer)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    kubeAPIServer.GenericAPIServer.AddPostStartHookOrDie(&quot;start-kube-apiserver-admission-initializer&quot;, admissionPostStartHook)</span><br><span class="line"></span><br><span class="line">    return kubeAPIServer, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>k8s.io/kubernetes/pkg/master/master.go:325</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line">func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) &#123;</span><br><span class="line">    ......</span><br><span class="line">    // 1、初始化 GenericAPIServer</span><br><span class="line">    s, err := c.GenericConfig.New(&quot;kube-apiserver&quot;, delegationTarget)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、注册 logs 相关的路由</span><br><span class="line">    if c.ExtraConfig.EnableLogsSupport &#123;</span><br><span class="line">        routes.Logs&#123;&#125;.Install(s.Handler.GoRestfulContainer)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    m := &amp;Master&#123;</span><br><span class="line">        GenericAPIServer: s,</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 3、安装 LegacyAPI</span><br><span class="line">    if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) &#123;</span><br><span class="line">        legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider&#123;</span><br><span class="line">            StorageFactory:              c.ExtraConfig.StorageFactory,</span><br><span class="line">            ProxyTransport:              c.ExtraConfig.ProxyTransport,</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">        if err := m.InstallLegacyAPI(&amp;c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider); err != nil &#123;</span><br><span class="line">            return nil, err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    restStorageProviders := []RESTStorageProvider&#123;</span><br><span class="line">        auditregistrationrest.RESTStorageProvider&#123;&#125;,</span><br><span class="line">        authenticationrest.RESTStorageProvider&#123;Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.  Authentication.APIAudiences&#125;,</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、安装 APIs</span><br><span class="line">    if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if c.ExtraConfig.Tunneler != nil &#123;</span><br><span class="line">        m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    m.GenericAPIServer.AddPostStartHookOrDie(&quot;ca-registration&quot;, c.ExtraConfig.ClientCARegistrationHook.PostStartHook)</span><br><span class="line"></span><br><span class="line">    return m, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="m-InstallLegacyAPI"><a href="#m-InstallLegacyAPI" class="headerlink" title="m.InstallLegacyAPI"></a>m.InstallLegacyAPI</h5><p>此方法的主要功能是将 core API 注册到路由中，是 apiserver 初始化流程中最核心的方法之一，不过其调用链非常深，下面会进行深入分析。将 API 注册到路由其最终的目的就是对外提供 RESTful API 来操作对应 resource，注册 API 主要分为两步，第一步是为 API 中的每个 resource 初始化 RESTStorage 以此操作后端存储中数据的变更，第二步是为每个 resource 根据其 verbs 构建对应的路由。<code>m.InstallLegacyAPI</code>  的主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>legacyRESTStorageProvider.NewLegacyRESTStorage</code> 为 LegacyAPI 中各个资源创建 RESTStorage，RESTStorage 的目的是将每种资源的访问路径及其后端存储的操作对应起来；</li>
+<li>2、初始化 <code>bootstrap-controller</code>，并将其加入到 PostStartHook 中，<code>bootstrap-controller</code> 是 apiserver 中的一个 controller，主要功能是创建系统所需要的一些 namespace 以及创建 kubernetes service 并定期触发对应的 sync 操作，apiserver 在启动后会通过调用 PostStartHook 来启动 <code>bootstrap-controller</code>；</li>
+<li>3、在为资源创建完 RESTStorage 后，调用 <code>m.GenericAPIServer.InstallLegacyAPIGroup</code> 为 APIGroup 注册路由信息，<code>InstallLegacyAPIGroup</code>方法的调用链非常深，主要为<code>InstallLegacyAPIGroup--&gt; installAPIResources --&gt; InstallREST --&gt; Install --&gt; registerResourceHandlers</code>，最终核心的路由构造在<code>registerResourceHandlers</code>方法内，该方法比较复杂，其主要功能是通过上一步骤构造的 REST Storage 判断该资源可以执行哪些操作（如 create、update等），将其对应的操作存入到 action 中，每一个 action 对应一个标准的 REST 操作，如 create 对应的 action 操作为 POST、update 对应的 action 操作为PUT。最终根据 actions 数组依次遍历，对每一个操作添加一个 handler 方法，注册到 route 中去，再将 route 注册到 webservice 中去，webservice 最终会注册到 container 中，遵循 go-restful 的设计模式；</li>
+</ul>
+<p>关于 <code>legacyRESTStorageProvider.NewLegacyRESTStorage</code> 以及 <code>m.GenericAPIServer.InstallLegacyAPIGroup</code> 方法的详细说明在后文中会继续进行讲解。</p>
+<p><code>k8s.io/kubernetes/pkg/master/master.go:406</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">func (m *Master) InstallLegacyAPI(......) error &#123;</span><br><span class="line">    legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error building core storage: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    controllerName := &quot;bootstrap-controller&quot;</span><br><span class="line">    coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)</span><br><span class="line">    bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())</span><br><span class="line">    m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)</span><br><span class="line">    m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)</span><br><span class="line"></span><br><span class="line">    if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &amp;apiGroupInfo); err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error in registering group versions: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>InstallAPIs</code> 与 <code>InstallLegacyAPI</code> 的主要流程是类似的，限于篇幅此处不再深入分析。</p>
+<h4 id="createAggregatorServer"><a href="#createAggregatorServer" class="headerlink" title="createAggregatorServer"></a>createAggregatorServer</h4><p><code>AggregatorServer</code> 主要用于自定义的聚合控制器的，使 CRD 能够自动注册到集群中。</p>
+<p>主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>aggregatorConfig.Complete().NewWithDelegate</code> 创建 aggregatorServer；</li>
+<li>2、初始化 <code>crdRegistrationController</code> 和 <code>autoRegistrationController</code>，<code>crdRegistrationController</code> 负责注册 CRD，<code>autoRegistrationController</code> 负责将 CRD 对应的 APIServices 自动注册到 apiserver 中，CRD 创建后可通过 <code>$ kubectl get apiservices</code> 查看是否注册到 apiservices 中；</li>
+<li>3、将 <code>autoRegistrationController</code> 和 <code>crdRegistrationController</code> 加入到 PostStartHook 中；</li>
+</ul>
+<p><code>k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go:124</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line">func createAggregatorServer(......) (*aggregatorapiserver.APIAggregator, error) &#123;</span><br><span class="line">    // 1、初始化 aggregatorServer</span><br><span class="line">    aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、初始化 auto-registration controller</span><br><span class="line">    apiRegistrationClient, err := apiregistrationclient.NewForConfig(aggregatorConfig.GenericConfig.LoopbackClientConfig)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    autoRegistrationController := autoregister.NewAutoRegisterController(......)</span><br><span class="line">    apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)</span><br><span class="line">    crdRegistrationController := crdregistration.NewCRDRegistrationController(......)</span><br><span class="line">    err = aggregatorServer.GenericAPIServer.AddPostStartHook(&quot;kube-apiserver-autoregistration&quot;, func(context genericapiserver.PostStartHookContext) error &#123;</span><br><span class="line">        go crdRegistrationController.Run(5, context.StopCh)</span><br><span class="line">        go func() &#123;</span><br><span class="line">            if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled(&quot;apiextensions.k8s.io&quot;) &#123;</span><br><span class="line">                crdRegistrationController.WaitForInitialSync()</span><br><span class="line">            &#125;</span><br><span class="line">            autoRegistrationController.Run(5, context.StopCh)</span><br><span class="line">        &#125;()</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    err = aggregatorServer.GenericAPIServer.AddBootSequenceHealthChecks(</span><br><span class="line">        makeAPIServiceAvailableHealthCheck(</span><br><span class="line">            &quot;autoregister-completion&quot;,</span><br><span class="line">            apiServices,</span><br><span class="line">            aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(),</span><br><span class="line">        ),</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return aggregatorServer, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="aggregatorConfig-Complete-NewWithDelegate"><a href="#aggregatorConfig-Complete-NewWithDelegate" class="headerlink" title="aggregatorConfig.Complete().NewWithDelegate"></a>aggregatorConfig.Complete().NewWithDelegate</h5><p><code>aggregatorConfig.Complete().NewWithDelegate</code> 是初始化 aggregatorServer 的方法，主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>c.GenericConfig.New</code> 初始化 GenericAPIServer，其内部的主要功能在上文已经分析过；</li>
+<li>2、调用 <code>apiservicerest.NewRESTStorage</code> 为 APIServices 资源创建 RESTStorage，RESTStorage 的目的是将每种资源的访问路径及其后端存储的操作对应起来；</li>
+<li>3、调用 <code>s.GenericAPIServer.InstallAPIGroup</code> 为 APIGroup 注册路由信息；</li>
+</ul>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:158</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line">func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) &#123;</span><br><span class="line">    openAPIConfig := c.GenericConfig.OpenAPIConfig</span><br><span class="line">    c.GenericConfig.OpenAPIConfig = nil</span><br><span class="line">    // 1、初始化 genericServer</span><br><span class="line">    genericServer, err := c.GenericConfig.New(&quot;kube-aggregator&quot;, delegationTarget)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    apiregistrationClient, err := clientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    informerFactory := informers.NewSharedInformerFactory(</span><br><span class="line">        apiregistrationClient,</span><br><span class="line">        5*time.Minute, </span><br><span class="line">    )</span><br><span class="line">    s := &amp;APIAggregator&#123;</span><br><span class="line">        GenericAPIServer: genericServer,</span><br><span class="line">        delegateHandler: delegationTarget.UnprotectedHandler(),</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、为 API 注册路由</span><br><span class="line">    apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)</span><br><span class="line">    if err := s.GenericAPIServer.InstallAPIGroup(&amp;apiGroupInfo); err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">	</span><br><span class="line">    // 3、初始化 apiserviceRegistrationController、availableController</span><br><span class="line">    apisHandler := &amp;apisHandler&#123;</span><br><span class="line">        codecs: aggregatorscheme.Codecs,</span><br><span class="line">        lister: s.lister,</span><br><span class="line">    &#125;</span><br><span class="line">    s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(&quot;/apis&quot;, apisHandler)</span><br><span class="line">    s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(&quot;/apis/&quot;, apisHandler)</span><br><span class="line">    apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)</span><br><span class="line">    availableController, err := statuscontrollers.NewAvailableConditionController(</span><br><span class="line">       ......</span><br><span class="line">    )</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、添加 PostStartHook</span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;start-kube-aggregator-informers&quot;, func(context genericapiserver.PostStartHookContext) error &#123;</span><br><span class="line">        informerFactory.Start(context.StopCh)</span><br><span class="line">        c.GenericConfig.SharedInformerFactory.Start(context.StopCh)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;apiservice-registration-controller&quot;, func(context genericapiserver.PostStartHookContext)      error &#123;</span><br><span class="line">        go apiserviceRegistrationController.Run(context.StopCh)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line">    s.GenericAPIServer.AddPostStartHookOrDie(&quot;apiservice-status-available-controller&quot;, func(context genericapiserver.PostStartHookContext)  error &#123;</span><br><span class="line">        go availableController.Run(5, context.StopCh)</span><br><span class="line">        return nil</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    return s, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上是对 AggregatorServer 初始化流程的分析，可以看出，在创建 APIExtensionsServer、KubeAPIServer 以及 AggregatorServer 时，其模式都是类似的，首先调用 <code>c.GenericConfig.New</code>  按照<code>go-restful</code>的模式初始化 Container，然后为 server 中需要注册的资源创建 RESTStorage，最后将 resource 的 APIGroup 信息注册到路由中。</p>
+<p>至此，CreateServerChain 中流程已经分析完，其中的调用链如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">                    |--&gt; CreateNodeDialer</span><br><span class="line">                    |</span><br><span class="line">                    |--&gt; CreateKubeAPIServerConfig</span><br><span class="line">                    |</span><br><span class="line">CreateServerChain --|--&gt; createAPIExtensionsConfig</span><br><span class="line">                    |</span><br><span class="line">                    |                                                                       |--&gt; c.GenericConfig.New</span><br><span class="line">                    |--&gt; createAPIExtensionsServer --&gt; apiextensionsConfig.Complete().New --|</span><br><span class="line">                    |                                                                       |--&gt; s.GenericAPIServer.InstallAPIGroup</span><br><span class="line">                    |</span><br><span class="line">                    |                                                                 |--&gt; c.GenericConfig.New --&gt; legacyRESTStorageProvider.NewLegacyRESTStorage</span><br><span class="line">                    |                                                                 |</span><br><span class="line">                    |--&gt; CreateKubeAPIServer --&gt; kubeAPIServerConfig.Complete().New --|--&gt; m.InstallLegacyAPI</span><br><span class="line">                    |                                                                 |</span><br><span class="line">                    |                                                                 |--&gt; m.InstallAPIs</span><br><span class="line">                    |</span><br><span class="line">                    |</span><br><span class="line">                    |--&gt; createAggregatorConfig</span><br><span class="line">                    |</span><br><span class="line">                    |                                                                             |--&gt; c.GenericConfig.New</span><br><span class="line">                    |                                                                             |</span><br><span class="line">                    |--&gt; createAggregatorServer --&gt; aggregatorConfig.Complete().NewWithDelegate --|--&gt; apiservicerest.NewRESTStorage</span><br><span class="line">                                                                                                  |</span><br><span class="line">                                                                                                  |--&gt; s.GenericAPIServer.InstallAPIGroup</span><br></pre></td></tr></table></figure>
+<h4 id="prepared-Run"><a href="#prepared-Run" class="headerlink" title="prepared.Run"></a>prepared.Run</h4><p>在 <code>Run</code> 方法中首先调用 <code>CreateServerChain</code> 完成各 server 的初始化，然后调用 <code>server.PrepareRun</code> 完成服务启动前的准备工作，最后调用 <code>prepared.Run</code> 方法来启动安全的 http server。<code>server.PrepareRun</code> 主要完成了健康检查、存活检查和<code>OpenAPI</code>路由的注册工作，下面继续分析 <code>prepared.Run</code> 的流程，在 <code>prepared.Run</code> 中主要调用 <code>s.NonBlockingRun</code> 来完成启动工作。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:269</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">func (s preparedAPIAggregator) Run(stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">    return s.runnable.Run(stopCh)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go:316</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">func (s preparedGenericAPIServer) Run(stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">    delayedStopCh := make(chan struct&#123;&#125;)</span><br><span class="line"></span><br><span class="line">    go func() &#123;</span><br><span class="line">        defer close(delayedStopCh)</span><br><span class="line">        &lt;-stopCh</span><br><span class="line"></span><br><span class="line">        time.Sleep(s.ShutdownDelayDuration)</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    // 调用 s.NonBlockingRun 完成启动流程</span><br><span class="line">    err := s.NonBlockingRun(delayedStopCh)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 当收到退出信号后完成一些收尾工作</span><br><span class="line">    &lt;-stopCh</span><br><span class="line">    err = s.RunPreShutdownHooks()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &lt;-delayedStopCh</span><br><span class="line">    s.HandlerChainWaitGroup.Wait()</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="s-NonBlockingRun"><a href="#s-NonBlockingRun" class="headerlink" title="s.NonBlockingRun"></a>s.NonBlockingRun</h5><p><code>s.NonBlockingRun</code> 的主要逻辑为：</p>
+<ul>
+<li>1、判断是否要启动审计日志服务；</li>
+<li>2、调用 <code>s.SecureServingInfo.Serve</code> 配置并启动 https server；</li>
+<li>3、执行 postStartHooks；</li>
+<li>4、向 systemd 发送 ready 信号；</li>
+</ul>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go:351</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">func (s preparedGenericAPIServer) NonBlockingRun(stopCh &lt;-chan struct&#123;&#125;) error &#123;</span><br><span class="line">    auditStopCh := make(chan struct&#123;&#125;)</span><br><span class="line"></span><br><span class="line">    // 1、判断是否要启动审计日志</span><br><span class="line">    if s.AuditBackend != nil &#123;</span><br><span class="line">        if err := s.AuditBackend.Run(auditStopCh); err != nil &#123;</span><br><span class="line">            return fmt.Errorf(&quot;failed to run the audit backend: %v&quot;, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、启动 https server</span><br><span class="line">    internalStopCh := make(chan struct&#123;&#125;)</span><br><span class="line">    var stoppedCh &lt;-chan struct&#123;&#125;</span><br><span class="line">    if s.SecureServingInfo != nil &amp;&amp; s.Handler != nil &#123;</span><br><span class="line">        var err error</span><br><span class="line">        stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            close(internalStopCh)</span><br><span class="line">            close(auditStopCh)</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    go func() &#123;</span><br><span class="line">        &lt;-stopCh</span><br><span class="line">        close(s.readinessStopCh)</span><br><span class="line">        close(internalStopCh)</span><br><span class="line">        if stoppedCh != nil &#123;</span><br><span class="line">            &lt;-stoppedCh</span><br><span class="line">        &#125;</span><br><span class="line">        s.HandlerChainWaitGroup.Wait()</span><br><span class="line">        close(auditStopCh)</span><br><span class="line">    &#125;()</span><br><span class="line"></span><br><span class="line">    // 3、执行 postStartHooks</span><br><span class="line">    s.RunPostStartHooks(stopCh)</span><br><span class="line"></span><br><span class="line">    // 4、向 systemd 发送 ready 信号</span><br><span class="line">    if _, err := systemd.SdNotify(true, &quot;READY=1\n&quot;); err != nil &#123;</span><br><span class="line">        klog.Errorf(&quot;Unable to send systemd daemon successful start message: %v\n&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是 server 的初始化以及启动流程过程的分析，上文已经提到各 server 初始化过程中最重要的就是 API Resource RESTStorage 的初始化以及路由的注册，由于该过程比较复杂，下文会单独进行讲述。 </p>
+<h3 id="storageFactory-的构建"><a href="#storageFactory-的构建" class="headerlink" title="storageFactory 的构建"></a>storageFactory 的构建</h3><p>上文已经提到过，apiserver 最终实现的 handler 对应的后端数据是以 <strong>Store</strong> 的结构保存的，这里以 <code>/api</code> 开头的路由举例，通过<code>NewLegacyRESTStorage</code>方法创建各个资源的<strong>RESTStorage</strong>。RESTStorage 是一个结构体，具体的定义在<code>k8s.io/apiserver/pkg/registry/generic/registry/store.go</code>下，结构体内主要包含<code>NewFunc</code>返回特定资源信息、<code>NewListFunc</code>返回特定资源列表、<code>CreateStrategy</code>特定资源创建时的策略、<code>UpdateStrategy</code>更新时的策略以及<code>DeleteStrategy</code>删除时的策略等重要方法。在<code>NewLegacyRESTStorage</code>内部，可以看到创建了多种资源的 RESTStorage。</p>
+<p><code>NewLegacyRESTStorage</code> 的调用链为 <code>CreateKubeAPIServer --&gt; kubeAPIServerConfig.Complete().New --&gt; m.InstallLegacyAPI --&gt; legacyRESTStorageProvider.NewLegacyRESTStorage</code>。</p>
+<h4 id="NewLegacyRESTStorage"><a href="#NewLegacyRESTStorage" class="headerlink" title="NewLegacyRESTStorage"></a>NewLegacyRESTStorage</h4><p>一个 API Group 下的资源都有其 REST 实现，<code>k8s.io/kubernetes/pkg/registry</code>下所有的 Group 都有一个rest目录，存储的就是对应资源的 RESTStorage。在<code>NewLegacyRESTStorage</code>方法中，通过<code>NewREST</code>或者<code>NewStorage</code>会生成各种资源对应的 Storage，此处以 pod 为例进行说明。</p>
+<p><code>k8s.io/kubernetes/pkg/registry/core/rest/storage_core.go:102</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br></pre></td><td class="code"><pre><span class="line">func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.  APIGroupInfo, error) &#123;</span><br><span class="line">    apiGroupInfo := genericapiserver.APIGroupInfo&#123;</span><br><span class="line">        PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(&quot;&quot;),</span><br><span class="line">        VersionedResourcesStorageMap: map[string]map[string]rest.Storage&#123;&#125;,</span><br><span class="line">        Scheme:                       legacyscheme.Scheme,</span><br><span class="line">        ParameterCodec:               legacyscheme.ParameterCodec,</span><br><span class="line">        NegotiatedSerializer:         legacyscheme.Codecs,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var podDisruptionClient policyclient.PodDisruptionBudgetsGetter</span><br><span class="line">    if policyGroupVersion := (schema.GroupVersion&#123;Group: &quot;policy&quot;, Version: &quot;v1beta1&quot;&#125;); legacyscheme.Scheme.                               IsVersionRegistered(policyGroupVersion) &#123;</span><br><span class="line">        var err error</span><br><span class="line">        podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 1、LegacyAPI 下的 resource RESTStorage 的初始化</span><br><span class="line">    restStorage := LegacyRESTStorage&#123;&#125;</span><br><span class="line"></span><br><span class="line">    podTemplateStorage, err := podtemplatestore.NewREST(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line">    eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line">    limitRangeStorage, err := limitrangestore.NewREST(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    endpointsStorage, err := endpointsstore.NewREST(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、pod RESTStorage 的初始化</span><br><span class="line">    podStorage, err := podstore.NewStorage(......)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">		</span><br><span class="line">    serviceClusterIPAllocator, err := ipallocator.NewAllocatorCIDRRange(&amp;serviceClusterIPRange, func(max int, rangeSpec string) (allocator. Interface, error) &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, fmt.Errorf(&quot;cannot create cluster IP allocator: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry</span><br><span class="line"></span><br><span class="line">    var secondaryServiceClusterIPAllocator ipallocator.Interface</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &amp;&amp; c.SecondaryServiceIPRange.IP != nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var serviceNodePortRegistry rangeallocation.RangeRegistry</span><br><span class="line">    serviceNodePortAllocator, err := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string)      (allocator.Interface, error) &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, fmt.Errorf(&quot;cannot create cluster port allocator: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    restStorage.ServiceNodePortAllocator = serviceNodePortRegistry</span><br><span class="line"></span><br><span class="line">    controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return LegacyRESTStorage&#123;&#125;, genericapiserver.APIGroupInfo&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    serviceRest, serviceRestProxy := servicestore.NewREST(......)</span><br><span class="line">    </span><br><span class="line">    // 3、restStorageMap 保存 resource http path 与 RESTStorage 对应关系</span><br><span class="line">    restStorageMap := map[string]rest.Storage&#123;</span><br><span class="line">        &quot;pods&quot;:             podStorage.Pod,</span><br><span class="line">        &quot;pods/attach&quot;:      podStorage.Attach,</span><br><span class="line">        &quot;pods/status&quot;:      podStorage.Status,</span><br><span class="line">        &quot;pods/log&quot;:         podStorage.Log,</span><br><span class="line">        &quot;pods/exec&quot;:        podStorage.Exec,</span><br><span class="line">        &quot;pods/portforward&quot;: podStorage.PortForward,</span><br><span class="line">        &quot;pods/proxy&quot;:       podStorage.Proxy,</span><br><span class="line">        ......</span><br><span class="line">        &quot;componentStatuses&quot;: componentstatus.NewStorage(componentStatusStorage&#123;c.StorageFactory&#125;.serversToValidate),</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="podstore-NewStorage"><a href="#podstore-NewStorage" class="headerlink" title="podstore.NewStorage"></a>podstore.NewStorage</h5><p><code>podstore.NewStorage</code> 是为 pod 生成 storage 的方法，该方法主要功能是为 pod 创建后端存储最终返回一个 RESTStorage 对象，其中调用 <code>store.CompleteWithOptions</code> 来创建后端存储的。</p>
+<p><code>k8s.io/kubernetes/pkg/registry/core/pod/storage/storage.go:71</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">func NewStorage(......) (PodStorage, error) &#123;</span><br><span class="line">    store := &amp;genericregistry.Store&#123;</span><br><span class="line">        NewFunc:                  func() runtime.Object &#123; return &amp;api.Pod&#123;&#125; &#125;,</span><br><span class="line">        NewListFunc:              func() runtime.Object &#123; return &amp;api.PodList&#123;&#125; &#125;,</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    options := &amp;generic.StoreOptions&#123;</span><br><span class="line">        RESTOptions: optsGetter,</span><br><span class="line">        AttrFunc:    pod.GetAttrs,</span><br><span class="line">        TriggerFunc: map[string]storage.IndexerFunc&#123;&quot;spec.nodeName&quot;: pod.NodeNameTriggerFunc&#125;,</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // 调用 store.CompleteWithOptions</span><br><span class="line">    if err := store.CompleteWithOptions(options); err != nil &#123;</span><br><span class="line">        return PodStorage&#123;&#125;, err</span><br><span class="line">    &#125;</span><br><span class="line">    statusStore := *store</span><br><span class="line">    statusStore.UpdateStrategy = pod.StatusStrategy</span><br><span class="line">    ephemeralContainersStore := *store</span><br><span class="line">    ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy</span><br><span class="line"></span><br><span class="line">    bindingREST := &amp;BindingREST&#123;store: store&#125;</span><br><span class="line">    </span><br><span class="line">    // PodStorage 对象</span><br><span class="line">    return PodStorage&#123;</span><br><span class="line">        Pod:                 &amp;REST&#123;store, proxyTransport&#125;,</span><br><span class="line">        Binding:             &amp;BindingREST&#123;store: store&#125;,</span><br><span class="line">        LegacyBinding:       &amp;LegacyBindingREST&#123;bindingREST&#125;,</span><br><span class="line">        Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),</span><br><span class="line">        Status:              &amp;StatusREST&#123;store: &amp;statusStore&#125;,</span><br><span class="line">        EphemeralContainers: &amp;EphemeralContainersREST&#123;store: &amp;ephemeralContainersStore&#125;,</span><br><span class="line">        Log:                 &amp;podrest.LogREST&#123;Store: store, KubeletConn: k&#125;,</span><br><span class="line">        Proxy:               &amp;podrest.ProxyREST&#123;Store: store, ProxyTransport: proxyTransport&#125;,</span><br><span class="line">        Exec:                &amp;podrest.ExecREST&#123;Store: store, KubeletConn: k&#125;,</span><br><span class="line">        Attach:              &amp;podrest.AttachREST&#123;Store: store, KubeletConn: k&#125;,</span><br><span class="line">        PortForward:         &amp;podrest.PortForwardREST&#123;Store: store, KubeletConn: k&#125;,</span><br><span class="line">    &#125;, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到最终返回的对象里对 pod 的不同操作都是一个 REST 对象，REST 中自动集成了 <code>genericregistry.Store</code> 对象，而 <code>store.CompleteWithOptions</code> 方法就是对 <code>genericregistry.Store</code> 对象中存储实例就行初始化的。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">type REST struct &#123;</span><br><span class="line">    *genericregistry.Store</span><br><span class="line">    proxyTransport http.RoundTripper</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">type BindingREST struct &#123;</span><br><span class="line">    store *genericregistry.Store</span><br><span class="line">&#125;</span><br><span class="line">......</span><br></pre></td></tr></table></figure>
+<h5 id="store-CompleteWithOptions"><a href="#store-CompleteWithOptions" class="headerlink" title="store.CompleteWithOptions"></a>store.CompleteWithOptions</h5><p><code>store.CompleteWithOptions</code> 主要功能是为 store 中的配置设置一些默认的值以及根据提供的 options 更新 store，其中最主要的就是初始化 store 的后端存储实例。</p>
+<p>在<code>CompleteWithOptions</code>方法内，调用了<code>options.RESTOptions.GetRESTOptions</code> 方法，其最终返回<code>generic.RESTOptions</code> 对象，<code>generic.RESTOptions</code> 对象中包含对 etcd 初始化的一些配置、数据序列化方法以及对 etcd 操作的 storage.Interface 对象。其会依次调用<code>StorageWithCacher--&gt;NewRawStorage--&gt;Create</code>方法创建最终依赖的后端存储。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go:1192</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br></pre></td><td class="code"><pre><span class="line">func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    var isNamespaced bool</span><br><span class="line">    switch &#123;</span><br><span class="line">    case e.CreateStrategy != nil:</span><br><span class="line">        isNamespaced = e.CreateStrategy.NamespaceScoped()</span><br><span class="line">    case e.UpdateStrategy != nil:</span><br><span class="line">        isNamespaced = e.UpdateStrategy.NamespaceScoped()</span><br><span class="line">    default:</span><br><span class="line">        return fmt.Errorf(&quot;store for %s must have CreateStrategy or UpdateStrategy set&quot;, e.DefaultQualifiedResource.String())</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、调用 options.RESTOptions.GetRESTOptions </span><br><span class="line">    opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、设置 ResourcePrefix </span><br><span class="line">    prefix := opts.ResourcePrefix</span><br><span class="line">    if !strings.HasPrefix(prefix, &quot;/&quot;) &#123;</span><br><span class="line">        prefix = &quot;/&quot; + prefix</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    if prefix == &quot;/&quot; &#123;</span><br><span class="line">        return fmt.Errorf(&quot;store for %s has an invalid prefix %q&quot;, e.DefaultQualifiedResource.String(), opts.ResourcePrefix)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    if e.KeyRootFunc == nil &amp;&amp; e.KeyFunc == nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    keyFunc := func(obj runtime.Object) (string, error) &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、以下操作主要是将 opts 对象中的值赋值到 store 对象中</span><br><span class="line">    if e.DeleteCollectionWorkers == 0 &#123;</span><br><span class="line">        e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    e.EnableGarbageCollection = opts.EnableGarbageCollection</span><br><span class="line">    if e.ObjectNameFunc == nil &#123;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if e.Storage.Storage == nil &#123;</span><br><span class="line">        e.Storage.Codec = opts.StorageConfig.Codec</span><br><span class="line">        var err error</span><br><span class="line">        e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(</span><br><span class="line">            opts.StorageConfig,</span><br><span class="line">            prefix,</span><br><span class="line">            keyFunc,</span><br><span class="line">            e.NewFunc,</span><br><span class="line">            e.NewListFunc,</span><br><span class="line">            attrFunc,</span><br><span class="line">            options.TriggerFunc,</span><br><span class="line">        )</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line">        e.StorageVersioner = opts.StorageConfig.EncodeVersioner</span><br><span class="line"></span><br><span class="line">        if opts.CountMetricPollPeriod &gt; 0 &#123;</span><br><span class="line">            stopFunc := e.startObservingCount(opts.CountMetricPollPeriod)</span><br><span class="line">            previousDestroy := e.DestroyFunc</span><br><span class="line">            e.DestroyFunc = func() &#123;</span><br><span class="line">                stopFunc()</span><br><span class="line">                if previousDestroy != nil &#123;</span><br><span class="line">                    previousDestroy()</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>options.RESTOptions</code> 是一个 interface，想要找到其 <code>GetRESTOptions</code> 方法的实现必须知道 <code>options.RESTOptions</code> 初始化时对应的实例，其初始化是在 <code>CreateKubeAPIServerConfig --&gt; buildGenericConfig --&gt; s.Etcd.ApplyWithStorageFactoryTo</code> 方法中进行初始化的，<code>RESTOptions</code> 对应的实例为 <code>StorageFactoryRestOptionsFactory</code>，所以 PodStorage 初始时构建的 store 对象中<code>genericserver.Config.RESTOptionsGetter</code> 实际的对象类型为 <code>StorageFactoryRestOptionsFactory</code>，其 <code>GetRESTOptions</code> 方法如下所示：</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/server/options/etcd.go:253</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) &#123;</span><br><span class="line">    storageConfig, err := f.StorageFactory.NewConfig(resource)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return generic.RESTOptions&#123;&#125;, fmt.Errorf(&quot;unable to find storage destination for %v, due to %v&quot;, resource, err.Error())</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ret := generic.RESTOptions&#123;</span><br><span class="line">        StorageConfig:           storageConfig,</span><br><span class="line">        Decorator:               generic.UndecoratedStorage,</span><br><span class="line">        DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,</span><br><span class="line">        EnableGarbageCollection: f.Options.EnableGarbageCollection,</span><br><span class="line">        ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),</span><br><span class="line">        CountMetricPollPeriod:   f.Options.StorageConfig.CountMetricPollPeriod,</span><br><span class="line">    &#125;</span><br><span class="line">    if f.Options.EnableWatchCache &#123;</span><br><span class="line">        sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return generic.RESTOptions&#123;&#125;, err</span><br><span class="line">        &#125;</span><br><span class="line">        cacheSize, ok := sizes[resource]</span><br><span class="line">        if !ok &#123;</span><br><span class="line">            cacheSize = f.Options.DefaultWatchCacheSize</span><br><span class="line">        &#125;</span><br><span class="line">        // 调用 generic.StorageDecorator</span><br><span class="line">        ret.Decorator = genericregistry.StorageWithCacher(cacheSize)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return ret, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 <code>genericregistry.StorageWithCacher</code> 中又调用了不同的方法最终会调用 <code>factory.Create</code> 来初始化存储实例，其调用链为：<code>genericregistry.StorageWithCacher --&gt; generic.NewRawStorage --&gt; factory.Create</code>。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory/factory.go:30</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) &#123;</span><br><span class="line">    switch c.Type &#123;</span><br><span class="line">    case &quot;etcd2&quot;:</span><br><span class="line">        return nil, nil, fmt.Errorf(&quot;%v is no longer a supported storage backend&quot;, c.Type)</span><br><span class="line">    // 目前 k8s 只支持使用 etcd v3</span><br><span class="line">    case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:</span><br><span class="line">        return newETCD3Storage(c)</span><br><span class="line">    default:</span><br><span class="line">        return nil, nil, fmt.Errorf(&quot;unknown storage type: %s&quot;, c.Type)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h6 id="newETCD3Storage"><a href="#newETCD3Storage" class="headerlink" title="newETCD3Storage"></a>newETCD3Storage</h6><p>在 <code>newETCD3Storage</code> 中，首先通过调用 <code>newETCD3Client</code> 创建 etcd 的 client，client 的创建最终是通过 etcd 官方提供的客户端工具 <a href="https://github.com/etcd-io/etcd/tree/master/clientv3" target="_blank" rel="noopener">clientv3</a> 进行创建的。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory/etcd3.go:209</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) &#123;</span><br><span class="line">    stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    client, err := newETCD3Client(c.Transport)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        stopCompactor()</span><br><span class="line">        return nil, nil, err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    var once sync.Once</span><br><span class="line">    destroyFunc := func() &#123;</span><br><span class="line">        once.Do(func() &#123;</span><br><span class="line">            stopCompactor()</span><br><span class="line">            client.Close()</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    transformer := c.Transformer</span><br><span class="line">    if transformer == nil &#123;</span><br><span class="line">        transformer = value.IdentityTransformer</span><br><span class="line">    &#125;</span><br><span class="line">    return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>至此对于 pod resource 中 store 的构建基本分析完成，不同 resource 对应一个 REST 对象，其中又引用了 <code>genericregistry.Store</code> 对象，最终是对 <code>genericregistry.Store</code> 的初始化。在分析完 store 的初始化后还有一个重要的步骤就是路由的注册，路由注册主要的流程是为 resource 根据不同 verbs 构建 http path 以及将 path 与对应 handler 进行绑定。</p>
+<h4 id="路由注册"><a href="#路由注册" class="headerlink" title="路由注册"></a>路由注册</h4><p>上文 RESTStorage 的构建对应的是 <code>InstallLegacyAPI</code> 中的 <code>legacyRESTStorageProvider.NewLegacyRESTStorage</code> 方法，下面继续分析 <code>InstallLegacyAPI</code> 中的 <code>m.GenericAPIServer.InstallLegacyAPIGroup</code> 方法的实现。</p>
+<p><code>k8s.io/kubernetes/pkg/master/master.go:406</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">func (m *Master) InstallLegacyAPI(......) error &#123;</span><br><span class="line">    legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error building core storage: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &amp;apiGroupInfo); err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error in registering group versions: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>m.GenericAPIServer.InstallLegacyAPIGroup</code> 的调用链非常深，最终是为 Group 下每一个 API resources 注册 handler 及路由信息，其调用链为：<code>m.GenericAPIServer.InstallLegacyAPIGroup --&gt; s.installAPIResources --&gt; apiGroupVersion.InstallREST --&gt; installer.Install --&gt; a.registerResourceHandlers</code>。其中几个方法的作用如下所示：</p>
+<ul>
+<li><code>s.installAPIResources</code>：为每一个 API resource 调用 <code>apiGroupVersion.InstallREST</code> 添加路由；</li>
+<li><code>apiGroupVersion.InstallREST</code>：将 <code>restful.WebServic</code> 对象添加到 container 中；</li>
+<li><code>installer.Install</code>：返回最终的 <code>restful.WebService</code> 对象</li>
+</ul>
+<h5 id="a-registerResourceHandlers"><a href="#a-registerResourceHandlers" class="headerlink" title="a.registerResourceHandlers"></a>a.registerResourceHandlers</h5><p>该方法实现了 <code>rest.Storage</code> 到 <code>restful.Route</code> 的转换，其首先会判断 API Resource 所支持的 REST 接口，然后为 REST 接口添加对应的 handler，最后将其注册到路由中。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/endpoints/installer.go:181</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br></pre></td><td class="code"><pre><span class="line">func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) &#123;       </span><br><span class="line">    admit := a.group.Admit</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">   </span><br><span class="line">    // 1、判断该 resource 实现了哪些 REST 操作接口，以此来判断其支持的 verbs 以便为其添加路由</span><br><span class="line">    creater, isCreater := storage.(rest.Creater)</span><br><span class="line">    namedCreater, isNamedCreater := storage.(rest.NamedCreater)</span><br><span class="line">    lister, isLister := storage.(rest.Lister)</span><br><span class="line">    getter, isGetter := storage.(rest.Getter)</span><br><span class="line">    getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)</span><br><span class="line">    gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)</span><br><span class="line">    collectionDeleter, isCollectionDeleter := storage.(rest.CollectionDeleter)</span><br><span class="line">    updater, isUpdater := storage.(rest.Updater)</span><br><span class="line">    patcher, isPatcher := storage.(rest.Patcher)</span><br><span class="line">    watcher, isWatcher := storage.(rest.Watcher)</span><br><span class="line">    connecter, isConnecter := storage.(rest.Connecter)</span><br><span class="line">    storageMeta, isMetadata := storage.(rest.StorageMetadata)</span><br><span class="line">    storageVersionProvider, isStorageVersionProvider := storage.(rest.StorageVersionProvider)</span><br><span class="line">    if !isMetadata &#123;</span><br><span class="line">        storageMeta = defaultStorageMetadata&#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    exporter, isExporter := storage.(rest.Exporter)</span><br><span class="line">    if !isExporter &#123;</span><br><span class="line">        exporter = nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line">    </span><br><span class="line">    // 2、为 resource 添加对应的 actions 并根据是否支持 namespace </span><br><span class="line">    switch &#123;</span><br><span class="line">    case !namespaceScoped:</span><br><span class="line">        ......</span><br><span class="line"></span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;LIST&quot;, resourcePath, resourceParams, namer, false&#125;, isLister)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;POST&quot;, resourcePath, resourceParams, namer, false&#125;, isCreater)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;DELETECOLLECTION&quot;, resourcePath, resourceParams, namer, false&#125;, isCollectionDeleter)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;WATCHLIST&quot;, &quot;watch/&quot; + resourcePath, resourceParams, namer, false&#125;, allowWatchList)</span><br><span class="line"></span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;GET&quot;, itemPath, nameParams, namer, false&#125;, isGetter)</span><br><span class="line">        if getSubpath &#123;</span><br><span class="line">            actions = appendIf(actions, action&#123;&quot;GET&quot;, itemPath + &quot;/&#123;path:*&#125;&quot;, proxyParams, namer, false&#125;, isGetter)</span><br><span class="line">        &#125;</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;PUT&quot;, itemPath, nameParams, namer, false&#125;, isUpdater)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;PATCH&quot;, itemPath, nameParams, namer, false&#125;, isPatcher)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;DELETE&quot;, itemPath, nameParams, namer, false&#125;, isGracefulDeleter)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;WATCH&quot;, &quot;watch/&quot; + itemPath, nameParams, namer, false&#125;, isWatcher)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;CONNECT&quot;, itemPath, nameParams, namer, false&#125;, isConnecter)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;CONNECT&quot;, itemPath + &quot;/&#123;path:*&#125;&quot;, proxyParams, namer, false&#125;, isConnecter &amp;&amp; connectSubpath)</span><br><span class="line">    default:</span><br><span class="line">        ......</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;LIST&quot;, resourcePath, resourceParams, namer, false&#125;, isLister)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;POST&quot;, resourcePath, resourceParams, namer, false&#125;, isCreater)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;DELETECOLLECTION&quot;, resourcePath, resourceParams, namer, false&#125;, isCollectionDeleter)</span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;WATCHLIST&quot;, &quot;watch/&quot; + resourcePath, resourceParams, namer, false&#125;, allowWatchList)</span><br><span class="line"></span><br><span class="line">        actions = appendIf(actions, action&#123;&quot;GET&quot;, itemPath, nameParams, namer, false&#125;, isGetter)</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、根据 action 创建对应的 route</span><br><span class="line">    kubeVerbs := map[string]struct&#123;&#125;&#123;&#125;</span><br><span class="line">    reqScope := handlers.RequestScope&#123;</span><br><span class="line">        Serializer:      a.group.Serializer,</span><br><span class="line">        ParameterCodec:  a.group.ParameterCodec,</span><br><span class="line">        Creater:         a.group.Creater,</span><br><span class="line">        Convertor:       a.group.Convertor,</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    // 4、从 rest.Storage 到 restful.Route 映射</span><br><span class="line">    // 为每个操作添加对应的 handler</span><br><span class="line">    for _, action := range actions &#123;</span><br><span class="line">        ......</span><br><span class="line">        verbOverrider, needOverride := storage.(StorageMetricsOverride)</span><br><span class="line">        switch action.Verb &#123;</span><br><span class="line">        case &quot;GET&quot;: ......</span><br><span class="line">        case &quot;LIST&quot;:</span><br><span class="line">        case &quot;PUT&quot;:</span><br><span class="line">        case &quot;PATCH&quot;:</span><br><span class="line">        // 此处以 POST 操作进行说明</span><br><span class="line">        case &quot;POST&quot;: </span><br><span class="line">            var handler restful.RouteFunction</span><br><span class="line">            // 5、初始化 handler</span><br><span class="line">            if isNamedCreater &#123;</span><br><span class="line">                handler = restfulCreateNamedResource(namedCreater, reqScope, admit)</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                handler = restfulCreateResource(creater, reqScope, admit)</span><br><span class="line">            &#125;</span><br><span class="line">            handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)</span><br><span class="line">            article := GetArticleForNoun(kind, &quot; &quot;)</span><br><span class="line">            doc := &quot;create&quot; + article + kind</span><br><span class="line">            if isSubresource &#123;</span><br><span class="line">                doc = &quot;create &quot; + subresource + &quot; of&quot; + article + kind</span><br><span class="line">            &#125;</span><br><span class="line">            // 6、route 与 handler 进行绑定</span><br><span class="line">            route := ws.POST(action.Path).To(handler).</span><br><span class="line">                Doc(doc).</span><br><span class="line">                Param(ws.QueryParameter(&quot;pretty&quot;, &quot;If &apos;true&apos;, then the output is pretty printed.&quot;)).</span><br><span class="line">                Operation(&quot;create&quot;+namespaced+kind+strings.Title(subresource)+operationSuffix).</span><br><span class="line">                Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).</span><br><span class="line">                Returns(http.StatusOK, &quot;OK&quot;, producedObject).</span><br><span class="line">                Returns(http.StatusCreated, &quot;Created&quot;, producedObject).</span><br><span class="line">                Returns(http.StatusAccepted, &quot;Accepted&quot;, producedObject).</span><br><span class="line">                Reads(defaultVersionedObject).</span><br><span class="line">                Writes(producedObject)</span><br><span class="line">            if err := AddObjectParams(ws, route, versionedCreateOptions); err != nil &#123;</span><br><span class="line">                return nil, err</span><br><span class="line">            &#125;</span><br><span class="line">            addParams(route, action.Params)</span><br><span class="line">            // 7、添加到路由中</span><br><span class="line">            routes = append(routes, route)</span><br><span class="line">        case &quot;DELETE&quot;: </span><br><span class="line">        case &quot;DELETECOLLECTION&quot;:</span><br><span class="line">        case &quot;WATCH&quot;:</span><br><span class="line">        case &quot;WATCHLIST&quot;:</span><br><span class="line">        case &quot;CONNECT&quot;:</span><br><span class="line">        default:</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    return &amp;apiResource, nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="restfulCreateNamedResource"><a href="#restfulCreateNamedResource" class="headerlink" title="restfulCreateNamedResource"></a>restfulCreateNamedResource</h5><p><code>restfulCreateNamedResource</code> 是 POST 操作对应的 handler，最终会调用 <code>createHandler</code> 方法完成。</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/endpoints/installer.go:1087</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction &#123;</span><br><span class="line">    return func(req *restful.Request, res *restful.Response) &#123;</span><br><span class="line">        handlers.CreateNamedResource(r, &amp;scope, admit)(res.ResponseWriter, req.Request)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func CreateNamedResource(r rest.NamedCreater, scope *RequestScope, admission admission.Interface) http.HandlerFunc &#123;</span><br><span class="line">    return createHandler(r, scope, admission, true)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="createHandler"><a href="#createHandler" class="headerlink" title="createHandler"></a>createHandler</h5><p> <code>createHandler</code> 是将数据写入到后端存储的方法，对于资源的操作都有相关的权限控制，在 <code>createHandler</code>  中首先会执行 <code>decoder</code> 和 <code>admission</code> 操作，然后调用 <code>create</code> 方法完成 resource 的创建，在 <code>create</code> 方法中会进行 <code>validate</code> 以及最终将数据保存到后端存储中。<code>admit</code> 操作即执行 kube-apiserver 中的 admission-plugins，admission-plugins 在 <code>CreateKubeAPIServerConfig</code> 中被初始化为了 admissionChain，其初始化的调用链为 <code>CreateKubeAPIServerConfig --&gt; buildGenericConfig --&gt; s.Admission.ApplyTo --&gt; a.GenericAdmission.ApplyTo --&gt; a.Plugins.NewFromPlugins</code>，最终在 <code>a.Plugins.NewFromPlugins</code> 中将所有已启用的 plugins 封装为 admissionChain，此处要执行的 admit 操作即执行 admission-plugins 中的 admit 操作。</p>
+<p><code>createHandler</code> 中调用的 create 方法是<code>genericregistry.Store</code> 对象的方法，在每个 resource 初始化 RESTStorage 都会引入 <code>genericregistry.Store</code> 对象。</p>
+<p><code>createHandler</code> 中所有的操作就是本文开头提到的请求流程，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">v1beta1 ⇒ internal ⇒    |    ⇒       |    ⇒  v1  ⇒ json/yaml ⇒ etcd</span><br><span class="line">                     admission    validation</span><br></pre></td></tr></table></figure>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/create.go:46</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br></pre></td><td class="code"><pre><span class="line">func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc &#123;</span><br><span class="line">    return func(w http.ResponseWriter, req *http.Request) &#123;</span><br><span class="line">        trace := utiltrace.New(&quot;Create&quot;, utiltrace.Field&#123;&quot;url&quot;, req.URL.Path&#125;)</span><br><span class="line">        defer trace.LogIfLong(500 * time.Millisecond)</span><br><span class="line">        ......</span><br><span class="line"></span><br><span class="line">        gv := scope.Kind.GroupVersion()</span><br><span class="line">        // 1、得到合适的SerializerInfo</span><br><span class="line">        s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            scope.err(err, w, req)</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line">        // 2、找到合适的 decoder</span><br><span class="line">        decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)</span><br><span class="line"></span><br><span class="line">        body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            scope.err(err, w, req)</span><br><span class="line">            return</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        ......</span><br><span class="line"></span><br><span class="line">        defaultGVK := scope.Kind</span><br><span class="line">        original := r.New()</span><br><span class="line">        trace.Step(&quot;About to convert to expected version&quot;)</span><br><span class="line">        // 3、decoder 解码</span><br><span class="line">        obj, gvk, err := decoder.Decode(body, &amp;defaultGVK, original)</span><br><span class="line">        ......</span><br><span class="line"></span><br><span class="line">        ae := request.AuditEventFrom(ctx)</span><br><span class="line">        admit = admission.WithAudit(admit, ae)</span><br><span class="line">        audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)</span><br><span class="line"></span><br><span class="line">        userInfo, _ := request.UserFrom(ctx)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">        if len(name) == 0 &#123;</span><br><span class="line">            _, name, _ = scope.Namer.ObjectName(obj)</span><br><span class="line">        &#125;</span><br><span class="line">        // 4、执行 admit 操作，即执行 kube-apiserver 启动时加载的 admission-plugins，</span><br><span class="line">        admissionAttributes := admission.NewAttributesRecord(......)</span><br><span class="line">        if mutatingAdmission, ok := admit.(admission.MutationInterface); ok &amp;&amp; mutatingAdmission.Handles(admission.Create) &#123;</span><br><span class="line">            err = mutatingAdmission.Admit(ctx, admissionAttributes, scope)</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                scope.err(err, w, req)</span><br><span class="line">                return</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        ......</span><br><span class="line">        // 5、执行 create 操作</span><br><span class="line">        result, err := finishRequest(timeout, func() (runtime.Object, error) &#123;</span><br><span class="line">            return r.Create(</span><br><span class="line">                ctx,</span><br><span class="line">                name,</span><br><span class="line">                obj,</span><br><span class="line">                rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, scope),</span><br><span class="line">                options,</span><br><span class="line">            )</span><br><span class="line">        &#125;)</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要分析 kube-apiserver 的启动流程，kube-apiserver 中包含三个 server，分别为 KubeAPIServer、APIExtensionsServer 以及 AggregatorServer，三个 server 是通过委托模式连接在一起的，初始化过程都是类似的，首先为每个 server 创建对应的 config，然后初始化 http server，http server 的初始化过程为首先初始化 <code>GoRestfulContainer</code>，然后安装 server 所包含的 API，安装 API 时首先为每个 API Resource 创建对应的后端存储 RESTStorage，再为每个 API Resource 支持的 verbs 添加对应的 handler，并将 handler 注册到 route 中，最后将 route 注册到 webservice 中，启动流程中 RESTFul API 的实现流程是其核心，至于 kube-apiserver 中认证鉴权等 filter 的实现、多版本资源转换、kubernetes service 的实现等一些细节会在后面的文章中继续进行分析。</p>
+<p>参考：</p>
+<p><a href="https://mp.weixin.qq.com/s/hTEWatYLhTnC5X0FBM2RWQ" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/hTEWatYLhTnC5X0FBM2RWQ</a></p>
+<p><a href="https://bbbmj.github.io/2019/04/13/Kubernetes/code-analytics/kube-apiserver/" target="_blank" rel="noopener">https://bbbmj.github.io/2019/04/13/Kubernetes/code-analytics/kube-apiserver/</a></p>
+<p><a href="https://mp.weixin.qq.com/s/TQuqAAzBjeWHwKPJZ3iJhA" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/TQuqAAzBjeWHwKPJZ3iJhA</a></p>
+<p><a href="https://blog.openshift.com/kubernetes-deep-dive-api-server-part-1/" target="_blank" rel="noopener">https://blog.openshift.com/kubernetes-deep-dive-api-server-part-1/</a></p>
+<p><a href="https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/apiserver/(14" target="_blank" rel="noopener">https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/apiserver/(14)%20storage%E6%9C%BA%E5%88%B6.md</a>%20storage%E6%9C%BA%E5%88%B6.md)</p>
+<p><a href="https://www.jianshu.com/p/daa4ff387a78" target="_blank" rel="noopener">https://www.jianshu.com/p/daa4ff387a78</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-apiserver/" rel="tag"># kube-apiserver</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/02/06/kubelet_garbage_collect/" rel="next" title="kubelet 中垃圾回收机制的设计与实现">
+                <i class="fa fa-chevron-left"></i> kubelet 中垃圾回收机制的设计与实现
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">50</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">55</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#kube-apiserver-处理流程"><span class="nav-number">1.</span> <span class="nav-text">kube-apiserver 处理流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kube-apiserver-中的组件"><span class="nav-number">2.</span> <span class="nav-text">kube-apiserver  中的组件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Aggregator"><span class="nav-number">2.1.</span> <span class="nav-text">Aggregator</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#启用-API-Aggregation"><span class="nav-number">2.1.1.</span> <span class="nav-text">启用 API Aggregation</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#KubeAPIServer"><span class="nav-number">2.2.</span> <span class="nav-text">KubeAPIServer</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#APIExtensionServer"><span class="nav-number">2.3.</span> <span class="nav-text">APIExtensionServer</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kube-apiserver-启动流程分析"><span class="nav-number">3.</span> <span class="nav-text">kube-apiserver 启动流程分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Run"><span class="nav-number">3.1.</span> <span class="nav-text">Run</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CreateServerChain"><span class="nav-number">3.2.</span> <span class="nav-text">CreateServerChain</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateKubeAPIServerConfig"><span class="nav-number">3.2.1.</span> <span class="nav-text">CreateKubeAPIServerConfig</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#buildGenericConfig"><span class="nav-number">3.2.2.</span> <span class="nav-text">buildGenericConfig</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#createAPIExtensionsServer"><span class="nav-number">3.2.3.</span> <span class="nav-text">createAPIExtensionsServer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CreateKubeAPIServer"><span class="nav-number">3.2.4.</span> <span class="nav-text">CreateKubeAPIServer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#kubeAPIServerConfig-Complete-New"><span class="nav-number">3.2.5.</span> <span class="nav-text">kubeAPIServerConfig.Complete().New</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#m-InstallLegacyAPI"><span class="nav-number">3.2.6.</span> <span class="nav-text">m.InstallLegacyAPI</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#createAggregatorServer"><span class="nav-number">3.3.</span> <span class="nav-text">createAggregatorServer</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#aggregatorConfig-Complete-NewWithDelegate"><span class="nav-number">3.3.1.</span> <span class="nav-text">aggregatorConfig.Complete().NewWithDelegate</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#prepared-Run"><span class="nav-number">3.4.</span> <span class="nav-text">prepared.Run</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#s-NonBlockingRun"><span class="nav-number">3.4.1.</span> <span class="nav-text">s.NonBlockingRun</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#storageFactory-的构建"><span class="nav-number">4.</span> <span class="nav-text">storageFactory 的构建</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#NewLegacyRESTStorage"><span class="nav-number">4.1.</span> <span class="nav-text">NewLegacyRESTStorage</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#podstore-NewStorage"><span class="nav-number">4.1.1.</span> <span class="nav-text">podstore.NewStorage</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#store-CompleteWithOptions"><span class="nav-number">4.1.2.</span> <span class="nav-text">store.CompleteWithOptions</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#newETCD3Storage"><span class="nav-number">4.1.2.1.</span> <span class="nav-text">newETCD3Storage</span></a></li></ol></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#路由注册"><span class="nav-number">4.2.</span> <span class="nav-text">路由注册</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#a-registerResourceHandlers"><span class="nav-number">4.2.1.</span> <span class="nav-text">a.registerResourceHandlers</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#restfulCreateNamedResource"><span class="nav-number">4.2.2.</span> <span class="nav-text">restfulCreateNamedResource</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#createHandler"><span class="nav-number">4.2.3.</span> <span class="nav-text">createHandler</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

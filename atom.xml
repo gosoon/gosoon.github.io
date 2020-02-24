@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2020-02-06T08:17:56.008Z</updated>
+  <updated>2020-02-24T09:25:46.655Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,33 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>kube-apiserver 的设计与实现</title>
+    <link href="https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/"/>
+    <id>https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/</id>
+    <published>2020-02-24T09:03:30.000Z</published>
+    <updated>2020-02-24T09:25:46.655Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;kube-apiserver 是 kubernetes 中与 etcd 直接交互的一个组件，其控制着 kubernetes 中核心资源的变化。它主要提供了以下几个功能：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;提供 &lt;a
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-apiserver" scheme="https://blog.tianfeiyu.com/tags/kube-apiserver/"/>
+    
+  </entry>
   
   <entry>
     <title>kubelet 中垃圾回收机制的设计与实现</title>
@@ -524,34 +551,6 @@
       <category term="improvements" scheme="https://blog.tianfeiyu.com/tags/improvements/"/>
     
       <category term="kubernetes" scheme="https://blog.tianfeiyu.com/tags/kubernetes/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>etcd 性能测试与调优</title>
-    <link href="https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/"/>
-    <id>https://blog.tianfeiyu.com/2019/10/08/etcd_improvements/</id>
-    <published>2019-10-08T06:50:30.000Z</published>
-    <updated>2019-10-08T08:11:13.643Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;etcd 是一个分布式一致性键值存储。其主要功能有服务注册与发现、消息发布与订阅、负载均衡、分布式通知与协调、分布式锁、分布式队列、集群监控与leader 选举等。&lt;/p&gt;
-&lt;h3 id=&quot;etcd-性能优化&quot;&gt;&lt;a href=&quot;#etcd-性能优化&quot;
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="etcd" scheme="https://blog.tianfeiyu.com/tags/etcd/"/>
-    
-      <category term="improvements" scheme="https://blog.tianfeiyu.com/tags/improvements/"/>
     
   </entry>
   
