@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2020-02-24T09:36:43.722Z</updated>
+  <updated>2020-03-04T06:13:28.443Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,33 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>kube-apiserver 中 apiserver service 的实现</title>
+    <link href="https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/"/>
+    <id>https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/</id>
+    <published>2020-03-04T06:10:30.000Z</published>
+    <updated>2020-03-04T06:13:28.443Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;在 kubernetes，可以从集群外部和内部两种方式访问 kubernetes API，在集群外直接访问 apiserver 提供的 API，在集群内即 pod 中可以通过访问 service 为 kubernetes 的 ClusterIP。kubernetes
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kube-apiserver" scheme="https://blog.tianfeiyu.com/tags/kube-apiserver/"/>
+    
+      <category term="bootstrapController" scheme="https://blog.tianfeiyu.com/tags/bootstrapController/"/>
+    
+  </entry>
   
   <entry>
     <title>kube-apiserver 的设计与实现</title>
@@ -523,34 +550,6 @@
     
     
       <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>大规模场景下 kubernetes 集群的性能优化</title>
-    <link href="https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/"/>
-    <id>https://blog.tianfeiyu.com/2019/10/12/k8s_improvements/</id>
-    <published>2019-10-12T08:00:30.000Z</published>
-    <updated>2020-01-06T03:38:05.545Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;h3 id=&quot;一、etcd-优化&quot;&gt;&lt;a href=&quot;#一、etcd-优化&quot; class=&quot;headerlink&quot; title=&quot;一、etcd 优化&quot;&gt;&lt;/a&gt;一、etcd 优化&lt;/h3&gt;&lt;ul&gt;
-&lt;li&gt;&lt;p&gt;1、etcd 采用本地 ssd
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="improvements" scheme="https://blog.tianfeiyu.com/tags/improvements/"/>
-    
-      <category term="kubernetes" scheme="https://blog.tianfeiyu.com/tags/kubernetes/"/>
     
   </entry>
   

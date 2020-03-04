@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="kube-apiserver,bootstrapController,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="在 kubernetes，可以从集群外部和内部两种方式访问 kubernetes API，在集群外直接访问 apiserver 提供的 API，在集群内即 pod 中可以通过访问 service 为 kubernetes 的 ClusterIP。kubernetes 集群在初始化完成后就会创建一个 kubernetes service，该 service 是 kube-apiserver 创建并进">
+<meta name="keywords" content="kube-apiserver,bootstrapController">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kube-apiserver 中 apiserver service 的实现">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="在 kubernetes，可以从集群外部和内部两种方式访问 kubernetes API，在集群外直接访问 apiserver 提供的 API，在集群内即 pod 中可以通过访问 service 为 kubernetes 的 ClusterIP。kubernetes 集群在初始化完成后就会创建一个 kubernetes service，该 service 是 kube-apiserver 创建并进">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2020-03-04T06:13:28.443Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-apiserver 中 apiserver service 的实现">
+<meta name="twitter:description" content="在 kubernetes，可以从集群外部和内部两种方式访问 kubernetes API，在集群外直接访问 apiserver 提供的 API，在集群内即 pod 中可以通过访问 service 为 kubernetes 的 ClusterIP。kubernetes 集群在初始化完成后就会创建一个 kubernetes service，该 service 是 kube-apiserver 创建并进">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/">
+
+
+
+
+
+
+  <title>kube-apiserver 中 apiserver service 的实现 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-rss">
+          <a href="/atom.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-rss"></i> <br>
+            
+            rss
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-kube-apiserver" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kube-apiserver 中 apiserver service 的实现</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-03-04T14:10:30+08:00">
+                2020-03-04
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/03/04/apiserver_bootstrap_controller/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/03/04/apiserver_bootstrap_controller/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在 kubernetes，可以从集群外部和内部两种方式访问 kubernetes API，在集群外直接访问 apiserver 提供的 API，在集群内即 pod 中可以通过访问 service 为 kubernetes 的 ClusterIP。kubernetes 集群在初始化完成后就会创建一个 kubernetes service，该 service 是 kube-apiserver 创建并进行维护的，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get service</span><br><span class="line">NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE</span><br><span class="line">kubernetes   ClusterIP   10.96.0.1    &lt;none&gt;        443/TCP   4d22h</span><br><span class="line"></span><br><span class="line">$ kubectl get endpoints kubernetes</span><br><span class="line">NAME         ENDPOINTS             AGE</span><br><span class="line">kubernetes   192.168.99.113:6443   4d22h</span><br></pre></td></tr></table></figure>
+<p>内置的 kubernetes service 无法删除，其 ClusterIP 为通过 <code>--service-cluster-ip-range</code> 参数指定的 ip 段中的首个 ip，kubernetes endpoints 中的 ip 以及 port 可以通过 <code>--advertise-address</code> 和 <code>--secure-port</code> 启动参数来指定。</p>
+<p>kubernetes service 是由 kube-apiserver 中的 bootstrap controller 进行控制的，其主要以下几个功能：</p>
+<ul>
+<li>创建 kubernetes service；</li>
+<li>创建 default、kube-system 和 kube-public 命名空间，如果启用了 <code>NodeLease</code> 特性还会创建 kube-node-lease 命名空间；</li>
+<li>提供基于 Service ClusterIP 的修复及检查功能；</li>
+<li>提供基于 Service NodePort 的修复及检查功能；</li>
+</ul>
+<p>kubernetes service 默认使用 ClusterIP 对外暴露服务，若要使用 nodePort 的方式可在 kube-apiserver 启动时通过 <code>--kubernetes-service-node-port</code> 参数指定对应的端口。</p>
+<h3 id="bootstrap-controller-源码分析"><a href="#bootstrap-controller-源码分析" class="headerlink" title="bootstrap controller 源码分析"></a>bootstrap controller 源码分析</h3><blockquote>
+<p>kubernetes 版本：v1.16</p>
+</blockquote>
+<p>bootstrap controller 的初始化以及启动是在 <code>CreateKubeAPIServer</code> 调用链的 <code>InstallLegacyAPI</code> 方法中完成的，bootstrap controller 的启停是由 apiserver 的 <code>PostStartHook</code> 和 <code>ShutdownHook</code> 进行控制的。</p>
+<p><code>k8s.io/kubernetes/pkg/master/master.go:406</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (m *Master) InstallLegacyAPI(......) error &#123;</span><br><span class="line">    legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error building core storage: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 初始化 bootstrap-controller</span><br><span class="line">    controllerName := &quot;bootstrap-controller&quot;</span><br><span class="line">    coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)</span><br><span class="line">    bootstrapController := c.NewBootstrapController(......)</span><br><span class="line">    m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)</span><br><span class="line">    m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)</span><br><span class="line"></span><br><span class="line">    if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &amp;apiGroupInfo); err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;Error in registering group versions: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>postStartHooks 会在 kube-apiserver 的启动方法 <code>prepared.Run</code> 中调用 <code>RunPostStartHooks</code> 启动所有 Hook。</p>
+<h4 id="NewBootstrapController"><a href="#NewBootstrapController" class="headerlink" title="NewBootstrapController"></a>NewBootstrapController</h4><p>bootstrap controller 在初始化时需要设定多个参数，主要有 PublicIP、ServiceCIDR、PublicServicePort 等。PublicIP 是通过命令行参数 <code>--advertise-address</code> 指定的，如果没有指定，系统会自动选出一个 global IP。PublicServicePort 通过 <code>--secure-port</code> 启动参数来指定（默认为 6443），ServiceCIDR 通过 <code>--service-cluster-ip-range</code> 参数指定（默认为 10.0.0.0/24）。</p>
+<p><code>k8s.io/kubernetes/pkg/master/controller.go:89</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">func (c *completedConfig) NewBootstrapController(......) *Controller &#123;</span><br><span class="line">    // 1、获取 PublicServicePort</span><br><span class="line">    _, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        klog.Fatalf(&quot;failed to get listener address: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、指定需要创建的 kube-system 和 kube-public</span><br><span class="line">    systemNamespaces := []string&#123;metav1.NamespaceSystem, metav1.NamespacePublic&#125;</span><br><span class="line">    if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) &#123;</span><br><span class="line">        systemNamespaces = append(systemNamespaces, corev1.NamespaceNodeLease)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return &amp;Controller&#123;</span><br><span class="line">        ......</span><br><span class="line">        // ServiceClusterIPRegistry 是在 CreateKubeAPIServer 初始化 RESTStorage 时初始化的，是一个 etcd 实例</span><br><span class="line">        ServiceClusterIPRegistry:          legacyRESTStorage.ServiceClusterIPAllocator,</span><br><span class="line">        ServiceClusterIPRange:             c.ExtraConfig.ServiceIPRange,</span><br><span class="line">        SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,</span><br><span class="line"></span><br><span class="line">        // SecondaryServiceClusterIPRange 需要在启用 IPv6DualStack 后才能使用</span><br><span class="line">        SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,</span><br><span class="line"></span><br><span class="line">        ServiceClusterIPInterval: 3 * time.Minute,</span><br><span class="line"></span><br><span class="line">        ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,</span><br><span class="line">        ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,</span><br><span class="line">        ServiceNodePortInterval: 3 * time.Minute,</span><br><span class="line"></span><br><span class="line">        // API Server 绑定的IP，这个IP会作为kubernetes service的Endpoint的IP</span><br><span class="line">        PublicIP: c.GenericConfig.PublicAddress,</span><br><span class="line">        // 取 clusterIP range 中的第一个 IP</span><br><span class="line">        ServiceIP:                 c.ExtraConfig.APIServerServiceIP,</span><br><span class="line">        // 默认为 6443</span><br><span class="line">        ServicePort:               c.ExtraConfig.APIServerServicePort,</span><br><span class="line">        ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,</span><br><span class="line">        ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,</span><br><span class="line">        // 这里为 6443</span><br><span class="line">        PublicServicePort:         publicServicePort,</span><br><span class="line"></span><br><span class="line">        // 缺省是基于 ClusterIP 启动模式，这里为0</span><br><span class="line">        KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>自动选出 global IP 的代码如下所示：</p>
+<p><code>k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/net/interface.go:323</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">func ChooseHostInterface() (net.IP, error) &#123;</span><br><span class="line">    var nw networkInterfacer = networkInterface&#123;&#125;</span><br><span class="line">    if _, err := os.Stat(ipv4RouteFile); os.IsNotExist(err) &#123;</span><br><span class="line">        return chooseIPFromHostInterfaces(nw)</span><br><span class="line">    &#125;</span><br><span class="line">    routes, err := getAllDefaultRoutes()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return nil, err</span><br><span class="line">    &#125;</span><br><span class="line">    return chooseHostInterfaceFromRoute(routes, nw)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="bootstrapController-Start"><a href="#bootstrapController-Start" class="headerlink" title="bootstrapController.Start"></a>bootstrapController.Start</h4><p>上文已经提到了 bootstrap controller 主要的四个功能：修复 ClusterIP、修复 NodePort、更新 kubernetes service、创建系统所需要的名字空间（default、kube-system、kube-public）。bootstrap controller 在启动后首先会完成一次 ClusterIP、NodePort 和 Kubernets 服务的处理，然后异步循环运行上面的4个工作。以下是其 <code>start</code> 方法：</p>
+<p><code>k8s.io/kubernetes/pkg/master/controller.go:146</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">func (c *Controller) Start() &#123;</span><br><span class="line">    if c.runner != nil &#123;</span><br><span class="line">        return</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 1、首次启动时首先从 kubernetes endpoints 中移除自身的配置，</span><br><span class="line">    // 此时 kube-apiserver 可能处于非 ready 状态</span><br><span class="line">    endpointPorts := createEndpointPortSpec(c.PublicServicePort, &quot;https&quot;, c.ExtraEndpointPorts)</span><br><span class="line">    if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil &#123;</span><br><span class="line">        klog.Errorf(&quot;Unable to remove old endpoints from kubernetes service: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、初始化 repairClusterIPs 和 repairNodePorts 对象</span><br><span class="line">    repairClusterIPs := servicecontroller.NewRepair(......)</span><br><span class="line">    repairNodePorts := portallocatorcontroller.NewRepair(......)</span><br><span class="line"></span><br><span class="line">    // 3、首先运行一次 epairClusterIPs 和 repairNodePorts，即进行初始化</span><br><span class="line">    if err := repairClusterIPs.RunOnce(); err != nil &#123;</span><br><span class="line">        klog.Fatalf(&quot;Unable to perform initial IP allocation check: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    if err := repairNodePorts.RunOnce(); err != nil &#123;</span><br><span class="line">        klog.Fatalf(&quot;Unable to perform initial service nodePort check: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、定期执行 bootstrap controller 主要的四个功能</span><br><span class="line">    c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)</span><br><span class="line">    c.runner.Start()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="c-RunKubernetesNamespaces"><a href="#c-RunKubernetesNamespaces" class="headerlink" title="c.RunKubernetesNamespaces"></a>c.RunKubernetesNamespaces</h4><p><code>c.RunKubernetesNamespaces</code> 主要功能时创建 kube-system 和 kube-public 命名空间，如果启用了 <code>NodeLease</code>  特性功能还会创建 kube-node-lease 命名空间，之后每隔一分钟检查一次。</p>
+<p><code>k8s.io/kubernetes/pkg/master/controller.go:199</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">func (c *Controller) RunKubernetesNamespaces(ch chan struct&#123;&#125;) &#123;</span><br><span class="line">    wait.Until(func() &#123;</span><br><span class="line">        for _, ns := range c.SystemNamespaces &#123;</span><br><span class="line">            if err := createNamespaceIfNeeded(c.NamespaceClient, ns); err != nil &#123;</span><br><span class="line">                runtime.HandleError(fmt.Errorf(&quot;unable to create required kubernetes system namespace %s: %v&quot;, ns, err))</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, c.SystemNamespacesInterval, ch)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="c-RunKubernetesService"><a href="#c-RunKubernetesService" class="headerlink" title="c.RunKubernetesService"></a>c.RunKubernetesService</h4><p><code>c.RunKubernetesService</code> 主要是检查 kubernetes service 是否处于正常状态，并定期执行同步操作。首先调用  <code>/healthz</code> 接口检查 apiserver 当前是否处于 ready 状态，若处于 ready 状态然后调用 <code>c.UpdateKubernetesService</code> 服务更新 kubernetes service 状态。</p>
+<p><code>k8s.io/kubernetes/pkg/master/controller.go:210</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">func (c *Controller) RunKubernetesService(ch chan struct&#123;&#125;) &#123;</span><br><span class="line">    wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) &#123;</span><br><span class="line">        var code int</span><br><span class="line">        c.healthClient.Get().AbsPath(&quot;/healthz&quot;).Do().StatusCode(&amp;code)</span><br><span class="line">        return code == http.StatusOK, nil</span><br><span class="line">    &#125;, ch)</span><br><span class="line"></span><br><span class="line">    wait.NonSlidingUntil(func() &#123;</span><br><span class="line">        if err := c.UpdateKubernetesService(false); err != nil &#123;</span><br><span class="line">            runtime.HandleError(fmt.Errorf(&quot;unable to sync kubernetes service: %v&quot;, err))</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, c.EndpointInterval, ch)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="c-UpdateKubernetesService"><a href="#c-UpdateKubernetesService" class="headerlink" title="c.UpdateKubernetesService"></a>c.UpdateKubernetesService</h5><p><code>c.UpdateKubernetesService</code> 的主要逻辑为：</p>
+<ul>
+<li>1、调用 <code>createNamespaceIfNeeded</code> 创建 default namespace；</li>
+<li>2、调用 <code>c.CreateOrUpdateMasterServiceIfNeeded</code> 为 master 创建 kubernetes service；</li>
+<li>3、调用 <code>c.EndpointReconciler.ReconcileEndpoints</code> 更新 master 的 endpoint；</li>
+</ul>
+<p><code>k8s.io/kubernetes/pkg/master/controller.go:230</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">func (c *Controller) UpdateKubernetesService(reconcile bool) error &#123;</span><br><span class="line">    if err := createNamespaceIfNeeded(c.NamespaceClient, metav1.NamespaceDefault); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, &quot;https&quot;, c.ExtraServicePorts)</span><br><span class="line">    if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil &#123;</span><br><span class="line">    		return err</span><br><span class="line">    &#125;</span><br><span class="line">    endpointPorts := createEndpointPortSpec(c.PublicServicePort, &quot;https&quot;, c.ExtraEndpointPorts)</span><br><span class="line">    if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="c-EndpointReconciler-ReconcileEndpoints"><a href="#c-EndpointReconciler-ReconcileEndpoints" class="headerlink" title="c.EndpointReconciler.ReconcileEndpoints"></a>c.EndpointReconciler.ReconcileEndpoints</h5><p>EndpointReconciler 的具体实现由 <code>EndpointReconcilerType</code> 决定，<code>EndpointReconcilerType</code> 是 <code>--endpoint-reconciler-type</code> 参数指定的，可选的参数有 <code>master-count, lease, none</code>，每种类型对应不同的 EndpointReconciler 实例，在 v1.16 中默认为 lease，此处仅分析 lease 对应的 EndpointReconciler 的实现。</p>
+<p>一个集群中可能会有多个 apiserver 实例，因此需要统一管理 apiserver service 的 endpoints，<code>c.EndpointReconciler.ReconcileEndpoints</code> 就是用来管理 apiserver endpoints 的。一个集群中 apiserver 的所有实例会在 etcd 中的对应目录下创建 key，并定期更新这个 key 来上报自己的心跳信息，ReconcileEndpoints 会从 etcd 中获取 apiserver 的实例信息并更新 endpoint。</p>
+<p><code>k8s.io/kubernetes/pkg/master/reconcilers/lease.go:144</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line">func (r *leaseEndpointReconciler) ReconcileEndpoints(......) error &#123;</span><br><span class="line">    r.reconcilingLock.Lock()</span><br><span class="line">    defer r.reconcilingLock.Unlock()</span><br><span class="line"></span><br><span class="line">    if r.stopReconcilingCalled &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 更新 lease 信息</span><br><span class="line">    if err := r.masterLeases.UpdateLease(ip.String()); err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return r.doReconcile(serviceName, endpointPorts, reconcilePorts)</span><br><span class="line">&#125;</span><br><span class="line">func (r *leaseEndpointReconciler) doReconcile(......) error &#123;</span><br><span class="line">    // 1、获取 master 的 endpoint</span><br><span class="line">    e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions&#123;&#125;)</span><br><span class="line">    shouldCreate := false</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        if !errors.IsNotFound(err) &#123;</span><br><span class="line">            return err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        shouldCreate = true</span><br><span class="line">        e = &amp;corev1.Endpoints&#123;</span><br><span class="line">            ObjectMeta: metav1.ObjectMeta&#123;</span><br><span class="line">                Name:      serviceName,</span><br><span class="line">                Namespace: corev1.NamespaceDefault,</span><br><span class="line">            &#125;,</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 2、从 etcd 中获取所有的 master</span><br><span class="line">    masterIPs, err := r.masterLeases.ListLeases()</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if len(masterIPs) == 0 &#123;</span><br><span class="line">        return fmt.Errorf(&quot;no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service&quot;)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 3、检查 endpoint 中 master 信息，如果与 etcd 中的不一致则进行更新</span><br><span class="line">    formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)</span><br><span class="line">    if formatCorrect &amp;&amp; ipCorrect &amp;&amp; portsCorrect &#123;</span><br><span class="line">        return nil</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if !formatCorrect &#123;</span><br><span class="line">        e.Subsets = []corev1.EndpointSubset&#123;&#123;</span><br><span class="line">            Addresses: []corev1.EndpointAddress&#123;&#125;,</span><br><span class="line">            Ports:     endpointPorts,</span><br><span class="line">        &#125;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    if !formatCorrect || !ipCorrect &#123;</span><br><span class="line">        e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))</span><br><span class="line">        for ind, ip := range masterIPs &#123;</span><br><span class="line">            e.Subsets[0].Addresses[ind] = corev1.EndpointAddress&#123;IP: ip&#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        e.Subsets = endpointsv1.RepackSubsets(e.Subsets)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if !portsCorrect &#123;</span><br><span class="line">        e.Subsets[0].Ports = endpointPorts</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if shouldCreate &#123;</span><br><span class="line">        if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) &#123;</span><br><span class="line">            err = nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        _, err = r.epAdapter.Update(corev1.NamespaceDefault, e)</span><br><span class="line">    &#125;</span><br><span class="line">    return err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="repairClusterIPs-RunUntil"><a href="#repairClusterIPs-RunUntil" class="headerlink" title="repairClusterIPs.RunUntil"></a>repairClusterIPs.RunUntil</h4><p>repairClusterIP 主要解决的问题有：</p>
+<ul>
+<li>保证集群中所有的  ClusterIP 都是唯一分配的；</li>
+<li>保证分配的 ClusterIP 不会超出指定范围；</li>
+<li>确保已经分配给 service 但是因为 crash 等其他原因没有正确创建 ClusterIP；</li>
+<li>自动将旧版本的 Kubernetes services 迁移到 ipallocator 原子性模型；</li>
+</ul>
+<p><code>repairClusterIPs.RunUntil</code> 其实是调用 <code>repairClusterIPs.runOnce</code> 来处理的，其代码中的主要逻辑如下所示：</p>
+<p><code>k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller/repair.go:134</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br></pre></td><td class="code"><pre><span class="line">func (c *Repair) runOnce() error &#123;</span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 1、首先从 etcd 中获取已经使用 ClusterIP 的快照</span><br><span class="line">    err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) &#123;</span><br><span class="line">        var err error</span><br><span class="line">        snapshot, err = c.alloc.Get()</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return false, err</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if c.shouldWorkOnSecondary() &#123;</span><br><span class="line">            secondarySnapshot, err = c.secondaryAlloc.Get()</span><br><span class="line">            if err != nil &#123;</span><br><span class="line">                return false, err</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        return true, nil</span><br><span class="line">    &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to refresh the service IP block: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、判断 snapshot 是否已经初始化</span><br><span class="line">    if snapshot.Range == &quot;&quot; &#123;</span><br><span class="line">        snapshot.Range = c.network.String()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if c.shouldWorkOnSecondary() &amp;&amp; secondarySnapshot.Range == &quot;&quot; &#123;</span><br><span class="line">        secondarySnapshot.Range = c.secondaryNetwork.String()</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    stored, err = ipallocator.NewFromSnapshot(snapshot)</span><br><span class="line">    if c.shouldWorkOnSecondary() &#123;</span><br><span class="line">        secondaryStored, secondaryErr = ipallocator.NewFromSnapshot(secondarySnapshot)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if err != nil || secondaryErr != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to rebuild allocator from snapshots: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 3、获取 service list</span><br><span class="line">    list, err := c.serviceClient.Services(metav1.NamespaceAll).List(metav1.ListOptions&#123;&#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to refresh the service IP block: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 4、将 CIDR 转换为对应的 IP range 格式</span><br><span class="line">    var rebuilt, secondaryRebuilt *ipallocator.Range</span><br><span class="line">    rebuilt, err = ipallocator.NewCIDRRange(c.network)</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">    // 5、检查每个 Service 的 ClusterIP，保证其处于正常状态</span><br><span class="line">    for _, svc := range list.Items &#123;</span><br><span class="line">        if !helper.IsServiceIPSet(&amp;svc) &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        ip := net.ParseIP(svc.Spec.ClusterIP)</span><br><span class="line">        ......</span><br><span class="line"></span><br><span class="line">        actualAlloc := c.selectAllocForIP(ip, rebuilt, secondaryRebuilt)</span><br><span class="line">        switch err := actualAlloc.Allocate(ip); err &#123;</span><br><span class="line">        // 6、检查 ip 是否泄漏</span><br><span class="line">        case nil:</span><br><span class="line">            actualStored := c.selectAllocForIP(ip, stored, secondaryStored)</span><br><span class="line">            if actualStored.Has(ip) &#123;</span><br><span class="line">                actualStored.Release(ip)</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">            delete(c.leaks, ip.String())</span><br><span class="line">        // 7、ip 重复分配</span><br><span class="line">        case ipallocator.ErrAllocated:</span><br><span class="line">            ......</span><br><span class="line">        // 8、ip 超出范围</span><br><span class="line">        case err.(*ipallocator.ErrNotInRange):</span><br><span class="line">            ......</span><br><span class="line">        // 9、ip 已经分配完</span><br><span class="line">        case ipallocator.ErrFull:</span><br><span class="line">            ......</span><br><span class="line">        default:</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 10、对比是否有泄漏 ip</span><br><span class="line">    c.checkLeaked(stored, rebuilt)</span><br><span class="line">    if c.shouldWorkOnSecondary() &#123;</span><br><span class="line">        c.checkLeaked(secondaryStored, secondaryRebuilt)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 11、更新快照</span><br><span class="line">    err = c.saveSnapShot(rebuilt, c.alloc, snapshot)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return err</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if c.shouldWorkOnSecondary() &#123;</span><br><span class="line">        err := c.saveSnapShot(secondaryRebuilt, c.secondaryAlloc, secondarySnapshot)</span><br><span class="line">        if err != nil &#123;</span><br><span class="line">            return nil</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="repairNodePorts-RunUnti"><a href="#repairNodePorts-RunUnti" class="headerlink" title="repairNodePorts.RunUnti"></a>repairNodePorts.RunUnti</h4><p>repairNodePorts 主要是用来纠正 service 中 nodePort 的信息，保证所有的 ports 都基于 cluster 创建的，当没有与 cluster 同步时会触发告警，其最终是调用 <code>repairNodePorts.runOnce</code> 进行处理的，主要逻辑与 ClusterIP 的处理逻辑类似。</p>
+<p><code>k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller/repair.go:84</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line">func (c *Repair) runOnce() error &#123;</span><br><span class="line">    // 1、首先从 etcd 中获取已使用 nodeport 的快照</span><br><span class="line">    err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) &#123;</span><br><span class="line">        var err error</span><br><span class="line">        snapshot, err = c.alloc.Get()</span><br><span class="line">        return err == nil, err</span><br><span class="line">    &#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to refresh the port allocations: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 2、检查 snapshot 是否初始化</span><br><span class="line">    if snapshot.Range == &quot;&quot; &#123;</span><br><span class="line">        snapshot.Range = c.portRange.String()</span><br><span class="line">    &#125;</span><br><span class="line">    // 3、获取已分配 nodePort 信息</span><br><span class="line">    stored, err := portallocator.NewFromSnapshot(snapshot)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to rebuild allocator from snapshot: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    // 4、获取 service list</span><br><span class="line">    list, err := c.serviceClient.Services(metav1.NamespaceAll).List(metav1.ListOptions&#123;&#125;)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to refresh the port block: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    rebuilt, err := portallocator.NewPortAllocator(c.portRange)</span><br><span class="line">    if err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to create port allocator: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // 5、检查每个 Service ClusterIP 的 port，保证其处于正常状态</span><br><span class="line">    for i := range list.Items &#123;</span><br><span class="line">        svc := &amp;list.Items[i]</span><br><span class="line">        ports := collectServiceNodePorts(svc)</span><br><span class="line">        if len(ports) == 0 &#123;</span><br><span class="line">            continue</span><br><span class="line">        &#125;</span><br><span class="line">        for _, port := range ports &#123;</span><br><span class="line">            switch err := rebuilt.Allocate(port); err &#123;</span><br><span class="line">            // 6、检查 port 是否泄漏</span><br><span class="line">            case nil:</span><br><span class="line">                if stored.Has(port) &#123;</span><br><span class="line">                    stored.Release(port)</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    ......</span><br><span class="line">                &#125;</span><br><span class="line">                delete(c.leaks, port)</span><br><span class="line">            // 7、port 重复分配</span><br><span class="line">            case portallocator.ErrAllocated:</span><br><span class="line">                ......</span><br><span class="line">            // 8、port 超出分配范围</span><br><span class="line">            case err.(*portallocator.ErrNotInRange):</span><br><span class="line">                ......</span><br><span class="line">            // 9、port 已经分配完</span><br><span class="line">            case portallocator.ErrFull:</span><br><span class="line">                ......</span><br><span class="line">            default:</span><br><span class="line">                ......</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    // 10、检查 port 是否泄漏</span><br><span class="line">    stored.ForEach(func(port int) &#123;</span><br><span class="line">        count, found := c.leaks[port]</span><br><span class="line">        switch &#123;</span><br><span class="line">        case !found:</span><br><span class="line">            ......</span><br><span class="line">            count = numRepairsBeforeLeakCleanup - 1</span><br><span class="line">            fallthrough</span><br><span class="line">        case count &gt; 0:</span><br><span class="line">            c.leaks[port] = count - 1</span><br><span class="line">            if err := rebuilt.Allocate(port); err != nil &#123;</span><br><span class="line">                runtime.HandleError(fmt.Errorf(&quot;the node port %d may have leaked, but can not be allocated: %v&quot;, port, err))</span><br><span class="line">            &#125;</span><br><span class="line">        default:</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line">    // 11、更新 snapshot</span><br><span class="line">    if err := rebuilt.Snapshot(snapshot); err != nil &#123;</span><br><span class="line">        return fmt.Errorf(&quot;unable to snapshot the updated port allocations: %v&quot;, err)</span><br><span class="line">    &#125;</span><br><span class="line">    ......</span><br><span class="line">    return nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是 bootstrap controller 的主要实现。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要分析了 kube-apiserver 中 apiserver service 的实现，apiserver service 是通过  bootstrap controller 控制的，bootstrap controller 会保证 apiserver service 以及其 endpoint 处于正常状态，需要注意的是，apiserver service 的 endpoint 根据启动时指定的参数分为三种控制方式，本文仅分析了 lease 的实现方式，如果使用 master-count 方式，需要将每个 master 实例的 port、apiserver-count 等配置参数改为一致。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/kube-apiserver/" rel="tag"># kube-apiserver</a>
+          
+            <a href="/tags/bootstrapController/" rel="tag"># bootstrapController</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/02/24/kube_apiserver/" rel="next" title="kube-apiserver 的设计与实现">
+                <i class="fa fa-chevron-left"></i> kube-apiserver 的设计与实现
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">51</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">56</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#bootstrap-controller-源码分析"><span class="nav-number">1.</span> <span class="nav-text">bootstrap controller 源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#NewBootstrapController"><span class="nav-number">1.1.</span> <span class="nav-text">NewBootstrapController</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#bootstrapController-Start"><span class="nav-number">1.2.</span> <span class="nav-text">bootstrapController.Start</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#c-RunKubernetesNamespaces"><span class="nav-number">1.3.</span> <span class="nav-text">c.RunKubernetesNamespaces</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#c-RunKubernetesService"><span class="nav-number">1.4.</span> <span class="nav-text">c.RunKubernetesService</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#c-UpdateKubernetesService"><span class="nav-number">1.4.1.</span> <span class="nav-text">c.UpdateKubernetesService</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#c-EndpointReconciler-ReconcileEndpoints"><span class="nav-number">1.4.2.</span> <span class="nav-text">c.EndpointReconciler.ReconcileEndpoints</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#repairClusterIPs-RunUntil"><span class="nav-number">1.5.</span> <span class="nav-text">repairClusterIPs.RunUntil</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#repairNodePorts-RunUnti"><span class="nav-number">1.6.</span> <span class="nav-text">repairNodePorts.RunUnti</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">2.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
