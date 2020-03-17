@@ -90,7 +90,7 @@
 <meta property="og:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/graph.png">
-<meta property="og:updated_time" content="2019-12-31T05:49:55.630Z">
+<meta property="og:updated_time" content="2019-12-31T05:49:55.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="garbage collector controller 源码分析">
 <meta name="twitter:description" content="在前面几篇关于 controller 源码分析的文章中多次提到了当删除一个对象时，其对应的 controller 并不会执行删除对象的操作，在 kubernetes 中对象的回收操作是由 GarbageCollectorController 负责的，其作用就是当删除一个对象时，会根据指定的删除策略回收该对象及其依赖对象，本文会深入分析垃圾收集背后的实现。 kubernetes 中的删除策略kube">
@@ -769,6 +769,15 @@
 
 
   <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
 
 
 

@@ -89,7 +89,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="kubernetes 中的垃圾回收机制主要有两部分组成：  一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象； 二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；  本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2020-02-06T08:17:56.008Z">
+<meta property="og:updated_time" content="2020-02-06T08:17:56.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubelet 中垃圾回收机制的设计与实现">
 <meta name="twitter:description" content="kubernetes 中的垃圾回收机制主要有两部分组成：  一是由 kube-controller-manager 中的 gc controller 自动回收 kubernetes 中被删除的对象以及其依赖的对象； 二是在每个节点上需要回收已退出的容器以及当 node 上磁盘资源不足时回收已不再使用的容器镜像；  本文主要分析 kubelet 中的垃圾回收机制，垃圾回收的主要目的是为了节约宿主上的">
@@ -704,6 +704,15 @@
 
 
   <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
 
 
 

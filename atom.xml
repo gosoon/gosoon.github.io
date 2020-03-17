@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2020-03-04T06:13:28.443Z</updated>
+  <updated>2020-03-04T06:49:53.000Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -21,7 +21,7 @@
     <link href="https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/"/>
     <id>https://blog.tianfeiyu.com/2020/03/04/apiserver_bootstrap_controller/</id>
     <published>2020-03-04T06:10:30.000Z</published>
-    <updated>2020-03-04T06:13:28.443Z</updated>
+    <updated>2020-03-04T06:49:53.000Z</updated>
     
     <summary type="html">
     
@@ -48,7 +48,7 @@
     <link href="https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/"/>
     <id>https://blog.tianfeiyu.com/2020/02/24/kube_apiserver/</id>
     <published>2020-02-24T09:03:30.000Z</published>
-    <updated>2020-02-24T09:36:43.722Z</updated>
+    <updated>2020-02-24T09:36:43.000Z</updated>
     
     <summary type="html">
     
@@ -75,7 +75,7 @@
     <link href="https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/"/>
     <id>https://blog.tianfeiyu.com/2020/02/06/kubelet_garbage_collect/</id>
     <published>2020-02-06T08:03:00.000Z</published>
-    <updated>2020-02-06T08:17:56.008Z</updated>
+    <updated>2020-02-06T08:17:56.000Z</updated>
     
     <summary type="html">
     
@@ -104,7 +104,7 @@
     <link href="https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/"/>
     <id>https://blog.tianfeiyu.com/2020/01/21/kubelet_qos/</id>
     <published>2020-01-21T08:28:30.000Z</published>
-    <updated>2020-01-21T08:42:57.018Z</updated>
+    <updated>2020-03-17T08:39:22.595Z</updated>
     
     <summary type="html">
     
@@ -133,7 +133,7 @@
     <link href="https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/"/>
     <id>https://blog.tianfeiyu.com/2020/01/09/nodelifecycle_controller/</id>
     <published>2020-01-09T12:18:30.000Z</published>
-    <updated>2020-01-13T06:20:49.277Z</updated>
+    <updated>2020-01-13T06:20:49.000Z</updated>
     
     <summary type="html">
     
@@ -160,7 +160,7 @@
     <link href="https://blog.tianfeiyu.com/2020/01/03/kubelet_init/"/>
     <id>https://blog.tianfeiyu.com/2020/01/03/kubelet_init/</id>
     <published>2020-01-03T12:22:30.000Z</published>
-    <updated>2020-01-03T12:34:16.221Z</updated>
+    <updated>2020-01-03T12:34:16.000Z</updated>
     
     <summary type="html">
     
@@ -185,7 +185,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/31/job_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/12/31/job_controller/</id>
     <published>2019-12-31T07:31:30.000Z</published>
-    <updated>2020-01-03T09:37:56.246Z</updated>
+    <updated>2020-01-03T09:37:56.000Z</updated>
     
     <summary type="html">
     
@@ -212,7 +212,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/12/28/garbagecollector_controller/</id>
     <published>2019-12-28T12:23:30.000Z</published>
-    <updated>2019-12-31T05:49:55.630Z</updated>
+    <updated>2019-12-31T05:49:55.000Z</updated>
     
     <summary type="html">
     
@@ -239,7 +239,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/25/kubelet_status_manager/"/>
     <id>https://blog.tianfeiyu.com/2019/12/25/kubelet_status_manager/</id>
     <published>2019-12-25T07:22:30.000Z</published>
-    <updated>2020-01-01T08:31:07.142Z</updated>
+    <updated>2020-01-01T08:31:07.000Z</updated>
     
     <summary type="html">
     
@@ -266,7 +266,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/12/18/daemonset_controller/</id>
     <published>2019-12-18T02:50:30.000Z</published>
-    <updated>2019-12-18T03:00:40.766Z</updated>
+    <updated>2019-12-18T03:00:40.000Z</updated>
     
     <summary type="html">
     
@@ -293,7 +293,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/</id>
     <published>2019-12-11T12:40:30.000Z</published>
-    <updated>2020-01-13T02:43:20.872Z</updated>
+    <updated>2020-01-13T02:43:20.000Z</updated>
     
     <summary type="html">
     
@@ -320,7 +320,7 @@
     <link href="https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/</id>
     <published>2019-12-08T09:00:30.000Z</published>
-    <updated>2019-12-09T01:26:42.388Z</updated>
+    <updated>2019-12-09T01:26:42.000Z</updated>
     
     <summary type="html">
     
@@ -347,7 +347,7 @@
     <link href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/"/>
     <id>https://blog.tianfeiyu.com/2019/11/28/deployment_controller/</id>
     <published>2019-11-28T06:30:30.000Z</published>
-    <updated>2019-12-12T09:04:22.392Z</updated>
+    <updated>2019-12-12T09:04:22.000Z</updated>
     
     <summary type="html">
     
@@ -374,7 +374,7 @@
     <link href="https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/"/>
     <id>https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/</id>
     <published>2019-11-18T03:40:30.000Z</published>
-    <updated>2019-11-18T06:15:54.021Z</updated>
+    <updated>2019-11-18T06:15:54.000Z</updated>
     
     <summary type="html">
     
@@ -402,7 +402,7 @@
     <link href="https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/"/>
     <id>https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/</id>
     <published>2019-11-06T11:50:30.000Z</published>
-    <updated>2019-11-17T09:18:20.886Z</updated>
+    <updated>2019-11-17T09:18:20.000Z</updated>
     
     <summary type="html">
     
@@ -429,7 +429,7 @@
     <link href="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/"/>
     <id>https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/</id>
     <published>2019-11-01T09:40:30.000Z</published>
-    <updated>2019-11-12T06:23:53.424Z</updated>
+    <updated>2019-11-12T06:23:53.000Z</updated>
     
     <summary type="html">
     
@@ -454,7 +454,7 @@
     <link href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/"/>
     <id>https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/</id>
     <published>2019-10-31T02:30:30.000Z</published>
-    <updated>2019-11-12T03:17:09.229Z</updated>
+    <updated>2019-11-12T03:17:09.000Z</updated>
     
     <summary type="html">
     
@@ -479,7 +479,7 @@
     <link href="https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/"/>
     <id>https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/</id>
     <published>2019-10-24T06:35:30.000Z</published>
-    <updated>2019-11-12T03:13:56.107Z</updated>
+    <updated>2019-11-12T03:13:56.000Z</updated>
     
     <summary type="html">
     
@@ -506,7 +506,7 @@
     <link href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/"/>
     <id>https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/</id>
     <published>2019-10-22T11:30:30.000Z</published>
-    <updated>2019-10-23T02:23:44.799Z</updated>
+    <updated>2019-10-23T02:23:44.000Z</updated>
     
     <summary type="html">
     
@@ -533,7 +533,7 @@
     <link href="https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/"/>
     <id>https://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/</id>
     <published>2019-10-21T09:30:30.000Z</published>
-    <updated>2019-10-21T09:49:12.782Z</updated>
+    <updated>2019-10-21T09:49:12.000Z</updated>
     
     <summary type="html">
     

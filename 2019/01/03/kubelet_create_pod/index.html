@@ -91,7 +91,7 @@
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/kubelet-1.png">
 <meta property="og:image" content="http://cdn.tianfeiyu.com/kubelet-2.png">
-<meta property="og:updated_time" content="2019-07-21T09:46:50.287Z">
+<meta property="og:updated_time" content="2019-07-21T09:46:50.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubelet 创建 pod 的流程">
 <meta name="twitter:description" content="上篇文章介绍了 kubelet 的启动流程，本篇文章主要介绍 kubelet 创建 pod 的流程。  kubernetes 版本： v1.12    kubelet 的工作核心就是在围绕着不同的生产者生产出来的不同的有关 pod 的消息来调用相应的消费者（不同的子模块）完成不同的行为(创建和删除 pod 等)，即图中的控制循环（SyncLoop），通过不同的事件驱动这个控制循环运行。 本文仅分析">
@@ -683,6 +683,15 @@
 
 
   <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
 
 
 
