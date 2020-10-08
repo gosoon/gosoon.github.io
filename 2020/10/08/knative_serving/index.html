@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="knative,serving,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="knative 部署完成后可以在 knative-serving namespace 下看到创建出的组件： 12345678910$ kubectl get pod -n knative-servingNAME                                READY   STATUS    RESTARTS   AGEactivator-7fff689bcb-zt9pm">
+<meta name="keywords" content="knative,serving">
+<meta property="og:type" content="article">
+<meta property="og:title" content="knative serving 组件分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2020/10/08/knative_serving/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="knative 部署完成后可以在 knative-serving namespace 下看到创建出的组件： 12345678910$ kubectl get pod -n knative-servingNAME                                READY   STATUS    RESTARTS   AGEactivator-7fff689bcb-zt9pm">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/object_model.png">
+<meta property="og:image" content="http://cdn.tianfeiyu.com/serving.png">
+<meta property="og:updated_time" content="2020-10-08T08:20:25.617Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="knative serving 组件分析">
+<meta name="twitter:description" content="knative 部署完成后可以在 knative-serving namespace 下看到创建出的组件： 12345678910$ kubectl get pod -n knative-servingNAME                                READY   STATUS    RESTARTS   AGEactivator-7fff689bcb-zt9pm">
+<meta name="twitter:image" content="http://cdn.tianfeiyu.com/object_model.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2020/10/08/knative_serving/">
+
+
+
+
+
+
+  <title>knative serving 组件分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-rss">
+          <a href="/atom.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-rss"></i> <br>
+            
+            rss
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-knative-serving" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2020/10/08/knative_serving/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">knative serving 组件分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-10-08T16:19:30+08:00">
+                2020-10-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2020/10/08/knative_serving/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2020/10/08/knative_serving/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>knative 部署完成后可以在 knative-serving namespace 下看到创建出的组件：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get pod -n knative-serving</span><br><span class="line">NAME                                READY   STATUS    RESTARTS   AGE</span><br><span class="line">activator-7fff689bcb-zt9pm          2/2     Running   2          28d</span><br><span class="line">autoscaler-5bcff95856-pr6nk         2/2     Running   3          28d</span><br><span class="line">autoscaler-hpa-75584dd678-fpk7w     2/2     Running   1          28d</span><br><span class="line">controller-bbdd78bc4-6cqm4          2/2     Running   1          28d</span><br><span class="line">istio-webhook-5f5794dcc4-sgzlj      2/2     Running   1          28d</span><br><span class="line">networking-istio-7d875675c7-gc55v   1/1     Running   0          28d</span><br><span class="line">storage-version-migration-f46wc     1/2     Running   2          28d</span><br><span class="line">webhook-68bb66b676-9xk4s            2/2     Running   11         28d</span><br></pre></td></tr></table></figure>
+<h3 id="创建-knative-serving"><a href="#创建-knative-serving" class="headerlink" title="创建 knative serving"></a>创建 knative serving</h3><p>首先创建一个 knative service 进行测试，yaml 文件如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line">// 创建 helloworld-go 示例：</span><br><span class="line">$ cat &lt;&lt;-EOF | kubectl apply -f -</span><br><span class="line">apiVersion: serving.knative.dev/v1</span><br><span class="line">kind: Service</span><br><span class="line">metadata:</span><br><span class="line">  name: helloworld-go</span><br><span class="line">  namespace: example</span><br><span class="line">spec:</span><br><span class="line">  template:</span><br><span class="line">    spec:</span><br><span class="line">      containers:</span><br><span class="line">      - image: registry.cn-hangzhou.aliyuncs.com/knative-sample/helloworld-go:160e4dc8</span><br><span class="line">        env:</span><br><span class="line">        - name: TARGET</span><br><span class="line">          value: &quot;Go Sample v1&quot;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">// 查看 helloworld-go serving 所关联的资源</span><br><span class="line">$ kubectl get all -n example</span><br><span class="line">NAME                                                  READY   STATUS    RESTARTS   AGE</span><br><span class="line">pod/helloworld-go-wkrdr-deployment-57b86596d7-7qvcf   2/2     Running   0          11s</span><br><span class="line"></span><br><span class="line">NAME                                  TYPE           CLUSTER-IP    EXTERNAL-IP                                            PORT(S)                             AGE</span><br><span class="line">service/helloworld-go                 ExternalName   &lt;none&gt;        cluster-local-gateway.istio-system.svc.cluster.local   &lt;none&gt;                              8s</span><br><span class="line">service/helloworld-go-wkrdr           ClusterIP      10.96.64.61   &lt;none&gt;                                                 80/TCP                              11s</span><br><span class="line">service/helloworld-go-wkrdr-private   ClusterIP      10.96.79.32   &lt;none&gt;                                                 80/TCP,9090/TCP,9091/TCP,8022/TCP   11s</span><br><span class="line"></span><br><span class="line">NAME                                             READY   UP-TO-DATE   AVAILABLE   AGE</span><br><span class="line">deployment.apps/helloworld-go-wkrdr-deployment   1/1     1            1           11s</span><br><span class="line"></span><br><span class="line">NAME                                                        DESIRED   CURRENT   READY   AGE</span><br><span class="line">replicaset.apps/helloworld-go-wkrdr-deployment-57b86596d7   1         1         1       11s</span><br><span class="line"></span><br><span class="line">NAME                                               CONFIG NAME     K8S SERVICE NAME      GENERATION   READY   REASON</span><br><span class="line">revision.serving.knative.dev/helloworld-go-wkrdr   helloworld-go   helloworld-go-wkrdr   1            True</span><br><span class="line"></span><br><span class="line">NAME                                              LATESTCREATED         LATESTREADY           READY   REASON</span><br><span class="line">configuration.serving.knative.dev/helloworld-go   helloworld-go-wkrdr   helloworld-go-wkrdr   True</span><br><span class="line"></span><br><span class="line">NAME                                        URL                                        LATESTCREATED         LATESTREADY           READY   REASON</span><br><span class="line">service.serving.knative.dev/helloworld-go   http://helloworld-go.example.example.com   helloworld-go-wkrdr   helloworld-go-wkrdr   True</span><br><span class="line"></span><br><span class="line">NAME                                      URL                                        READY   REASON</span><br><span class="line">route.serving.knative.dev/helloworld-go   http://helloworld-go.example.example.com   True</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">$ kubectl get serverlessservice -n example</span><br><span class="line">NAME                  MODE    ACTIVATORS   SERVICENAME           PRIVATESERVICENAME            READY     REASON</span><br><span class="line">helloworld-go-wkrdr   Proxy   2            helloworld-go-wkrdr   helloworld-go-wkrdr-private   Unknown   NoHealthyBackends</span><br><span class="line"></span><br><span class="line">$ kubectl get svc istio-ingressgateway --namespace istio-system</span><br><span class="line">NAME                   TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                      AGE</span><br><span class="line">istio-ingressgateway   LoadBalancer   10.96.189.189   &lt;pending&gt;     15021:30883/TCP,80:31046/TCP,443:32728/TCP,15443:30769/TCP   21d</span><br></pre></td></tr></table></figure>
+<p>创建完成后验证一下 knative 的 kpa 功能，创建完 helloworld-go serving 后会存在一个 pod 实例，如果该 pod 长时间没有被访问则会被销毁。首先验证下首次请求 helloworld-go 的场景，当服务的实例被完全销毁后，请求 helloworld-go 的 URL 此时会先启动一个实例，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ time curl -H &quot;Host: helloworld-go.example.example.com&quot; http://192.168.99.130:31046</span><br><span class="line">Hello Go Sample v1!</span><br><span class="line">curl -H &quot;Host: helloworld-go.example.example.com&quot; http://192.168.99.130:31046  0.00s user 0.01s system 0% cpu 2.189 total</span><br></pre></td></tr></table></figure>
+<p>使用 minkube 搭建的 k8s 集群由于没有 loadBalancer 此处使用 nodeport 来访问，nodeport 的 31046  端口会转发到后端实例的 8080 端口。当流量到达 helloworld-go 服务时，此时该服务还没有实例，activator 感知到请求后会对 helloworld-go 的 deployment 进行一次扩容，将 deployment 的 replicas 指定为 1，此时 helloworld-go deployment 会拉起一个 pod 实例，由于 pod 首次启动会比较慢。</p>
+<p>在实际的环境中，当流量达到后再启动  pod 是不可接受的，一般会保留一个相同实例的 pod 或者一个配置较低的实例，避免冷启动时相应慢或者丢失流量等情况。</p>
+<p>存在一个实例后，再次访问时可以看到整个请求流程非常快了，如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ time curl -H &quot;Host: helloworld-go.example.example.com&quot; http://192.168.99.130:31046</span><br><span class="line">Hello Go Sample v1!</span><br><span class="line">$ curl -H &quot;Host: helloworld-go.example.example.com&quot; http://192.168.99.130:31046  0.01s user 0.01s system 45% cpu 0.026 total</span><br></pre></td></tr></table></figure>
+<h3 id="knative-serving-组件"><a href="#knative-serving-组件" class="headerlink" title="knative serving 组件"></a>knative serving 组件</h3><p>serving 共有 6 个主要的组件，其中 5 个在 knative-serving 这个 namespace 下面，分别为 controller 、webhook 、autoscaler、autoscaler-hpa、activator 这五个组件；还有一个 queue，运行在每个应用的 pod 里，作为 pod 的 sidecar 存在。</p>
+<ul>
+<li>1、Controller：负载 Service 整个生命周期的管理，涉及、Configuration、Route、Revision 等的 CURD。是一个控制器，根据用户输入更新集群的状态；</li>
+<li>2、Webhook：主要负责创建和更新的参数校验；</li>
+<li>3、Activator：在应用缩容到 0 后，拦截用户的请求，通知 autoscaler 启动相应应用实例，等待启动后将请求转发。负责将服务缩容到 0 以及转发请求；</li>
+<li>4、Autoscaler：根据应用的请求并发量对应用扩缩容；</li>
+<li>5、Queue：负载拦截转发给 Pod 的请求，用于统计 Pod 的请求并发量等，autoscaler 会访问 queue 获取相应数据对应用扩缩容；</li>
+<li>6、Autoscaler-hpa：负责 autoscaler 应用的扩缩容；</li>
+</ul>
+<p>Knative 把应用里的所有能力全都放到统一的 CRD 资源中管理—Service。这里的 Service 与 K8s 原生用户访问的 Service 不同，这是 Knative 的自定义资源，管理 Knative 应用的整个生命周期。</p>
+<ul>
+<li>Service：service.serving.knative.dev 资源管理着工作负载的整个生命周期。它控制其他对象（Route、Configration、Revison）的创建，并确保每次对 Service 的更新都作用到其他对象。</li>
+<li>Route: route.serving.knative.dev 资源将网络端点映射到一个或多个 Revision。可以通过配置 Route 实现多种流量管理方式，包括部分流量和命名路由。</li>
+<li>Configuration：configuration.serving.knative.dev 资源保持部署所需的状态。它提供了代码和配置之间的清晰分离，并遵循十二要素应用程序方法。修改 Configuration 将创建新的 Revision。</li>
+<li>Revision：revision.serving.knative.dev 资源是对工作负荷所做的每个修改的代码和配置的时间点快照。修订是不变的对象，只要有用就可以保留。Revision 可以根据进入的流量自动扩缩容。</li>
+</ul>
+<p><img src="http://cdn.tianfeiyu.com/object_model.png" alt=""></p>
+<p>Serving 关联的所有资源如下图所示：</p>
+<p><img src="http://cdn.tianfeiyu.com/serving.png" alt=""></p>
+<ul>
+<li>1、revision 会创建 imageCache、deployment、kpa 以及 sks 几个组件，deployment 是所运行的服务，kpa 会根据并发数进行伸缩对应的 deployment，ServerlessService 会为 kpa 服务在 cluster 内部和外部都创建一个可以访问的 service。image cache 主要是为了解决冷启动时拉取镜像慢的问题；</li>
+<li>2、route 会创建 svc、kingress、virtualService 几个组件，供 service 之间以及从外部访问；</li>
+</ul>
+<h3 id="自动扩缩容"><a href="#自动扩缩容" class="headerlink" title="自动扩缩容"></a>自动扩缩容</h3><p>1-&gt;n: 任何访问应用的请求在进入 Pod 后都会被 Queue 拦截，统计当前 Pod 的请求并发数，同时 Queue 会开放一个 metric 接口，autoscalor 通过访问该端口去获取 Pod 的请求并发量并计算是否需要扩缩容。当需要扩缩容时，autoscalor 会通过修改 Revision 下的 deployment 的实例个数达到扩缩容的效果。</p>
+<p>0-&gt;1: 在应用长时间无请求访问时，实例会缩减到 0。这个时候，访问应用的请求会被转发到 activator，并在请求在转发到 activator 之前会被标记请求访问的 Revision 信息（由 controller 修改 VirtualService 实现）。activator 接收到请求后，会将 Revision 的并发量加 1，并将 metric 推送给 autoscalor，启动 Pod。同时，activator 监控 Revision 的启动状态，Revision 正常启动后，将请求转发给相应的 Pod。</p>
+<p>当然，在 Revision 正常启动后，应用的请求将不会再发送到 activator，而且直接发送至应用的 Pod（由 controller 修改 VirtualService 实现）。</p>
+<p>在 mac 下使用 hey 进行压测，当请求数增加时对应服务的实例数同样会增加：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hey -z 30s -c 50 -host &quot;helloworld-go.example.example.com&quot; http://192.168.99.130:31046</span><br></pre></td></tr></table></figure>
+<h3 id="knative-网络模式"><a href="#knative-网络模式" class="headerlink" title="knative 网络模式"></a>knative 网络模式</h3><p>knative 目前默认使用 Istio 作为网络的基础，但 knative 不强依赖 istio，除 istio 之外，还可以选择 ambassador，contour，gloo，kourier 等。网络模式分两个部分，一个为 service 之间的访问，一个为外部访问。</p>
+<p>service 之间的访问：</p>
+<ul>
+<li>istio 会解析 knative service 的 virtualService 下发给各个 pod 的 envoy，当应用通过域名相互访问时，envoy 会拦截请求直接转发给相应的 pod。</li>
+</ul>
+<p>外部访问：</p>
+<ul>
+<li><p>如果是在集群外访问，默认的请求入口为 ingressgateway，ingressgateway 将请求根据访问域名转发到应用，如上面示例所示，在本地搭建的 k8s 集群上访问 ingressgateway 的 nodeport，ingressgateway 会将请求转发到后端的 service；</p>
+</li>
+<li><p>如果是在集群节点上访问，每个 knative service 都对应一个 k8s service, 这个 service 的后端都为 ingressgateway，ingressgateway 会根据访问域名转发到应用；</p>
+</li>
+</ul>
+<p>knative 会给每一个 revision 都生成一个域名用于外部访问使用，service 默认的主域名是 example.com，所有 knative service 生成的独立域名都是这个主域名的子域名，可以通过修改 config 来指定默认域名：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl edit cm config-domain --namespace knative-serving</span><br></pre></td></tr></table></figure>
+<p>参考：</p>
+<p><a href="https://knative.dev/docs/serving/" target="_blank" rel="noopener">https://knative.dev/docs/serving/</a></p>
+<p><a href="https://github.com/knative/docs/tree/master/docs/serving/samples/hello-world/helloworld-go" target="_blank" rel="noopener">https://github.com/knative/docs/tree/master/docs/serving/samples/hello-world/helloworld-go</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/knative/" rel="tag"># knative</a>
+          
+            <a href="/tags/serving/" rel="tag"># serving</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/09/06/deploy_with_minkube/" rel="next" title="在 minikube 上部署 knative">
+                <i class="fa fa-chevron-left"></i> 在 minikube 上部署 knative
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">54</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">58</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#创建-knative-serving"><span class="nav-number">1.</span> <span class="nav-text">创建 knative serving</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#knative-serving-组件"><span class="nav-number">2.</span> <span class="nav-text">knative serving 组件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#自动扩缩容"><span class="nav-number">3.</span> <span class="nav-text">自动扩缩容</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#knative-网络模式"><span class="nav-number">4.</span> <span class="nav-text">knative 网络模式</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+    <a href="http://www.beian.miit.gov.cn/">陕ICP备15001765号-1</a> 
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

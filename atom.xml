@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2020-04-13T12:47:42.702Z</updated>
+  <updated>2020-10-08T08:20:25.617Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,59 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>knative serving 组件分析</title>
+    <link href="https://blog.tianfeiyu.com/2020/10/08/knative_serving/"/>
+    <id>https://blog.tianfeiyu.com/2020/10/08/knative_serving/</id>
+    <published>2020-10-08T08:19:30.000Z</published>
+    <updated>2020-10-08T08:20:25.617Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;knative 部署完成后可以在 knative-serving namespace 下看到创建出的组件：&lt;/p&gt;
+&lt;figure class=&quot;highlight plain&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;span
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="knative" scheme="https://blog.tianfeiyu.com/tags/knative/"/>
+    
+      <category term="serving" scheme="https://blog.tianfeiyu.com/tags/serving/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>在 minikube 上部署 knative</title>
+    <link href="https://blog.tianfeiyu.com/2020/09/06/deploy_with_minkube/"/>
+    <id>https://blog.tianfeiyu.com/2020/09/06/deploy_with_minkube/</id>
+    <published>2020-09-06T02:50:30.000Z</published>
+    <updated>2020-10-08T08:22:28.663Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;安装-minkube&quot;&gt;&lt;a href=&quot;#安装-minkube&quot; class=&quot;headerlink&quot; title=&quot;安装 minkube&quot;&gt;&lt;/a&gt;安装 minkube&lt;/h3&gt;&lt;figure class=&quot;highlight
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="knative" scheme="https://blog.tianfeiyu.com/tags/knative/"/>
+    
+  </entry>
   
   <entry>
     <title>kubernetes 中的增强特性(Kubernetes Enhancement Proposal)</title>
@@ -496,60 +549,6 @@
     
     
       <category term="kubernetes service" scheme="https://blog.tianfeiyu.com/tags/kubernetes-service/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kube-scheduler 优先级与抢占机制源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/"/>
-    <id>https://blog.tianfeiyu.com/2019/10/24/kube_scheduler_preempt/</id>
-    <published>2019-10-24T06:35:30.000Z</published>
-    <updated>2019-11-12T03:13:56.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;前面已经分析了 kube-scheduler 的代码逻辑以及 predicates 与 priorities 算法，本节会继续讲 scheduler 中的一个重要机制，pod 优先级与抢占机制(Pod Priority and Preemption)，该功能是在 v1.8
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
-    
-      <category term="preempt" scheme="https://blog.tianfeiyu.com/tags/preempt/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kube-scheduler predicates 与 priorities 调度算法源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/"/>
-    <id>https://blog.tianfeiyu.com/2019/10/22/kube_scheduler_algorithm/</id>
-    <published>2019-10-22T11:30:30.000Z</published>
-    <updated>2019-10-23T02:23:44.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;在上篇文章&lt;a href=&quot;http://blog.tianfeiyu.com/2019/10/21/kube_scheduler_process/&quot;&gt;kube-scheduler 源码分析&lt;/a&gt;中已经介绍了 kube-scheduler
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-scheduler" scheme="https://blog.tianfeiyu.com/tags/kube-scheduler/"/>
-    
-      <category term="algorithm" scheme="https://blog.tianfeiyu.com/tags/algorithm/"/>
     
   </entry>
   
