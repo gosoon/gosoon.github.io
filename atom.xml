@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2020-10-08T08:20:25.617Z</updated>
+  <updated>2021-09-03T02:37:34.506Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,33 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>blkio cgroup</title>
+    <link href="https://blog.tianfeiyu.com/2021/01/01/blkio_cgroup/"/>
+    <id>https://blog.tianfeiyu.com/2021/01/01/blkio_cgroup/</id>
+    <published>2021-01-01T12:50:30.000Z</published>
+    <updated>2021-09-03T02:37:34.506Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;blkio-cgroup-基本功能&quot;&gt;&lt;a href=&quot;#blkio-cgroup-基本功能&quot; class=&quot;headerlink&quot; title=&quot;blkio cgroup 基本功能&quot;&gt;&lt;/a&gt;blkio cgroup 基本功能&lt;/h3&gt;&lt;p&gt;blkio 是
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="blkio cgroup" scheme="https://blog.tianfeiyu.com/tags/blkio-cgroup/"/>
+    
+      <category term="cgroup v1" scheme="https://blog.tianfeiyu.com/tags/cgroup-v1/"/>
+    
+  </entry>
   
   <entry>
     <title>knative serving 组件分析</title>
@@ -524,31 +551,6 @@
     
     
       <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kubernetes service 原理解析</title>
-    <link href="https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/"/>
-    <id>https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/</id>
-    <published>2019-10-31T02:30:30.000Z</published>
-    <updated>2019-11-12T03:17:09.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;h3 id=&quot;为什么需要-service&quot;&gt;&lt;a href=&quot;#为什么需要-service&quot; class=&quot;headerlink&quot; title=&quot;为什么需要 service&quot;&gt;&lt;/a&gt;为什么需要 service&lt;/h3&gt;&lt;p&gt;在 kubernetes 
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kubernetes service" scheme="https://blog.tianfeiyu.com/tags/kubernetes-service/"/>
     
   </entry>
   
