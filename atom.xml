@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-09-03T02:37:34.506Z</updated>
+  <updated>2021-09-08T07:07:18.446Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,33 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>pid cgroup</title>
+    <link href="https://blog.tianfeiyu.com/2021/02/03/pid_cgroup/"/>
+    <id>https://blog.tianfeiyu.com/2021/02/03/pid_cgroup/</id>
+    <published>2021-02-03T12:50:30.000Z</published>
+    <updated>2021-09-08T07:07:18.446Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;1、为了避免系统资源被耗光，需要对进程的最大进程数进行限制，通过向对应进程所在 cgroup 的 pid.max 文件中写入具体的数字来限制其进程数。默认值为 ‘max’ 也就是不限制，和 cgroup 最上层中的限制数保持一致。pids.current 表示
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="cgroup v1" scheme="https://blog.tianfeiyu.com/tags/cgroup-v1/"/>
+    
+      <category term="pid cgroup" scheme="https://blog.tianfeiyu.com/tags/pid-cgroup/"/>
+    
+  </entry>
   
   <entry>
     <title>blkio cgroup</title>
@@ -526,31 +553,6 @@
       <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
     
       <category term="iptables" scheme="https://blog.tianfeiyu.com/tags/iptables/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kube-proxy 源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/"/>
-    <id>https://blog.tianfeiyu.com/2019/11/01/kube_proxy_process/</id>
-    <published>2019-11-01T09:40:30.000Z</published>
-    <updated>2019-11-12T06:23:53.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;上篇文章 &lt;a href=&quot;https://blog.tianfeiyu.com/2019/10/31/k8s_service_theory/&quot;&gt;kubernetes service 原理解析&lt;/a&gt; 已经分析了 service 原理以 kube-proxy
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
     
   </entry>
   
