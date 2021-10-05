@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Evicted,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="线上被驱逐实例数据最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有">
+<meta name="keywords" content="Evicted">
+<meta property="og:type" content="article">
+<meta property="og:title" content="kubernetes 中 Evicted pod 是如何产生的">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="线上被驱逐实例数据最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2021-10-05T08:04:59.588Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kubernetes 中 Evicted pod 是如何产生的">
+<meta name="twitter:description" content="线上被驱逐实例数据最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/">
+
+
+
+
+
+
+  <title>kubernetes 中 Evicted pod 是如何产生的 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-rss">
+          <a href="/atom.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-rss"></i> <br>
+            
+            rss
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-evicted pod" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">kubernetes 中 Evicted pod 是如何产生的</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-03-01T15:31:30+08:00">
+                2021-03-01
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2021/03/01/k8s_evicted/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2021/03/01/k8s_evicted/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="线上被驱逐实例数据"><a href="#线上被驱逐实例数据" class="headerlink" title="线上被驱逐实例数据"></a>线上被驱逐实例数据</h3><p>最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有一个 Pod 空壳在 k8s 中保存着，但需要人为手动清理。本文会分析为什么为产生 Evicted 实例、为什么 Evicted 实例没有被自动清理以及如何进行自动清理。</p>
+<blockquote>
+<p>kubernetes 版本：v1.17</p>
+</blockquote>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ kubectl get pod | grep -i Evicted</span><br><span class="line">cloud-1023955-84421-49604-5-deploy-c-7748f8fd8-hjqsh        0/1     Evicted   0          73d</span><br><span class="line">cloud-1023955-84421-49604-5-deploy-c-7748f8fd8-mzd8x        0/1     Evicted   0          81d</span><br><span class="line">cloud-1237162-276467-199844-2-deploy-7bdc7c98b6-26r2r       0/1     Evicted   0          18d</span><br></pre></td></tr></table></figure>
+<p>Evicted 实例状态：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">status:</span><br><span class="line">  message: &apos;Pod The node had condition: [DiskPressure]. &apos;</span><br><span class="line">  phase: Failed</span><br><span class="line">  reason: Evicted</span><br><span class="line">  startTime: &quot;2021-09-14T10:42:32Z&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="实例被驱逐的原因"><a href="#实例被驱逐的原因" class="headerlink" title="实例被驱逐的原因"></a>实例被驱逐的原因</h3><p>kubelet 默认会配置节点资源不足时驱逐实例的策略，当节点资源不足时 k8s 会停止该节点上实例并在其他节点启动新实例，在某些情况下也可通过配置 <code>--eviction-hard=</code> 参数为空来禁用驱逐策略，在之前的生产环境中我们也确实这么做了。</p>
+<h4 id="节点资源不足导致实例被驱逐"><a href="#节点资源不足导致实例被驱逐" class="headerlink" title="节点资源不足导致实例被驱逐"></a>节点资源不足导致实例被驱逐</h4><p>k8s 中产生 Evicted 状态实例主要是因为节点资源不足实例主动被驱逐导致的，kubelet eviction_manager 模块会定期检查节点内存使用率、inode 使用率、磁盘使用率、pid 等资源，根据 kubelet 的配置当使用率达到一定阈值后会先回收可以回收的资源，若回收后资源使用率依然超过阈值则进行驱逐实例操作。</p>
+<table>
+<thead>
+<tr>
+<th>Eviction Signal</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>memory.available</td>
+<td>memory.available := node.status.capacity[memory] - node.stats.memory.workingSet</td>
+</tr>
+<tr>
+<td>nodefs.available</td>
+<td>nodefs.available := node.stats.fs.available</td>
+</tr>
+<tr>
+<td>nodefs.inodesFree</td>
+<td>nodefs.inodesFree := node.stats.fs.inodesFree</td>
+</tr>
+<tr>
+<td>imagefs.available</td>
+<td>imagefs.available := node.stats.runtime.imagefs.available</td>
+</tr>
+<tr>
+<td>imagefs.inodesFree</td>
+<td>imagefs.inodesFree := node.stats.runtime.imagefs.inodesFree</td>
+</tr>
+<tr>
+<td>pid.available</td>
+<td>pid.available := node.stats.rlimit.maxpid - node.stats.rlimit.curproc</td>
+</tr>
+</tbody>
+</table>
+<p>kubelet 中 pod 的 stats 数据一部分是通过 cAdvisor 接口获取到的，一部分是通过 CRI runtimes 的接口获取到的。</p>
+<p><strong>memory.available</strong>：当前节点可用内存，计算方式为 cgroup memory 子系统中 memory.usage_in_bytes 中的值减去 memory.stat 中 total_inactive_file 的值；<br><strong>nodefs.available</strong>：nodefs 包含 kubelet 配置中 <code>--root-dir</code> 指定的文件分区和 /var/lib/kubelet/ 所在的分区磁盘使用率；<br><strong>nodefs.inodesFree</strong>：nodefs.available 分区的 inode 使用率；<br><strong>imagefs.available：</strong>镜像所在分区磁盘使用率；<br><strong>imagefs.inodesFree：</strong>镜像所在分区磁盘inode使用率；<br><strong>pid.available：</strong><code>/proc/sys/kernel/pid_max</code> 中的值为系统最大可用 pid 数；</p>
+<p>kubelet 可以通过参数 <code>--eviction-hard</code> 来配置以上几个参数的阈值，该参数默认值为 <code>imagefs.available&lt;15%,memory.available&lt;100Mi,nodefs.available&lt;10%,nodefs.inodesFree&lt;5%</code>，当达到阈值时会驱逐节点上的容器。</p>
+<h3 id="kubelet-驱逐实例时与资源处理相关的已知问题"><a href="#kubelet-驱逐实例时与资源处理相关的已知问题" class="headerlink" title="kubelet 驱逐实例时与资源处理相关的已知问题"></a>kubelet 驱逐实例时与资源处理相关的已知问题</h3><p><strong>1、kubelet 不会实时感知到节点内存数据的变化</strong></p>
+<p>kubelet 定期通过 cadvisor 接口采集节点内存使用数据，当节点短时间内内存使用率突增，此时 kubelet 无法感知到也不会有 MemoryPressure 相关事件，但依然会调用 OOMKiller 停止容器。可以通过为 kubelet 配置 <code>--kernel-memcg-notification</code> 参数启用 memcg api，当触发memory 使用率阈值时 memcg 会主动进行通知；</p>
+<p>memcg 主动通知的功能是 cgroup 中已有的，kubelet 会在 <code>/sys/fs/cgroup/memory/cgroup.event_control</code> 文件中写入 memory.available 的阈值，而阈值与 inactive_file 文件的大小有关系，kubelet 也会定期更新阈值，当 memcg 使用率达到配置的阈值后会主动通知 kubelet，kubelet 通过 epoll 机制来接收通知。</p>
+<p><strong>2、kubelet</strong> <strong>memory.available 不会计算 active page</strong></p>
+<p>kubelet 通过内存使用率驱逐实例时，内存使用率数据包含了 page cache 中 active_file 的数据，在某些场景下会因 page cache 过高导致内存使用率超过阈值会造成实例被驱逐，</p>
+<p>由于在内存紧张时 inactive_file 会被内核首先回收，但在内存不足时，active_file 也会被内核进行回收，社区对此机制也有一些疑问，针对内核回收内存的情况比较复杂，社区暂时还未进行回应，详情可以参考 <a href="https://github.com/kubernetes/kubernetes/issues/43916" target="_blank" rel="noopener">kubelet counts active page cache against memory.available (maybe it shouldn’t?)</a>。</p>
+<p>kubelet 计算节点可用内存的方式如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">#!/usr/bin/env bash</span><br><span class="line"></span><br><span class="line"># This script reproduces what the kubelet does</span><br><span class="line"># to calculate memory.available relative to root cgroup.</span><br><span class="line"></span><br><span class="line"># current memory usage</span><br><span class="line">memory_capacity_in_kb=$(cat /proc/meminfo | grep MemTotal | awk &apos;&#123;print $2&#125;&apos;)</span><br><span class="line">memory_capacity_in_bytes=$((memory_capacity_in_kb * 1024))</span><br><span class="line">memory_usage_in_bytes=$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes)</span><br><span class="line">memory_total_inactive_file=$(cat /sys/fs/cgroup/memory/memory.stat | grep total_inactive_file | awk &apos;&#123;print $2&#125;&apos;)</span><br><span class="line"></span><br><span class="line">memory_working_set=$&#123;memory_usage_in_bytes&#125;</span><br><span class="line">if [ &quot;$memory_working_set&quot; -lt &quot;$memory_total_inactive_file&quot; ];</span><br><span class="line">then</span><br><span class="line">    memory_working_set=0</span><br><span class="line">else</span><br><span class="line">    memory_working_set=$((memory_usage_in_bytes - memory_total_inactive_file))</span><br><span class="line">fi</span><br><span class="line"></span><br><span class="line">memory_available_in_bytes=$((memory_capacity_in_bytes - memory_working_set))</span><br><span class="line">memory_available_in_kb=$((memory_available_in_bytes / 1024))</span><br><span class="line">memory_available_in_mb=$((memory_available_in_kb / 1024))</span><br><span class="line"></span><br><span class="line">echo &quot;memory.capacity_in_bytes $memory_capacity_in_bytes&quot;</span><br><span class="line">echo &quot;memory.usage_in_bytes $memory_usage_in_bytes&quot;</span><br><span class="line">echo &quot;memory.total_inactive_file $memory_total_inactive_file&quot;</span><br><span class="line">echo &quot;memory.working_set $memory_working_set&quot;</span><br><span class="line">echo &quot;memory.available_in_bytes $memory_available_in_bytes&quot;</span><br><span class="line">echo &quot;memory.available_in_kb $memory_available_in_kb&quot;</span><br><span class="line">echo &quot;memory.available_in_mb $memory_available_in_mb&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="驱逐实例未被删除原因分析"><a href="#驱逐实例未被删除原因分析" class="headerlink" title="驱逐实例未被删除原因分析"></a>驱逐实例未被删除原因分析</h3><p>源码中对于 Statefulset 和 DaemonSet 会自动删除 Evicted 实例，但是对于 Deployment 不会自动删除。阅读了部分官方文档以及 issue，暂未找到官方对 Deployment Evicted 实例未删除原因给出解释。</p>
+<p><strong>statefulset：</strong><br>pkg/controller/statefulset/stateful_set_control.go<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">// Examine each replica with respect to its ordinal</span><br><span class="line">for i := range replicas &#123;</span><br><span class="line">    // delete and recreate failed pods</span><br><span class="line">    if isFailed(replicas[i]) &#123;</span><br><span class="line">        ssc.recorder.Eventf(set, v1.EventTypeWarning, &quot;RecreatingFailedPod&quot;,</span><br><span class="line">            &quot;StatefulSet %s/%s is recreating failed Pod %s&quot;,</span><br><span class="line">            set.Namespace,</span><br><span class="line">            set.Name,</span><br><span class="line">            replicas[i].Name)</span><br><span class="line">        if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil &#123;</span><br><span class="line">            return &amp;status, err</span><br><span class="line">        &#125;</span><br><span class="line">        if getPodRevision(replicas[i]) == currentRevision.Name &#123;</span><br><span class="line">            status.CurrentReplicas--</span><br><span class="line">        &#125;</span><br><span class="line">        if getPodRevision(replicas[i]) == updateRevision.Name &#123;</span><br><span class="line">            status.UpdatedReplicas--</span><br><span class="line">        &#125;</span><br><span class="line">        ......</span><br></pre></td></tr></table></figure></p>
+<p><strong>daemonset：</strong><br>pkg/controller/daemon/daemon_controller.go<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) podsShouldBeOnNode(</span><br><span class="line">		......</span><br><span class="line">) (nodesNeedingDaemonPods, podsToDelete []string) &#123;</span><br><span class="line"></span><br><span class="line">		......</span><br><span class="line"></span><br><span class="line">    switch &#123;</span><br><span class="line">		......</span><br><span class="line">    case shouldContinueRunning:</span><br><span class="line">				......</span><br><span class="line">        for _, pod := range daemonPods &#123;</span><br><span class="line">            if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            if pod.Status.Phase == v1.PodFailed &#123;</span><br><span class="line">                // This is a critical place where DS is often fighting with kubelet that rejects pods.</span><br><span class="line">                // We need to avoid hot looping and backoff.</span><br><span class="line">                backoffKey := failedPodsBackoffKey(ds, node.Name)</span><br><span class="line">                ......</span><br></pre></td></tr></table></figure></p>
+<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>1、团队里面有了一套 k8s 集群事件采集的链路，我们通过消费 k8s 中 pod 的相关事件来进行处理，消费事件时过滤 pod 中与 Evicted 实例相关的事件然后处理即可。</p>
+<p>Evicted 实例判断逻辑：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">const (</span><br><span class="line">	podEvictedStatus = &quot;Evicted&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// 判断如果为 Evicted 状态的实例且 Pod 中容器数为 0 时直接删除 pod</span><br><span class="line">if strings.ToLower(status) == strings.ToLower(podEvictedStatus) &amp;&amp; len(pod.Status.ContainerStatuses) == 0 &#123;</span><br><span class="line">	</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>2、社区有人提供通过在 kube-controller-manager 中配置 podgc controller –terminated-pod-gc-threshold 参数来自动清理：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Podgc controller flags:</span><br><span class="line"></span><br><span class="line">      --terminated-pod-gc-threshold int32</span><br><span class="line">                Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If</span><br><span class="line">                &lt;= 0, the terminated pod garbage collector is disabled. (default 12500)</span><br></pre></td></tr></table></figure>
+<p>该参数配置的是保留的异常实例数，默认值为 12500，但 podgc controller 回收 pod 时使用强杀模式不支持实例的优雅退出，因此暂不考虑使用。</p>
+<p>3、其他处理方式可以参考社区中提供的 <a href="https://github.com/kubernetes/kubernetes/issues/55051" target="_blank" rel="noopener">Kubelet does not delete evicted pods</a>。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>由于在之前的公司中对于稳定性的高度重视，线上节点并未开启驱逐实例的功能，因此也不会存在 Evicted 状态的实例，当节点资源严重不足时会有告警人工介入处理，以及还会有二次调度、故障自愈等一些辅助处理措施。本次针对 Evicted 相关实例的分析，发现 k8s 与操作系统之间存在了很多联系，如果要彻底搞清楚某些机制需要对操作系统的一些原理有一定的了解。</p>
+<p>参考：<br><a href="https://github.com/kubernetes/kubernetes/issues/55051" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/55051</a><br><a href="https://ieevee.com/tech/2019/05/23/ephemeral-storage.html" target="_blank" rel="noopener">https://ieevee.com/tech/2019/05/23/ephemeral-storage.html</a><br><a href="https://github.com/kubernetes/kubernetes/issues/43916" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/43916</a><br><a href="https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Evicted/" rel="tag"># Evicted</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/02/03/pid_cgroup/" rel="next" title="pid cgroup">
+                <i class="fa fa-chevron-left"></i> pid cgroup
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">57</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">62</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#线上被驱逐实例数据"><span class="nav-number">1.</span> <span class="nav-text">线上被驱逐实例数据</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#实例被驱逐的原因"><span class="nav-number">2.</span> <span class="nav-text">实例被驱逐的原因</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#节点资源不足导致实例被驱逐"><span class="nav-number">2.1.</span> <span class="nav-text">节点资源不足导致实例被驱逐</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#kubelet-驱逐实例时与资源处理相关的已知问题"><span class="nav-number">3.</span> <span class="nav-text">kubelet 驱逐实例时与资源处理相关的已知问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#驱逐实例未被删除原因分析"><span class="nav-number">4.</span> <span class="nav-text">驱逐实例未被删除原因分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#解决方案"><span class="nav-number">5.</span> <span class="nav-text">解决方案</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">6.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+    <a href="http://www.beian.miit.gov.cn/">陕ICP备15001765号-1</a> 
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

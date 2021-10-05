@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-09-08T07:50:20.306Z</updated>
+  <updated>2021-10-05T08:04:59.588Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,31 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>kubernetes 中 Evicted pod 是如何产生的</title>
+    <link href="https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/"/>
+    <id>https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/</id>
+    <published>2021-03-01T07:31:30.000Z</published>
+    <updated>2021-10-05T08:04:59.588Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;h3 id=&quot;线上被驱逐实例数据&quot;&gt;&lt;a href=&quot;#线上被驱逐实例数据&quot; class=&quot;headerlink&quot; title=&quot;线上被驱逐实例数据&quot;&gt;&lt;/a&gt;线上被驱逐实例数据&lt;/h3&gt;&lt;p&gt;最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="Evicted" scheme="https://blog.tianfeiyu.com/tags/Evicted/"/>
+    
+  </entry>
   
   <entry>
     <title>pid cgroup</title>
@@ -526,33 +551,6 @@
       <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
     
       <category term="ipvs" scheme="https://blog.tianfeiyu.com/tags/ipvs/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kube-proxy iptables 模式源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/"/>
-    <id>https://blog.tianfeiyu.com/2019/11/06/kube_proxy_iptables/</id>
-    <published>2019-11-06T11:50:30.000Z</published>
-    <updated>2019-11-17T09:18:20.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;h3 id=&quot;iptables-的功能&quot;&gt;&lt;a href=&quot;#iptables-的功能&quot; class=&quot;headerlink&quot; title=&quot;iptables 的功能&quot;&gt;&lt;/a&gt;iptables 的功能&lt;/h3&gt;&lt;p&gt;在前面的文章中已经介绍过  iptable
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
-    
-      <category term="iptables" scheme="https://blog.tianfeiyu.com/tags/iptables/"/>
     
   </entry>
   
