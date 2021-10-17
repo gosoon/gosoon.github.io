@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="golang,stack_or_heap,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="变量内存分配与回收 堆与栈的区别   变量内存分配逃逸分析 检查该变量是在栈上分配还是堆上分配 函数内变量在堆上分配的一些 case   函数使用值与指针返回时性能的差异 其他的一些使用经验   总结  变量内存分配与回收Go 程序会在两个地方为变量分配内存，一个是全局的堆上，另一个是函数调用栈，Go 语言有垃圾回收机制，在Go中变量分配在堆还是栈上是由编译器决定的，因此开发者无需过多关注变量是">
+<meta name="keywords" content="golang,stack_or_heap">
+<meta property="og:type" content="article">
+<meta property="og:title" content="golang 中函数使用值返回与指针返回的区别，底层原理分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2021/04/13/go_func_return_value_or_pointer/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="变量内存分配与回收 堆与栈的区别   变量内存分配逃逸分析 检查该变量是在栈上分配还是堆上分配 函数内变量在堆上分配的一些 case   函数使用值与指针返回时性能的差异 其他的一些使用经验   总结  变量内存分配与回收Go 程序会在两个地方为变量分配内存，一个是全局的堆上，另一个是函数调用栈，Go 语言有垃圾回收机制，在Go中变量分配在堆还是栈上是由编译器决定的，因此开发者无需过多关注变量是">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://cdn.tianfeiyu.com/%E5%87%BD%E6%95%B0%E8%B0%83%E5%BA%A6%E6%A0%88.png">
+<meta property="og:updated_time" content="2021-10-17T07:46:17.398Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="golang 中函数使用值返回与指针返回的区别，底层原理分析">
+<meta name="twitter:description" content="变量内存分配与回收 堆与栈的区别   变量内存分配逃逸分析 检查该变量是在栈上分配还是堆上分配 函数内变量在堆上分配的一些 case   函数使用值与指针返回时性能的差异 其他的一些使用经验   总结  变量内存分配与回收Go 程序会在两个地方为变量分配内存，一个是全局的堆上，另一个是函数调用栈，Go 语言有垃圾回收机制，在Go中变量分配在堆还是栈上是由编译器决定的，因此开发者无需过多关注变量是">
+<meta name="twitter:image" content="https://cdn.tianfeiyu.com/%E5%87%BD%E6%95%B0%E8%B0%83%E5%BA%A6%E6%A0%88.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2021/04/13/go_func_return_value_or_pointer/">
+
+
+
+
+
+
+  <title>golang 中函数使用值返回与指针返回的区别，底层原理分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-rss">
+          <a href="/atom.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-rss"></i> <br>
+            
+            rss
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-golang stack_or_heap" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2021/04/13/go_func_return_value_or_pointer/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">golang 中函数使用值返回与指针返回的区别，底层原理分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-04-13T15:36:30+08:00">
+                2021-04-13
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2021/04/13/go_func_return_value_or_pointer/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2021/04/13/go_func_return_value_or_pointer/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <ul>
+<li><a href="#变量内存分配与回收">变量内存分配与回收</a><ul>
+<li><a href="#堆与栈的区别">堆与栈的区别</a></li>
+</ul>
+</li>
+<li><a href="#变量内存分配逃逸分析">变量内存分配逃逸分析</a><ul>
+<li><a href="#检查该变量是在栈上分配还是堆上分配">检查该变量是在栈上分配还是堆上分配</a></li>
+<li><a href="#函数内变量在堆上分配的一些-case">函数内变量在堆上分配的一些 case</a></li>
+</ul>
+</li>
+<li><a href="#函数使用值与指针返回时性能的差异">函数使用值与指针返回时性能的差异</a><ul>
+<li><a href="#其他的一些使用经验">其他的一些使用经验</a></li>
+</ul>
+</li>
+<li><a href="#总结">总结</a></li>
+</ul>
+<h3 id="变量内存分配与回收"><a href="#变量内存分配与回收" class="headerlink" title="变量内存分配与回收"></a>变量内存分配与回收</h3><p>Go 程序会在两个地方为变量分配内存，一个是全局的堆上，另一个是函数调用栈，Go 语言有垃圾回收机制，在Go中变量分配在堆还是栈上是由编译器决定的，因此开发者无需过多关注变量是分配在栈上还是堆上。但如果想写出高质量的代码，了解语言背后的实现是有必要的，变量在栈上分配和在堆上分配底层实现的机制完全不同，变量的分配与回收流程不同，性能差异是非常大的。</p>
+<h4 id="堆与栈的区别"><a href="#堆与栈的区别" class="headerlink" title="堆与栈的区别"></a>堆与栈的区别</h4><p><strong>堆</strong></p>
+<p>程序运行时动态分配的内存都位于堆中，这部分内存由内存分配器负责管理，该区域的大小会随着程序的运行而变化，即当我们向堆请求分配内存但分配器发现堆中的内存不足时，它会向操作系统内核申请向高地址方向扩展堆的大小，而当我们释放内存把它归还给堆时如果内存分配器发现剩余空闲内存太多则又会向操作系统请求向低地址方向收缩堆的大小，从内存申请和释放流程可以看出，从堆上分配的内存用完之后必须归还给堆，否则内存分配器可能会反复向操作系统申请扩展堆的大小从而导致堆内存越用越多，最后出现内存不足，这就是所谓的内存泄漏。值的一提的是传统的 c/c++ 代码需要手动处理内存的分配和释放，而在 Go 语言中，有垃圾回收器来回收堆上的内存，所以程序员只管申请内存，而不用管内存的释放，大大降低了程序员的心智负担，这不光是提高了程序员的生产力，更重要的是还会减少很多bug的产生。</p>
+<p><strong>栈</strong></p>
+<p>函数调用栈简称栈，在程序运行过程中，不管是函数的执行还是函数调用，栈都起着非常重要的作用，它主要被用来：</p>
+<ul>
+<li>保存函数的局部变量；</li>
+<li>向被调用函数传递参数；</li>
+<li>返回函数的返回值；</li>
+<li>保存函数的返回地址，返回地址是指从被调用函数返回后调用者应该继续执行的指令地址；</li>
+</ul>
+<p>每个函数在执行过程中都需要使用一块栈内存用来保存上述这些值，我们称这块栈内存为某函数的栈帧(stack frame)。当发生函数调用时，因为调用者还没有执行完，其栈内存中保存的数据还有用，所以被调用函数不能覆盖调用者的栈帧，只能把被调用函数的栈帧“push”到栈上，等被调函数执行完成后再把其栈帧从栈上“pop”出去，这样，栈的大小就会随函数调用层级的增加而生长，随函数的返回而缩小，也就是说函数调用层级越深，消耗的栈空间就越大。栈的生长和收缩都是自动的，由编译器插入的代码自动完成，因此位于栈内存中的函数局部变量所使用的内存随函数的调用而分配，随函数的返回而自动释放，所以程序员不管是使用有垃圾回收还是没有垃圾回收的高级编程语言都不需要自己释放局部变量所使用的内存，这一点与堆上分配的内存截然不同。</p>
+<p><img src="https://cdn.tianfeiyu.com/%E5%87%BD%E6%95%B0%E8%B0%83%E5%BA%A6%E6%A0%88.png" alt="函数调用栈"></p>
+<p>进程是操作系统资源分配的基本单位，每个进程在启动时操作系统会进程的栈分配固定大小的内存，Linux 中进程默认栈的大小可以通过 <code>ulimit -s</code> 查看，当函数退出时分配在栈上的内存通过修改寄存器指针的偏移量会自动进行回收，进程在运行时堆中内存的大小都需要向操作系统申请，进程堆可用内存的大小也取决于当前操作系统可用内存的量。</p>
+<p>那么在 Go 中变量分配在堆上与栈上编译器是如何决定的？</p>
+<h3 id="变量内存分配逃逸分析"><a href="#变量内存分配逃逸分析" class="headerlink" title="变量内存分配逃逸分析"></a>变量内存分配逃逸分析</h3><p>上文已经提到 Go 中变量分配在堆还是栈上是由编译器决定的，这种由编译器决定内存分配位置的方式称之为逃逸分析(escape analysis)。Go 中声明一个函数内局部变量时，当编译器发现变量的作用域没有逃出函数范围时，就会在栈上分配内存，反之则分配在堆上，逃逸分析由编译器完成，作用于编译阶段。</p>
+<h4 id="检查该变量是在栈上分配还是堆上分配"><a href="#检查该变量是在栈上分配还是堆上分配" class="headerlink" title="检查该变量是在栈上分配还是堆上分配"></a>检查该变量是在栈上分配还是堆上分配</h4><p>有两种方式可以确定变量是在堆还是在栈上分配内存:</p>
+<ul>
+<li>通过编译后生成的汇编函数来确认，在堆上分配内存的变量都会调用 runtime 包的 <code>newobject</code> 函数；</li>
+<li>编译时通过指定选项显示编译优化信息，编译器会输出逃逸的变量；</li>
+</ul>
+<p>通过以上两种方式来分析以下代码示例中的变量是否存在逃逸：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">type demo struct &#123;</span><br><span class="line">	Msg string</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func example() *demo &#123;</span><br><span class="line">	d := &amp;demo&#123;&#125;</span><br><span class="line">	return d</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	example()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>1、通过汇编来确认变量内存分配是否有逃逸</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">$ go tool compile -S main.go</span><br><span class="line">go tool compile -S main.go</span><br><span class="line">&quot;&quot;.example STEXT size=72 args=0x8 locals=0x18</span><br><span class="line">	0x0000 00000 (main.go:7)	TEXT	&quot;&quot;.example(SB), ABIInternal, $24-8</span><br><span class="line">	0x0000 00000 (main.go:7)	MOVQ	(TLS), CX</span><br><span class="line">	0x0009 00009 (main.go:7)	CMPQ	SP, 16(CX)</span><br><span class="line">	0x000d 00013 (main.go:7)	PCDATA	$0, $-2</span><br><span class="line">	0x000d 00013 (main.go:7)	JLS	65</span><br><span class="line">	0x000f 00015 (main.go:7)	PCDATA	$0, $-1</span><br><span class="line">	0x000f 00015 (main.go:7)	SUBQ	$24, SP</span><br><span class="line">	0x0013 00019 (main.go:7)	MOVQ	BP, 16(SP)</span><br><span class="line">	0x0018 00024 (main.go:7)	LEAQ	16(SP), BP</span><br><span class="line">	0x001d 00029 (main.go:7)	PCDATA	$0, $-2</span><br><span class="line">	0x001d 00029 (main.go:7)	PCDATA	$1, $-2</span><br><span class="line">	0x001d 00029 (main.go:7)	FUNCDATA	$0, gclocals·9fb7f0986f647f17cb53dda1484e0f7a(SB)</span><br><span class="line">	0x001d 00029 (main.go:7)	FUNCDATA	$1, gclocals·69c1753bd5f81501d95132d08af04464(SB)</span><br><span class="line">	0x001d 00029 (main.go:7)	FUNCDATA	$2, gclocals·9fb7f0986f647f17cb53dda1484e0f7a(SB)</span><br><span class="line">	0x001d 00029 (main.go:8)	PCDATA	$0, $1</span><br><span class="line">	0x001d 00029 (main.go:8)	PCDATA	$1, $0</span><br><span class="line">	0x001d 00029 (main.go:8)	LEAQ	type.&quot;&quot;.demo(SB), AX</span><br><span class="line">	0x0024 00036 (main.go:8)	PCDATA	$0, $0</span><br><span class="line">	0x0024 00036 (main.go:8)	MOVQ	AX, (SP)</span><br><span class="line">	0x0028 00040 (main.go:8)	CALL	runtime.newobject(SB)  // 调用 runtime.newobject 函数</span><br><span class="line">	0x002d 00045 (main.go:8)	PCDATA	$0, $1</span><br><span class="line">	0x002d 00045 (main.go:8)	MOVQ	8(SP), AX</span><br><span class="line">	0x0032 00050 (main.go:9)	PCDATA	$0, $0</span><br><span class="line">	0x0032 00050 (main.go:9)	PCDATA	$1, $1</span><br><span class="line">	0x0032 00050 (main.go:9)	MOVQ	AX, &quot;&quot;.~r0+32(SP)</span><br><span class="line">	0x0037 00055 (main.go:9)	MOVQ	16(SP), BP</span><br><span class="line">	0x003c 00060 (main.go:9)	ADDQ	$24, SP</span><br><span class="line">	0x0040 00064 (main.go:9)	RET</span><br><span class="line">	0x0041 00065 (main.go:9)	NOP</span><br><span class="line">	0x0041 00065 (main.go:7)	PCDATA	$1, $-1</span><br><span class="line">	0x0041 00065 (main.go:7)	PCDATA	$0, $-2</span><br><span class="line">	0x0041 00065 (main.go:7)	CALL	runtime.morestack_noctxt(SB)</span><br><span class="line">	0x0046 00070 (main.go:7)	PCDATA	$0, $-1</span><br><span class="line">	0x0046 00070 (main.go:7)	JMP	0</span><br></pre></td></tr></table></figure>
+<p>以上仅仅列出了 example 函数编译后的汇编代码，可以看到在程序的第8行调用了 runtime.newobject 函数。</p>
+<p><strong>2、通过编译选项检查</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">执行 go tool compile -l -m -m main.go 或者 go build -gcflags &quot;-m -m -l&quot; main.go</span><br><span class="line"></span><br><span class="line">$ go build -gcflags &quot;-m -l&quot; main.go</span><br><span class="line"># command-line-arguments</span><br><span class="line">./main.go:8:7: &amp;demo literal escapes to heap:</span><br><span class="line">./main.go:8:7:   flow: d = &amp;&#123;storage for &amp;demo literal&#125;:</span><br><span class="line">./main.go:8:7:     from &amp;demo literal (spill) at ./main.go:8:7</span><br><span class="line">./main.go:8:7:     from d := &amp;demo literal (assign) at ./main.go:8:4</span><br><span class="line">./main.go:8:7:   flow: ~r0 = d:</span><br><span class="line">./main.go:8:7:     from return d (return) at ./main.go:9:2</span><br><span class="line">./main.go:8:7: &amp;demo literal escapes to heap</span><br><span class="line"></span><br><span class="line">$ go tool compile -l -m -m main.go</span><br><span class="line">main.go:8:7: &amp;demo literal escapes to heap:</span><br><span class="line">main.go:8:7:   flow: d = &amp;&#123;storage for &amp;demo literal&#125;:</span><br><span class="line">main.go:8:7:     from &amp;demo literal (spill) at main.go:8:7</span><br><span class="line">main.go:8:7:     from d := &amp;demo literal (assign) at main.go:8:4</span><br><span class="line">main.go:8:7:   flow: ~r0 = d:</span><br><span class="line">main.go:8:7:     from return d (return) at main.go:9:2</span><br><span class="line">main.go:8:7: &amp;demo literal escapes to heap</span><br></pre></td></tr></table></figure>
+<p>可以使用 <code>go tool compile --help</code> 查看几个选项的含义。</p>
+<p>Go 官方 faq 文档 <a href="https://golang.org/doc/faq#stack_or_heap" target="_blank" rel="noopener">stack_or_heap</a> 一节也说了如何知道一个变量是在堆上还是在粘上分配内存的，文档描述的比较简单，下面再看几个特定类型的示例。</p>
+<h4 id="函数内变量在堆上分配的一些-case"><a href="#函数内变量在堆上分配的一些-case" class="headerlink" title="函数内变量在堆上分配的一些 case"></a>函数内变量在堆上分配的一些 case</h4><p><strong>1、指针类型的变量，指针逃逸</strong></p>
+<p>代码示例，和上节示例一致：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">type demo struct &#123;</span><br><span class="line">	Msg string</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func example() *demo &#123;</span><br><span class="line">	d := &amp;demo&#123;&#125;</span><br><span class="line">	return d</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	example()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$ go tool compile -l -m main.go</span><br><span class="line">main.go:8:7: &amp;demo literal escapes to heap</span><br></pre></td></tr></table></figure>
+<p><strong>2、栈空间不足</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">func generate8191() &#123;</span><br><span class="line">	nums := make([]int, 8191) // &lt; 64KB</span><br><span class="line">	for i := 0; i &lt; 8191; i++ &#123;</span><br><span class="line">		nums[i] = i</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func generate8192() &#123;</span><br><span class="line">	nums := make([]int, 8192) // = 64KB</span><br><span class="line">	for i := 0; i &lt; 8192; i++ &#123;</span><br><span class="line">		nums[i] = i</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func generate(n int) &#123;</span><br><span class="line">	nums := make([]int, n) // 不确定大小</span><br><span class="line">	for i := 0; i &lt; n; i++ &#123;</span><br><span class="line">		nums[i] = i</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	generate8191()</span><br><span class="line">	generate8192()</span><br><span class="line">	generate(1)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$ go tool compile -l -m main.go</span><br><span class="line">main.go:4:14: make([]int, 8191) does not escape</span><br><span class="line">main.go:9:14: make([]int, 8192) escapes to heap</span><br><span class="line">main.go:14:14: make([]int, n) escapes to heap</span><br></pre></td></tr></table></figure>
+<p>在 Go 编译器代码中可以看到，对于有声明类型的变量大小超过 10M 会被分配到堆上，隐式变量默认超过64KB 会被分配在堆上。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">var (</span><br><span class="line">    // maximum size variable which we will allocate on the stack.</span><br><span class="line">    // This limit is for explicit variable declarations like &quot;var x T&quot; or &quot;x := ...&quot;.</span><br><span class="line">    // Note: the flag smallframes can update this value.</span><br><span class="line">    maxStackVarSize = int64(10 * 1024 * 1024)</span><br><span class="line"></span><br><span class="line">    // maximum size of implicit variables that we will allocate on the stack.</span><br><span class="line">    //   p := new(T)          allocating T on the stack</span><br><span class="line">    //   p := &amp;T&#123;&#125;            allocating T on the stack</span><br><span class="line">    //   s := make([]T, n)    allocating [n]T on the stack</span><br><span class="line">    //   s := []byte(&quot;...&quot;)   allocating [n]byte on the stack</span><br><span class="line">    // Note: the flag smallframes can update this value.</span><br><span class="line">    maxImplicitStackVarSize = int64(64 * 1024)</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p><strong>3、动态类型，interface{} 动态类型逃逸</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">type Demo struct &#123;</span><br><span class="line">	Name string</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	_ = example()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func example() interface&#123;&#125; &#123;</span><br><span class="line">	return Demo&#123;&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$ go tool compile -l -m main.go</span><br><span class="line">main.go:12:13: Demo literal escapes to heap</span><br></pre></td></tr></table></figure>
+<p><strong>4、闭包引用对象</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import &quot;fmt&quot;</span><br><span class="line"></span><br><span class="line">func increase(x int) func() int &#123;</span><br><span class="line">	return func() int &#123;</span><br><span class="line">		x++</span><br><span class="line">		return x</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	x := 0</span><br><span class="line">	in := increase(x)</span><br><span class="line">	fmt.Println(in())</span><br><span class="line">	fmt.Println(in())</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$ go tool compile -l -m main.go</span><br><span class="line">main.go:5:15: moved to heap: x</span><br><span class="line">main.go:6:9: func literal escapes to heap</span><br><span class="line">main.go:15:13: ... argument does not escape</span><br><span class="line">main.go:15:16: in() escapes to heap</span><br><span class="line">main.go:16:13: ... argument does not escape</span><br><span class="line">main.go:16:16: in() escapes to heap</span><br></pre></td></tr></table></figure>
+<h3 id="函数使用值与指针返回时性能的差异"><a href="#函数使用值与指针返回时性能的差异" class="headerlink" title="函数使用值与指针返回时性能的差异"></a>函数使用值与指针返回时性能的差异</h3><p>上文介绍了 Go 中变量内存分配方式，通过上文可以知道在函数中定义变量并使用值返回时，该变量会在栈上分配内存，函数返回时会拷贝整个对象，使用指针返回时变量在分配内存时会逃逸到堆中，返回时只会拷贝指针地址，最终变量会通过 Go 的垃圾回收机制回收掉。</p>
+<p>那在函数中返回时是使用值还是指针，哪种效率更高呢，虽然值有拷贝操作，但是返回指针会将变量分配在堆上，堆上变量的分配以及回收也会有较大的开销。对于该问题，跟返回的对象和平台也有一定的关系，不同的平台需要通过基准测试才能得到一个比较准确的结果。</p>
+<p><code>return_value_or_pointer.go</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import &quot;fmt&quot;</span><br><span class="line"></span><br><span class="line">const bigSize = 200000</span><br><span class="line"></span><br><span class="line">type bigStruct struct &#123;</span><br><span class="line">    nums [bigSize]int</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func newBigStruct() bigStruct &#123;</span><br><span class="line">    var a bigStruct</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; bigSize; i++ &#123;</span><br><span class="line">        a.nums[i] = i</span><br><span class="line">    &#125;</span><br><span class="line">    return a</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func newBigStructPtr() *bigStruct &#123;</span><br><span class="line">    var a bigStruct</span><br><span class="line"></span><br><span class="line">    for i := 0; i &lt; bigSize; i++ &#123;</span><br><span class="line">        a.nums[i] = i</span><br><span class="line">    &#125;</span><br><span class="line">    return &amp;a</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">    a := newBigStruct()</span><br><span class="line">    b := newBigStructPtr()</span><br><span class="line"></span><br><span class="line">    fmt.Println(a, b)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>benchmark_test.go</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import &quot;testing&quot;</span><br><span class="line"></span><br><span class="line">func BenchmarkStructReturnValue(b *testing.B) &#123;</span><br><span class="line">    b.ReportAllocs()</span><br><span class="line"></span><br><span class="line">    t := 0</span><br><span class="line">    for i := 0; i &lt; b.N; i++ &#123;</span><br><span class="line">        v := newBigStruct()</span><br><span class="line">        t += v.nums[0]</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func BenchmarkStructReturnPointer(b *testing.B) &#123;</span><br><span class="line">    b.ReportAllocs()</span><br><span class="line"></span><br><span class="line">    t := 0</span><br><span class="line">    for i := 0; i &lt; b.N; i++ &#123;</span><br><span class="line">        v := newBigStructPtr()</span><br><span class="line">        t += v.nums[0]</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ go test -bench .</span><br><span class="line">goos: darwin</span><br><span class="line">goarch: amd64</span><br><span class="line">BenchmarkStructReturnValue-12      	    4215	    278542 ns/op	       0 B/op	       0 allocs/op</span><br><span class="line">BenchmarkStructReturnPointer-12    	    4556	    267253 ns/op	 1605634 B/op	       1 allocs/op</span><br><span class="line">PASS</span><br><span class="line">ok  	_/Users/tianfeiyu/golang-dev/test	3.670s</span><br></pre></td></tr></table></figure>
+<p>在我本地测试中，200000 个 int 类型的结构体返回值更快些，小于 200000 时返回指针会更快。 如果对于代码有更高的性能要求，需要在实际平台上进行基准测试来得出结论。</p>
+<h4 id="其他的一些使用经验"><a href="#其他的一些使用经验" class="headerlink" title="其他的一些使用经验"></a>其他的一些使用经验</h4><p>1、有状态的对象必须使用指针返回，如系统内置的 sync.WaitGroup、sync.Pool 之类的值，在 Go 中有些结构体中会显式存在 noCopy 字段提醒不能进行值拷贝；</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">// A WaitGroup must not be copied after first use.</span><br><span class="line">type WaitGroup struct &#123;</span><br><span class="line">    noCopy noCopy</span><br><span class="line"></span><br><span class="line">		......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>2、生命周期短的对象使用值返回，如果对象的生命周期存在比较久或者对象比较大，可以使用指针返回；</p>
+<p>3、大对象推荐使用指针返回，对象大小临界值需要在具体平台进行基准测试得出数据；</p>
+<p>4、参考一些大的开源项目中的使用方式，比如 kubernetes、docker 等；</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文通过分析在 Go 函数中使用变量时的一些问题，变量在分配内存时会在堆和栈两个地方存在，在堆和栈上分配内存的不同，以及何时需要在堆上分配内存的变量。</p>
+<p>参考：</p>
+<p><a href="https://mojotv.cn/go/bad-go-pointer-returns" target="_blank" rel="noopener">https://mojotv.cn/go/bad-go-pointer-returns</a></p>
+<p><a href="https://github.com/eastany/eastany.github.com/issues/61" target="_blank" rel="noopener">https://github.com/eastany/eastany.github.com/issues/61</a></p>
+<p><a href="https://mp.weixin.qq.com/s/PXGCqxK97U8mLGxW07ZTqw" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/PXGCqxK97U8mLGxW07ZTqw</a></p>
+<p><a href="https://golang.design/under-the-hood/zh-cn/part1basic/ch01basic/asm/" target="_blank" rel="noopener">https://golang.design/under-the-hood/zh-cn/part1basic/ch01basic/asm/</a></p>
+<p><a href="https://golang.org/doc/asm" target="_blank" rel="noopener">https://golang.org/doc/asm</a></p>
+<p><a href="https://blog.csdn.net/qmhball" target="_blank" rel="noopener">https://blog.csdn.net/qmhball</a></p>
+<p><a href="https://golang.org/doc/faq#stack_or_heap" target="_blank" rel="noopener">https://golang.org/doc/faq#stack_or_heap</a></p>
+<p><a href="https://geektutu.com/post/hpg-escape-analysis.html" target="_blank" rel="noopener">https://geektutu.com/post/hpg-escape-analysis.html</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/golang/" rel="tag"># golang</a>
+          
+            <a href="/tags/stack-or-heap/" rel="tag"># stack_or_heap</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/03/01/k8s_evicted/" rel="next" title="kubernetes 中 Evicted pod 是如何产生的">
+                <i class="fa fa-chevron-left"></i> kubernetes 中 Evicted pod 是如何产生的
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">58</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">64</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#变量内存分配与回收"><span class="nav-number">1.</span> <span class="nav-text">变量内存分配与回收</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#堆与栈的区别"><span class="nav-number">1.1.</span> <span class="nav-text">堆与栈的区别</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#变量内存分配逃逸分析"><span class="nav-number">2.</span> <span class="nav-text">变量内存分配逃逸分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#检查该变量是在栈上分配还是堆上分配"><span class="nav-number">2.1.</span> <span class="nav-text">检查该变量是在栈上分配还是堆上分配</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#函数内变量在堆上分配的一些-case"><span class="nav-number">2.2.</span> <span class="nav-text">函数内变量在堆上分配的一些 case</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#函数使用值与指针返回时性能的差异"><span class="nav-number">3.</span> <span class="nav-text">函数使用值与指针返回时性能的差异</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#其他的一些使用经验"><span class="nav-number">3.1.</span> <span class="nav-text">其他的一些使用经验</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+    <a href="http://www.beian.miit.gov.cn/">陕ICP备15001765号-1</a> 
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

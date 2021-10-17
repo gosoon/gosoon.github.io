@@ -89,7 +89,7 @@
 <meta property="og:site_name" content="田飞雨">
 <meta property="og:description" content="线上被驱逐实例数据最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2021-10-05T08:04:59.588Z">
+<meta property="og:updated_time" content="2021-10-13T07:26:05.377Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="kubernetes 中 Evicted pod 是如何产生的">
 <meta name="twitter:description" content="线上被驱逐实例数据最近在线上发现很多实例处于 Evicted 状态，通过 pod yaml 可以看到实例是因为节点资源不足被驱逐，但是这些实例并没有被自动清理，平台的大部分用户在操作时看到服务下面出现 Evicted 实例时会以为服务有问题或者平台有问题的错觉，影响了用户的体验。而这部分 Evicted 状态的 Pod 在底层关联的容器其实已经被销毁了，对用户的服务也不会产生什么影响，也就是说只有">
@@ -435,7 +435,7 @@
 <p><strong>daemonset：</strong><br>pkg/controller/daemon/daemon_controller.go<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">func (dsc *DaemonSetsController) podsShouldBeOnNode(</span><br><span class="line">		......</span><br><span class="line">) (nodesNeedingDaemonPods, podsToDelete []string) &#123;</span><br><span class="line"></span><br><span class="line">		......</span><br><span class="line"></span><br><span class="line">    switch &#123;</span><br><span class="line">		......</span><br><span class="line">    case shouldContinueRunning:</span><br><span class="line">				......</span><br><span class="line">        for _, pod := range daemonPods &#123;</span><br><span class="line">            if pod.DeletionTimestamp != nil &#123;</span><br><span class="line">                continue</span><br><span class="line">            &#125;</span><br><span class="line">            if pod.Status.Phase == v1.PodFailed &#123;</span><br><span class="line">                // This is a critical place where DS is often fighting with kubelet that rejects pods.</span><br><span class="line">                // We need to avoid hot looping and backoff.</span><br><span class="line">                backoffKey := failedPodsBackoffKey(ds, node.Name)</span><br><span class="line">                ......</span><br></pre></td></tr></table></figure></p>
 <h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>1、团队里面有了一套 k8s 集群事件采集的链路，我们通过消费 k8s 中 pod 的相关事件来进行处理，消费事件时过滤 pod 中与 Evicted 实例相关的事件然后处理即可。</p>
 <p>Evicted 实例判断逻辑：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">const (</span><br><span class="line">	podEvictedStatus = &quot;Evicted&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// 判断如果为 Evicted 状态的实例且 Pod 中容器数为 0 时直接删除 pod</span><br><span class="line">if strings.ToLower(status) == strings.ToLower(podEvictedStatus) &amp;&amp; len(pod.Status.ContainerStatuses) == 0 &#123;</span><br><span class="line">	</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">const (</span><br><span class="line">	podEvictedStatus = &quot;Evicted&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">// 判断如果为 Evicted 状态的实例且 Pod 中容器数为 0 时直接删除 pod</span><br><span class="line">if strings.ToLower(pod.Status.Reason) == strings.ToLower(podEvictedStatus) &amp;&amp; pod.Status.Phase == v1.PodFailed &amp;&amp;</span><br><span class="line">		len(pod.Status.ContainerStatuses) == 0 &#123;</span><br><span class="line">	</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>2、社区有人提供通过在 kube-controller-manager 中配置 podgc controller –terminated-pod-gc-threshold 参数来自动清理：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Podgc controller flags:</span><br><span class="line"></span><br><span class="line">      --terminated-pod-gc-threshold int32</span><br><span class="line">                Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If</span><br><span class="line">                &lt;= 0, the terminated pod garbage collector is disabled. (default 12500)</span><br></pre></td></tr></table></figure>
 <p>该参数配置的是保留的异常实例数，默认值为 12500，但 podgc controller 回收 pod 时使用强杀模式不支持实例的优雅退出，因此暂不考虑使用。</p>
@@ -481,6 +481,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/04/13/go_func_return_value_or_pointer/" rel="prev" title="golang 中函数使用值返回与指针返回的区别，底层原理分析">
+                golang 中函数使用值返回与指针返回的区别，底层原理分析 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -574,7 +578,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">57</span>
+                  <span class="site-state-item-count">58</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -587,7 +591,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">62</span>
+                  <span class="site-state-item-count">64</span>
                   <span class="site-state-item-name">标签</span>
                 
               </div>

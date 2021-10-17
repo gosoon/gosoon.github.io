@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-10-05T08:04:59.588Z</updated>
+  <updated>2021-10-17T07:46:17.398Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -17,11 +17,43 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
+    <title>golang 中函数使用值返回与指针返回的区别，底层原理分析</title>
+    <link href="https://blog.tianfeiyu.com/2021/04/13/go_func_return_value_or_pointer/"/>
+    <id>https://blog.tianfeiyu.com/2021/04/13/go_func_return_value_or_pointer/</id>
+    <published>2021-04-13T07:36:30.000Z</published>
+    <updated>2021-10-17T07:46:17.398Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;#变量内存分配与回收&quot;&gt;变量内存分配与回收&lt;/a&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;#堆与栈的区别&quot;&gt;堆与栈的区别&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;a
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="golang" scheme="https://blog.tianfeiyu.com/tags/golang/"/>
+    
+      <category term="stack_or_heap" scheme="https://blog.tianfeiyu.com/tags/stack-or-heap/"/>
+    
+  </entry>
+  
+  <entry>
     <title>kubernetes 中 Evicted pod 是如何产生的</title>
     <link href="https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/"/>
     <id>https://blog.tianfeiyu.com/2021/03/01/k8s_evicted/</id>
     <published>2021-03-01T07:31:30.000Z</published>
-    <updated>2021-10-05T08:04:59.588Z</updated>
+    <updated>2021-10-13T07:26:05.377Z</updated>
     
     <summary type="html">
     
@@ -523,34 +555,6 @@
       <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
     
       <category term="deployment controller" scheme="https://blog.tianfeiyu.com/tags/deployment-controller/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>kube-proxy ipvs 模式源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/"/>
-    <id>https://blog.tianfeiyu.com/2019/11/18/kube_proxy_ipvs/</id>
-    <published>2019-11-18T03:40:30.000Z</published>
-    <updated>2019-11-18T06:15:54.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;前几篇文章已经分析了 service 的原理以及 kube-proxy  iptables 模式的原理与实现，本篇文章会继续分析 kube-proxy ipvs 模式的原理与实现。&lt;/p&gt;
-&lt;h3 id=&quot;ipvs&quot;&gt;&lt;a href=&quot;#ipvs&quot;
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-proxy" scheme="https://blog.tianfeiyu.com/tags/kube-proxy/"/>
-    
-      <category term="ipvs" scheme="https://blog.tianfeiyu.com/tags/ipvs/"/>
     
   </entry>
   
