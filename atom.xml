@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-10-17T07:46:17.398Z</updated>
+  <updated>2021-11-22T04:12:34.430Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,36 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Golang 程序启动流程分析</title>
+    <link href="https://blog.tianfeiyu.com/2021/07/01/golang_bootstrap/"/>
+    <id>https://blog.tianfeiyu.com/2021/07/01/golang_bootstrap/</id>
+    <published>2021-07-01T12:50:30.000Z</published>
+    <updated>2021-11-22T04:12:34.430Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;blockquote&gt;
+&lt;p&gt;本文使用 golang 1.17 代码，如有任何问题，还望指出。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&quot;Golang-代码被操作系统运行起来的流程&quot;&gt;&lt;a href=&quot;#Golang-代码被操作系统运行起来的流程&quot;
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="golang runtime" scheme="https://blog.tianfeiyu.com/tags/golang-runtime/"/>
+    
+      <category term="plan9" scheme="https://blog.tianfeiyu.com/tags/plan9/"/>
+    
+  </entry>
   
   <entry>
     <title>golang 中函数使用值返回与指针返回的区别，底层原理分析</title>
@@ -528,33 +558,6 @@
       <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
     
       <category term="replicaset controller" scheme="https://blog.tianfeiyu.com/tags/replicaset-controller/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>deployment controller 源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/11/28/deployment_controller/"/>
-    <id>https://blog.tianfeiyu.com/2019/11/28/deployment_controller/</id>
-    <published>2019-11-28T06:30:30.000Z</published>
-    <updated>2019-12-12T09:04:22.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;在前面的文章中已经分析过 kubernetes 中多个组件的源码了，本章会继续解读 kube-controller-manager 源码，kube-controller-manager  中有数十个 controller，本文会分析最常用到的 deployment
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
-    
-      <category term="deployment controller" scheme="https://blog.tianfeiyu.com/tags/deployment-controller/"/>
     
   </entry>
   

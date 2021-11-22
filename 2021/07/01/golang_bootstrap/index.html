@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="golang runtime,plan9,">
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="田飞雨" type="application/atom+xml">
+
+
+
+
+
+
+<meta name="description" content="本文使用 golang 1.17 代码，如有任何问题，还望指出。  Golang 代码被操作系统运行起来的流程一、编译go 源代码首先要通过 go build 编译为可执行文件，在 linux 平台上为 ELF 格式的可执行文件，编译阶段会经过编译器、汇编器、链接器三个过程最终生成可执行文件。  1、编译器：.go 源码通过 go 编译器生成为 .s 的 plan9 汇编代码，Go 编译器入口是">
+<meta name="keywords" content="golang runtime,plan9">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Golang 程序启动流程分析">
+<meta property="og:url" content="https://blog.tianfeiyu.com/2021/07/01/golang_bootstrap/index.html">
+<meta property="og:site_name" content="田飞雨">
+<meta property="og:description" content="本文使用 golang 1.17 代码，如有任何问题，还望指出。  Golang 代码被操作系统运行起来的流程一、编译go 源代码首先要通过 go build 编译为可执行文件，在 linux 平台上为 ELF 格式的可执行文件，编译阶段会经过编译器、汇编器、链接器三个过程最终生成可执行文件。  1、编译器：.go 源码通过 go 编译器生成为 .s 的 plan9 汇编代码，Go 编译器入口是">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://cdn.tianfeiyu.com/%E7%BC%96%E8%AF%91%E6%B5%81%E7%A8%8B.png">
+<meta property="og:image" content="https://cdn.tianfeiyu.com/golang%E8%BF%9B%E7%A8%8B%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4.png">
+<meta property="og:image" content="https://cdn.tianfeiyu.com/golang%E8%BF%9B%E7%A8%8B%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4-m0.png">
+<meta property="og:updated_time" content="2021-11-22T04:12:34.430Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Golang 程序启动流程分析">
+<meta name="twitter:description" content="本文使用 golang 1.17 代码，如有任何问题，还望指出。  Golang 代码被操作系统运行起来的流程一、编译go 源代码首先要通过 go build 编译为可执行文件，在 linux 平台上为 ELF 格式的可执行文件，编译阶段会经过编译器、汇编器、链接器三个过程最终生成可执行文件。  1、编译器：.go 源码通过 go 编译器生成为 .s 的 plan9 汇编代码，Go 编译器入口是">
+<meta name="twitter:image" content="https://cdn.tianfeiyu.com/%E7%BC%96%E8%AF%91%E6%B5%81%E7%A8%8B.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="https://blog.tianfeiyu.com/2021/07/01/golang_bootstrap/">
+
+
+
+
+
+
+  <title>Golang 程序启动流程分析 | 田飞雨</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">田飞雨</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">专注 k8s 云原生实践</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-ebook">
+          <a href="/source-code-reading-notes/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-book"></i> <br>
+            
+            电子书
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-rss">
+          <a href="/atom.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-rss"></i> <br>
+            
+            rss
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-golang runtime" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.tianfeiyu.com/2021/07/01/golang_bootstrap/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="tianfeiyu">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="田飞雨">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Golang 程序启动流程分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-07-01T20:50:30+08:00">
+                2021-07-01
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2021/07/01/golang_bootstrap/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2021/07/01/golang_bootstrap/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <blockquote>
+<p>本文使用 golang 1.17 代码，如有任何问题，还望指出。</p>
+</blockquote>
+<h3 id="Golang-代码被操作系统运行起来的流程"><a href="#Golang-代码被操作系统运行起来的流程" class="headerlink" title="Golang 代码被操作系统运行起来的流程"></a>Golang 代码被操作系统运行起来的流程</h3><h4 id="一、编译"><a href="#一、编译" class="headerlink" title="一、编译"></a>一、编译</h4><p>go 源代码首先要通过 go build 编译为可执行文件，在 linux 平台上为 ELF 格式的可执行文件，编译阶段会经过编译器、汇编器、链接器三个过程最终生成可执行文件。</p>
+<ul>
+<li>1、编译器：<em>.go 源码通过 go 编译器生成为 </em>.s 的 plan9 汇编代码，Go 编译器入口是 <a href="https://github.com/golang/go/blob/master/src/cmd/compile/internal/gc/main.go" target="_blank" rel="noopener">compile/internal/gc/main.go</a> 文件的 main 函数；</li>
+<li>2、汇编器：通过 go 汇编器将编译器生成的 <em>.s 汇编语言转换为机器代码，并写出最终的目标程序 </em>.o 文件，<a href="https://github.com/golang/go/tree/master/src/cmd/internal/obj" target="_blank" rel="noopener">src/cmd/internal/obj </a>包实现了go汇编器；</li>
+<li>3、链接器：汇编器生成的一个个 *.o 目标文件通过链接处理得到最终的可执行程序，<a href="https://github.com/golang/go/tree/master/src/cmd/link/internal/ld" target="_blank" rel="noopener">src/cmd/link/internal/ld</a> 包实现了链接器；</li>
+</ul>
+<p><img src="https://cdn.tianfeiyu.com/%E7%BC%96%E8%AF%91%E6%B5%81%E7%A8%8B.png" alt=""></p>
+<h4 id="二、运行"><a href="#二、运行" class="headerlink" title="二、运行"></a>二、运行</h4><p>go 源码通过上述几个步骤生成可执行文件后，二进制文件在被操作系统加载起来运行时会经过如下几个阶段：</p>
+<ul>
+<li><p>1、从磁盘上把可执行程序读入内存；</p>
+</li>
+<li><p>2、创建进程和主线程；</p>
+</li>
+<li><p>3、为主线程分配栈空间；</p>
+</li>
+<li><p>4、把由用户在命令行输入的参数拷贝到主线程的栈；</p>
+</li>
+<li><p>5、把主线程放入操作系统的运行队列等待被调度执起来运行；</p>
+</li>
+</ul>
+<h3 id="Golang-程序启动流程分析"><a href="#Golang-程序启动流程分析" class="headerlink" title="Golang 程序启动流程分析"></a>Golang 程序启动流程分析</h3><h4 id="1、通过-gdb-调试分析程序启动流程"><a href="#1、通过-gdb-调试分析程序启动流程" class="headerlink" title="1、通过 gdb 调试分析程序启动流程"></a>1、通过 gdb 调试分析程序启动流程</h4><p>此处以一个简单的 go 程序通过单步调试来分析其启动过程的流程：</p>
+<p><code>main.go</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import &quot;fmt&quot;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	fmt.Println(&quot;hello world&quot;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编译该程序并使用 gdb 进行调试。使用 gdb 调试时首先在程序入口处设置一个断点，然后进行单步调试即可看到该程序启动过程中的代码执行流程。 </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">$ go build -gcflags &quot;-N -l&quot; -o main main.go</span><br><span class="line"></span><br><span class="line">$ gdb ./main</span><br><span class="line"></span><br><span class="line">(gdb) info files</span><br><span class="line">Symbols from &quot;/home/gosoon/main&quot;.</span><br><span class="line">Local exec file:</span><br><span class="line">	`/home/gosoon/main&apos;, file type elf64-x86-64.</span><br><span class="line">	Entry point: 0x465860</span><br><span class="line">	0x0000000000401000 - 0x0000000000497893 is .text</span><br><span class="line">	0x0000000000498000 - 0x00000000004dbb65 is .rodata</span><br><span class="line">	0x00000000004dbd00 - 0x00000000004dc42c is .typelink</span><br><span class="line">	0x00000000004dc440 - 0x00000000004dc490 is .itablink</span><br><span class="line">	0x00000000004dc490 - 0x00000000004dc490 is .gosymtab</span><br><span class="line">	0x00000000004dc4a0 - 0x0000000000534b90 is .gopclntab</span><br><span class="line">	0x0000000000535000 - 0x0000000000535020 is .go.buildinfo</span><br><span class="line">	0x0000000000535020 - 0x00000000005432e4 is .noptrdata</span><br><span class="line">	0x0000000000543300 - 0x000000000054aa70 is .data</span><br><span class="line">	0x000000000054aa80 - 0x00000000005781f0 is .bss</span><br><span class="line">	0x0000000000578200 - 0x000000000057d510 is .noptrbss</span><br><span class="line">	0x0000000000400f9c - 0x0000000000401000 is .note.go.buildid</span><br><span class="line">(gdb) b *0x465860</span><br><span class="line">Breakpoint 1 at 0x465860: file /home/gosoon/golang/go/src/runtime/rt0_linux_amd64.s, line 8.</span><br><span class="line">(gdb) r</span><br><span class="line">Starting program: /home/gaofeilei/./main</span><br><span class="line"></span><br><span class="line">Breakpoint 1, _rt0_amd64_linux () at /home/gaofeilei/golang/go/src/runtime/rt0_linux_amd64.s:8</span><br><span class="line">8		JMP	_rt0_amd64(SB)</span><br><span class="line">(gdb) n</span><br><span class="line">_rt0_amd64 () at /home/gaofeilei/golang/go/src/runtime/asm_amd64.s:15</span><br><span class="line">15		MOVQ	0(SP), DI	// argc</span><br><span class="line">(gdb) n</span><br><span class="line">16		LEAQ	8(SP), SI	// argv</span><br><span class="line">(gdb) n</span><br><span class="line">17		JMP	runtime·rt0_go(SB)</span><br><span class="line">(gdb) n</span><br><span class="line">runtime.rt0_go () at /home/gaofeilei/golang/go/src/runtime/asm_amd64.s:91</span><br><span class="line">91		MOVQ	DI, AX		// argc</span><br><span class="line">......</span><br><span class="line">231		CALL	runtime·mstart(SB)</span><br><span class="line">(gdb) n</span><br><span class="line">hello world</span><br><span class="line">[Inferior 1 (process 39563) exited normally]</span><br></pre></td></tr></table></figure>
+<p>通过单步调试可以看到程序入口函数在 <code>runtime/rt0_linux_amd64.s</code> 文件中的第 8 行，最终会执行 <code>CALL    runtime·mstart(SB)</code> 指令后输出 “hello world” 然后程序就退出了。</p>
+<p>启动流程流程中的函数调用如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rt0_linux_amd64.s --&gt;_rt0_amd64 --&gt; rt0_go--&gt;runtime·settls --&gt;runtime·check--&gt;runtime·args--&gt;runtime·osinit--&gt;runtime·schedinit--&gt;runtime·newproc--&gt;runtime·mstart</span><br></pre></td></tr></table></figure>
+<h4 id="2、golang-启动流程分析"><a href="#2、golang-启动流程分析" class="headerlink" title="2、golang 启动流程分析"></a>2、golang 启动流程分析</h4><p>上节通过gdb调试已经看到了 golang 程序在启动过程中会执行一系列的汇编指令，本节会具体分析启动程序过程中每条指令的含义，了解了这些才能明白 golang 程序在启动过程中所执行的操作。</p>
+<p><code>src/runtime/rt0_linux_amd64.s</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">#include &quot;textflag.h&quot;</span><br><span class="line"></span><br><span class="line">TEXT _rt0_amd64_linux(SB),NOSPLIT,$-8</span><br><span class="line">    JMP _rt0_amd64(SB)</span><br><span class="line"></span><br><span class="line">TEXT _rt0_amd64_linux_lib(SB),NOSPLIT,$0</span><br><span class="line">    JMP _rt0_amd64_lib(SB)</span><br></pre></td></tr></table></figure>
+<p>首先执行的第8行即 <code>JMP _rt0_amd64</code>，此处在 amd64 平台下运行，<code>_rt0_amd64</code> 函数所在的文件为 <code>src/runtime/asm_amd64.s</code>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">TEXT _rt0_amd64(SB),NOSPLIT,$-8</span><br><span class="line">		// 处理 argc 和 argv 参数，argc 是指命令行输入参数的个数，argv 存储了所有的命令行参数</span><br><span class="line">    MOVQ    0(SP), DI   // argc</span><br><span class="line">    // argv 为指针类型</span><br><span class="line">    LEAQ    8(SP), SI   // argv</span><br><span class="line">    JMP runtime·rt0_go(SB)</span><br></pre></td></tr></table></figure>
+<p><code>_rt0_amd64</code> 函数中将 argc 和 argv 两个参数保存到 DI 和 SI 寄存器后跳转到了 <code>rt0_go</code> 函数，<code>rt0_go</code> 函数的主要作用：</p>
+<ul>
+<li>1、将 argc、argv 参数拷贝到主线程栈上；</li>
+<li>2、初始化全局变量 g0，为 g0 在主线程栈上分配大约 64K 栈空间，并设置 g0 的stackguard0，stackguard1，stack 三个字段；</li>
+<li>3、执行 CPUID 指令，探测 CPU 信息；</li>
+<li>4、执行 nocpuinfo 代码块判断是否需要初始化 cgo；</li>
+<li>5、执行 needtls 代码块，初始化 tls 和 m0；</li>
+<li>6、执行 ok 代码块，首先将 m0 和 g0 绑定，然后调用 <code>runtime·args</code> 函数处理进程参数和环境变量，调用 <code>runtime·osinit</code> 函数初始化 cpu 数量，调用 <code>runtime·schedinit</code> 初始化调度器，调用 <code>runtime·newproc</code> 创建第一个 goroutine 执行 main 函数，调用 <code>runtime·mstart</code> 启动主线程，主线程会执行第一个 goroutine 来运行 main 函数，此处会阻塞住直到进程退出；</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">TEXT runtime·rt0_go(SB),NOSPLIT|TOPFRAME,$0</span><br><span class="line">		// 处理命令行参数的代码</span><br><span class="line">    MOVQ    DI, AX      // AX = argc </span><br><span class="line">    MOVQ    SI, BX      // BX = argv</span><br><span class="line">    // 将栈扩大39字节，此处为什么扩大39字节暂时还没有搞清楚</span><br><span class="line">    SUBQ    $(4*8+7), SP        </span><br><span class="line">    ANDQ    $~15, SP    // 调整为 16 字节对齐</span><br><span class="line">    MOVQ    AX, 16(SP)  //argc放在SP + 16字节处</span><br><span class="line">    MOVQ    BX, 24(SP)  //argv放在SP + 24字节处</span><br><span class="line"></span><br><span class="line">		// 开始初始化 g0，runtime·g0 是一个全局变量，变量在 src/runtime/proc.go 中定义，全局变量会保存在进程内存空间的数据区，下文会介绍查看 elf 二进制文件中的代码数据和全局变量的方法</span><br><span class="line">		// g0 的栈是从进程栈内存区进行分配的，g0 占用了大约 64k 大小。 </span><br><span class="line">    MOVQ    $runtime·g0(SB), DI    // g0 的地址放入 DI 寄存器 </span><br><span class="line">    LEAQ    (-64*1024+104)(SP), BX // BX = SP - 64*1024 + 104</span><br><span class="line">    </span><br><span class="line">    // 开始初始化 g0 对象的 stackguard0,stackguard1,stack 这三个字段    </span><br><span class="line">    MOVQ    BX, g_stackguard0(DI) // g0.stackguard0 = SP - 64*1024 + 104</span><br><span class="line">    MOVQ    BX, g_stackguard1(DI) // g0.stackguard1 = SP - 64*1024 + 104</span><br><span class="line">    MOVQ    BX, (g_stack+stack_lo)(DI) // g0.stack.lo = SP - 64*1024 + 104</span><br><span class="line">    MOVQ    SP, (g_stack+stack_hi)(DI) // g0.stack.hi = SP</span><br></pre></td></tr></table></figure>
+<p>执行完以上指令后，进程内存空间布局如下所示：</p>
+<p><img src="https://cdn.tianfeiyu.com/golang%E8%BF%9B%E7%A8%8B%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4.png" alt=""></p>
+<p>然后开始执行获取 cpu 信息的指令以及与 cgo 初始化相关的，此段代码暂时可以不用关注。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">		// 执行CPUID指令，尝试获取CPU信息，探测 CPU 和 指令集的代码</span><br><span class="line">    MOVL    $0, AX</span><br><span class="line">    CPUID</span><br><span class="line">    MOVL    AX, SI</span><br><span class="line">    CMPL    AX, $0</span><br><span class="line">    JE  nocpuinfo</span><br><span class="line"></span><br><span class="line">    // Figure out how to serialize RDTSC.</span><br><span class="line">    // On Intel processors LFENCE is enough. AMD requires MFENCE.</span><br><span class="line">    // Don&apos;t know about the rest, so let&apos;s do MFENCE.</span><br><span class="line">    CMPL    BX, $0x756E6547  // &quot;Genu&quot;</span><br><span class="line">    JNE notintel</span><br><span class="line">    CMPL    DX, $0x49656E69  // &quot;ineI&quot;</span><br><span class="line">    JNE notintel</span><br><span class="line">    CMPL    CX, $0x6C65746E  // &quot;ntel&quot;</span><br><span class="line">    JNE notintel</span><br><span class="line">    MOVB    $1, runtime·isIntel(SB)</span><br><span class="line">    MOVB    $1, runtime·lfenceBeforeRdtsc(SB)</span><br><span class="line">notintel:</span><br><span class="line"></span><br><span class="line">    // Load EAX=1 cpuid flags</span><br><span class="line">    MOVL    $1, AX</span><br><span class="line">    CPUID</span><br><span class="line">    MOVL    AX, runtime·processorVersionInfo(SB)</span><br><span class="line">    </span><br><span class="line">nocpuinfo:</span><br><span class="line">		// cgo 初始化相关，_cgo_init 为全局变量</span><br><span class="line">    MOVQ    _cgo_init(SB), AX</span><br><span class="line">    // 检查 AX 是否为 0</span><br><span class="line">    TESTQ   AX, AX</span><br><span class="line">    // 跳转到 needtls</span><br><span class="line">    JZ  needtls</span><br><span class="line">    // arg 1: g0, already in DI</span><br><span class="line">    MOVQ    $setg_gcc&lt;&gt;(SB), SI // arg 2: setg_gcc</span><br><span class="line"></span><br><span class="line">		CALL    AX</span><br><span class="line">		</span><br><span class="line">		// 如果开启了 CGO 特性，则会修改 g0 的部分字段</span><br><span class="line">    MOVQ    $runtime·g0(SB), CX</span><br><span class="line">    MOVQ    (g_stack+stack_lo)(CX), AX</span><br><span class="line">    ADDQ    $const__StackGuard, AX</span><br><span class="line">    MOVQ    AX, g_stackguard0(CX)</span><br><span class="line">    MOVQ    AX, g_stackguard1(CX)</span><br></pre></td></tr></table></figure>
+<p>下面开始执行 <code>needtls</code> 代码块，初始化 tls 和 m0，tls 为线程本地存储，在 golang 程序运行过程中，每个 m 都需要和一个工作线程关联，那么工作线程如何知道其关联的 m，此时就会用到线程本地存储，线程本地存储就是线程私有的全局变量，通过线程本地存储可以为每个线程初始化一个私有的全局变量 m，然后就可以在每个工作线程中都使用相同的全局变量名来访问不同的 m 结构体对象。后面会分析到其实每个工作线程 m 在刚刚被创建出来进入调度循环之前就利用线程本地存储机制为该工作线程实现了一个指向 m 结构体实例对象的私有全局变量。</p>
+<p>在后面代码分析中，会经常看到调用 <code>getg</code> 函数，<code>getg</code> 函数会从线程本地存储中获取当前正在运行的 g，这里获取出来的 m 关联的 g0。</p>
+<p>tls 地址会写到 m0 中，而 m0 会和 g0 绑定，所以可以直接从 tls 中获取到 g0。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">// 下面开始初始化tls(thread local storage，线程本地存储)，设置 m0 为线程私有变量，将 m0 绑定到主线程</span><br><span class="line">needtls:</span><br><span class="line">    LEAQ    runtime·m0+m_tls(SB), DI  //DI = &amp;m0.tls，取m0的tls成员的地址到DI寄存器</span><br><span class="line">    </span><br><span class="line">    // 调用 runtime·settls 函数设置线程本地存储，runtime·settls 函数的参数在 DI 寄存器中</span><br><span class="line">    // 在 runtime·settls 函数中将 m0.tls[1] 的地址设置为 tls 的地址</span><br><span class="line">    // runtime·settls 函数在 runtime/sys_linux_amd64.s#599</span><br><span class="line">    CALL    runtime·settls(SB)</span><br><span class="line"></span><br><span class="line">    // 此处是在验证本地存储是否可以正常工作，确保值正确写入了 m0.tls，</span><br><span class="line">    // 如果有问题则 abort 退出程序</span><br><span class="line">    // get_tls 是宏，位于 runtime/go_tls.h</span><br><span class="line">    get_tls(BX) 					 // 将 tls 的地址放入 BX 中,即 BX = &amp;m0.tls[1] </span><br><span class="line">    MOVQ    $0x123, g(BX)  // BX = 0x123，即 m0.tls[0] = 0x123</span><br><span class="line">    MOVQ    runtime·m0+m_tls(SB), AX    // AX = m0.tls[0]</span><br><span class="line">    CMPQ    AX, $0x123</span><br><span class="line">    JEQ 2(PC)   								// 如果相等则向后跳转两条指令即到 ok 代码块</span><br><span class="line">    CALL    runtime·abort(SB)   // 使用 INT 指令执行中断</span><br></pre></td></tr></table></figure>
+<p>继续执行 ok 代码块，主要逻辑为：</p>
+<ul>
+<li><p>将 m0 和 g0 进行绑定，启动主线程；</p>
+</li>
+<li><p>调用 <code>runtime·osinit</code> 函数用来初始化 cpu 数量，调度器初始化时需要知道当前系统有多少个CPU核；</p>
+</li>
+<li><p>调用 <code>runtime·schedinit</code> 函数会初始化m0和p对象，还设置了全局变量 sched 的 maxmcount 成员为10000，限制最多可以创建10000个操作系统线程出来工作；</p>
+</li>
+<li><p>调用 <code>runtime·newproc</code> 为main 函数创建 goroutine；</p>
+</li>
+<li><p>调用 <code>runtime·mstart</code> 启动主线程，执行 main 函数；</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">// 首先将 g0 地址保存在 tls 中，即 m0.tls[0] = &amp;g0，然后将 m0 和 g0 绑定</span><br><span class="line">// 即 m0.g0 = g0, g0.m = m0</span><br><span class="line">ok:</span><br><span class="line">    get_tls(BX)    							// 获取tls地址到BX寄存器，即 BX = m0.tls[0]</span><br><span class="line">    LEAQ    runtime·g0(SB), CX  // CX = &amp;g0</span><br><span class="line">    MOVQ    CX, g(BX) 				  // m0.tls[0]=&amp;g0</span><br><span class="line">    LEAQ    runtime·m0(SB), AX  // AX = &amp;m0</span><br><span class="line">  </span><br><span class="line">    MOVQ    CX, m_g0(AX)  // m0.g0 = g0</span><br><span class="line">    MOVQ    AX, g_m(CX)   // g0.m = m0</span><br><span class="line">		</span><br><span class="line">    CLD             // convention is D is always left cleared</span><br><span class="line">   	// check 函数检查了各种类型以及类型转换是否有问题，位于 runtime/runtime1.go#137 中</span><br><span class="line">    CALL    runtime·check(SB)</span><br><span class="line">	</span><br><span class="line">		// 将 argc 和 argv 移动到 SP+0 和 SP+8 的位置</span><br><span class="line">		// 此处是为了将 argc 和 argv 作为 runtime·args 函数的参数</span><br><span class="line">    MOVL    16(SP), AX      </span><br><span class="line">    MOVL    AX, 0(SP)</span><br><span class="line">    MOVQ    24(SP), AX      </span><br><span class="line">    MOVQ    AX, 8(SP)</span><br><span class="line">    </span><br><span class="line">    // args 函数会从栈中读取参数和环境变量等进行处理</span><br><span class="line">    // args 函数位于 runtime/runtime1.go#61</span><br><span class="line">    CALL    runtime·args(SB)</span><br><span class="line">    </span><br><span class="line">    // osinit 函数用来初始化 cpu 数量，函数位于 runtime/os_linux.go#301</span><br><span class="line">    CALL    runtime·osinit(SB)</span><br><span class="line">		// schedinit 函数用来初始化调度器，函数位于 runtime/proc.go#654</span><br><span class="line">    CALL    runtime·schedinit(SB)</span><br><span class="line"></span><br><span class="line">		// 创建第一个 goroutine 执行 runtime.main 函数。获取 runtime.main 的地址，调用 newproc 创建 g</span><br><span class="line">    MOVQ    $runtime·mainPC(SB), AX     </span><br><span class="line">    PUSHQ   AX            // runtime.main 作为 newproc 的第二个参数入栈</span><br><span class="line">    PUSHQ   $0            // newproc 的第一个参数入栈，该参数表示runtime.main函数需要的参数大小，runtime.main没有参数，所以这里是0</span><br><span class="line">    </span><br><span class="line">		// newproc 创建一个新的 goroutine 并放置到等待队列里，该 goroutine 会执行runtime.main 函数， 函数位于 runtime/proc.go#4250</span><br><span class="line">    CALL    runtime·newproc(SB)</span><br><span class="line">    // 弹出栈顶的数据</span><br><span class="line">    POPQ    AX</span><br><span class="line">    POPQ    AX</span><br><span class="line"></span><br><span class="line">		// mstart 函数会启动主线程进入调度循环，然后运行刚刚创建的 goroutine，mstart 会阻塞住，除非函数退出，mstart 函数位于 runtime/proc.go#1328</span><br><span class="line">    CALL    runtime·mstart(SB)</span><br><span class="line"></span><br><span class="line">    CALL    runtime·abort(SB)   // mstart should never return</span><br><span class="line">    RET</span><br><span class="line"></span><br><span class="line">    // Prevent dead-code elimination of debugCallV2, which is</span><br><span class="line">    // intended to be called by debuggers.</span><br><span class="line">    MOVQ    $runtime·debugCallV2&lt;ABIInternal&gt;(SB), AX</span><br><span class="line">    RET</span><br></pre></td></tr></table></figure>
+<p>此时进程内存空间布局如下所示：</p>
+<p><img src="https://cdn.tianfeiyu.com/golang%E8%BF%9B%E7%A8%8B%E5%9C%B0%E5%9D%80%E7%A9%BA%E9%97%B4-m0.png" alt=""></p>
+<h4 id="查看-ELF-二进制文件结构"><a href="#查看-ELF-二进制文件结构" class="headerlink" title="查看 ELF 二进制文件结构"></a>查看 ELF 二进制文件结构</h4><p>可以通过 readelf 命令查看 ELF 二进制文件的结构，可以看到二进制文件中代码区和数据区的内容，全局变量保存在数据区，函数保存在代码区。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ readelf -s main | grep runtime.g0</span><br><span class="line">  1765: 000000000054b3a0   376 OBJECT  GLOBAL DEFAULT   11 runtime.g0</span><br><span class="line">  </span><br><span class="line">// _cgo_init 为全局变量</span><br><span class="line">$ readelf -s main | grep -i _cgo_init</span><br><span class="line">  2159: 000000000054aa88     8 OBJECT  GLOBAL DEFAULT   11 _cgo_init</span><br></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>本文主要介绍 Golang 程序启动流程中的关键代码，启动过程的主要代码是通过 Plan9 汇编编写的，如果没有做过底层相关的东西看起来还是非常吃力的，笔者对其中的一些细节也未完全搞懂，如果有兴趣可以私下讨论一些详细的实现细节，其中有一些硬编码的数字以及操作系统和硬件相关的规范理解起来相对比较困难。针对 Golang runtime 中的几大组件也会陆续写出相关的分析文章。</p>
+<p>参考：</p>
+<p><a href="https://loulan.me/post/golang-boot/" target="_blank" rel="noopener">https://loulan.me/post/golang-boot/</a></p>
+<p><a href="https://mp.weixin.qq.com/s/W9D4Sl-6jYfcpczzdPfByQ" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/W9D4Sl-6jYfcpczzdPfByQ</a></p>
+<p><a href="https://programmerall.com/article/6411655977/" target="_blank" rel="noopener">https://programmerall.com/article/6411655977/</a></p>
+<p><a href="https://ld246.com/article/1547651846124" target="_blank" rel="noopener">https://ld246.com/article/1547651846124</a></p>
+<p><a href="https://zboya.github.io/post/go_scheduler/#mstartfn" target="_blank" rel="noopener">https://zboya.github.io/post/go_scheduler/#mstartfn</a></p>
+<p><a href="https://blog.csdn.net/yockie/article/details/79166713" target="_blank" rel="noopener">https://blog.csdn.net/yockie/article/details/79166713</a></p>
+<p><a href="https://blog.csdn.net/ocean_1996/article/details/107088530" target="_blank" rel="noopener">https://blog.csdn.net/ocean_1996/article/details/107088530</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/golang-runtime/" rel="tag"># golang runtime</a>
+          
+            <a href="/tags/plan9/" rel="tag"># plan9</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/04/13/go_func_return_value_or_pointer/" rel="next" title="golang 中函数使用值返回与指针返回的区别，底层原理分析">
+                <i class="fa fa-chevron-left"></i> golang 中函数使用值返回与指针返回的区别，底层原理分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<!-- 横向广告 -->
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8588056830970747" data-ad-slot="8446931428" data-ad-format="auto" data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">tianfeiyu</p>
+              <p class="site-description motion-element" itemprop="description">专注 k8s 云原生实践</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">59</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">66</span>
+                  <span class="site-state-item-name">标签</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+            <div class="feed-link motion-element">
+              <a href="/atom.xml" rel="alternate">
+                <i class="fa fa-rss"></i>
+                RSS
+              </a>
+            </div>
+          
+
+          
+
+          
+          
+
+          
+          
+        
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Golang-代码被操作系统运行起来的流程"><span class="nav-number">1.</span> <span class="nav-text">Golang 代码被操作系统运行起来的流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、编译"><span class="nav-number">1.1.</span> <span class="nav-text">一、编译</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、运行"><span class="nav-number">1.2.</span> <span class="nav-text">二、运行</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Golang-程序启动流程分析"><span class="nav-number">2.</span> <span class="nav-text">Golang 程序启动流程分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1、通过-gdb-调试分析程序启动流程"><span class="nav-number">2.1.</span> <span class="nav-text">1、通过 gdb 调试分析程序启动流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2、golang-启动流程分析"><span class="nav-number">2.2.</span> <span class="nav-text">2、golang 启动流程分析</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#查看-ELF-二进制文件结构"><span class="nav-number">2.3.</span> <span class="nav-text">查看 ELF 二进制文件结构</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">tianfeiyu</span>
+
+    <a href="http://www.beian.miit.gov.cn/">陕ICP备15001765号-1</a> 
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+ 
+    
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <!-- <script src="//unpkg.com/valine/dist/Valine.min.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/valine@1.3.9/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: '4rrWgTYNotH1jcsnIEprRQzE-gzGzoHsz',
+        appKey: 'AwqgkQSLtSvYJzrvEJzGQrRe',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
