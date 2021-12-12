@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-11-24T02:39:00.707Z</updated>
+  <updated>2021-12-12T12:55:34.001Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,36 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Golang GPM 模型剖析</title>
+    <link href="https://blog.tianfeiyu.com/2021/12/12/golang_gpm/"/>
+    <id>https://blog.tianfeiyu.com/2021/12/12/golang_gpm/</id>
+    <published>2021-12-12T12:31:30.000Z</published>
+    <updated>2021-12-12T12:55:34.001Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;blockquote&gt;
+&lt;p&gt;本文使用 golang 1.17 代码，如有任何问题，还望指出。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&quot;线程、内核线程和用户线程区别&quot;&gt;&lt;a href=&quot;#线程、内核线程和用户线程区别&quot; class=&quot;headerlink&quot;
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="golang runtime" scheme="https://blog.tianfeiyu.com/tags/golang-runtime/"/>
+    
+      <category term="GPM" scheme="https://blog.tianfeiyu.com/tags/GPM/"/>
+    
+  </entry>
   
   <entry>
     <title>Golang 程序启动流程分析</title>
@@ -531,33 +561,6 @@
       <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
     
       <category term="statefulset controller" scheme="https://blog.tianfeiyu.com/tags/statefulset-controller/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>replicaset controller 源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/"/>
-    <id>https://blog.tianfeiyu.com/2019/12/08/replicaset_controller/</id>
-    <published>2019-12-08T09:00:30.000Z</published>
-    <updated>2019-12-09T01:26:42.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;在前面的文章中已经介绍了 deployment controller 的设计与实现，deployment 控制的是 replicaset，而 replicaset 控制 pod 的创建与删除，deployment 通过控制 replicaset
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
-    
-      <category term="replicaset controller" scheme="https://blog.tianfeiyu.com/tags/replicaset-controller/"/>
     
   </entry>
   
