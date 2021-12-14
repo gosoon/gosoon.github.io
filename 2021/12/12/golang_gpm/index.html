@@ -91,13 +91,13 @@
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/%E7%94%A8%E6%88%B7%E7%BA%BF%E7%A8%8B%E4%B8%8E%E5%86%85%E6%A0%B8%E7%BA%BF%E7%A8%8B.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/goroutine%E4%B8%8E%E7%BA%BF%E7%A8%8B%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="https://cdn.tianfeiyu.com/goroutine%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%88%86%E5%B8%83.png">
+<meta property="og:image" content="https://cdn.tianfeiyu.com/goroutine_heap.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/gpm.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/P_Status.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/M_Status.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/G_Status.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/g0_g.png">
-<meta property="og:updated_time" content="2021-12-12T12:55:34.001Z">
+<meta property="og:updated_time" content="2021-12-14T03:14:59.167Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Golang GPM 模型剖析">
 <meta name="twitter:description" content="本文使用 golang 1.17 代码，如有任何问题，还望指出。  线程、内核线程和用户线程区别 线程：从内核角度来说并没有线程这个概念。Linux 把所有的线程都当做进程来实现，内核也没有特别的调度算法来处理线程。线程仅仅被视为一个与其他进程共享某些资源的进程，和进程一样，每个线程也都是有自己的task_struct，所以在内核中，线程看起来就是一个普通的进程。线程也被称作轻量级进程，一个进程">
@@ -413,7 +413,7 @@
 </li>
 </ul>
 <h3 id="Goroutine-在进程内存空间中的分布"><a href="#Goroutine-在进程内存空间中的分布" class="headerlink" title="Goroutine 在进程内存空间中的分布"></a>Goroutine 在进程内存空间中的分布</h3><p>协程的本质其实就是可以被暂停以及可以被恢复运行的函数，创建一个 goroutine 时会在进程的堆区中分配一段空间，这段空间是用来保存协程栈区的，当需要恢复协程的运行时再从堆区中出来复制出来恢复函数运行时状态。</p>
-<p><img src="https://cdn.tianfeiyu.com/goroutine%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%88%86%E5%B8%83.png" alt=""></p>
+<p><img src="https://cdn.tianfeiyu.com/goroutine_heap.png" alt=""></p>
 <h3 id="GPM-模型分析"><a href="#GPM-模型分析" class="headerlink" title="GPM 模型分析"></a>GPM 模型分析</h3><p>在 Golang 代码的历史提交记录中会发现很多代码都是从 C 翻译到 Go 的，在 go 1.4 前 runtime 中大量代码是用 C 实现的，比如当前版本 <code>proc.go</code> 文件中实现的很多调度相关的功能最开始都是用 C 实现的，后面用 Go 代码进行了翻译，如果需要了解 Golang 最开始的设计细节可以翻阅最早提交的 C 代码。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">commit b2cdf30eb6c4a76504956aaaad47df969274296b</span><br><span class="line">Author: Russ Cox &lt;rsc@golang.org&gt;</span><br><span class="line">Date:   Tue Nov 11 17:08:33 2014 -0500</span><br><span class="line"></span><br><span class="line">    [dev.cc] runtime: convert scheduler from C to Go</span><br><span class="line">    </span><br><span class="line">    </span><br><span class="line">    </span><br><span class="line">commit 15ced2d00832dd9129b4ee0ac53b5367ade24c13</span><br><span class="line">Author: Russ Cox &lt;rsc@golang.org&gt;</span><br><span class="line">Date:   Tue Nov 11 17:06:22 2014 -0500</span><br><span class="line"></span><br><span class="line">    [dev.cc] runtime: convert assembly files for C to Go transition</span><br><span class="line"></span><br><span class="line">    The main change is that #include &quot;zasm_GOOS_GOARCH.h&quot;</span><br><span class="line">    is now #include &quot;go_asm.h&quot; and/or #include &quot;go_tls.h&quot;.</span><br><span class="line"></span><br><span class="line">    Also, because C StackGuard is now Go _StackGuard,</span><br><span class="line">    the assembly name changes from const_StackGuard to</span><br><span class="line">    const__StackGuard.</span><br><span class="line"></span><br><span class="line">    In asm_$GOARCH.s, add new function getg, formerly</span><br><span class="line">    implemented in C.</span><br></pre></td></tr></table></figure>
 <p>本文主要介绍当前调度器中的 GPM 模型，首先了解下 GPM 模型中三个组件的作用与联系：</p>
@@ -507,7 +507,7 @@
 <p><strong>(2) M 的销毁</strong></p>
 <p>M 不会被销毁，当找不到要运行的 G 或者绑定不到空闲的 P 时，会通过执行 <code>stopm()</code> 函数进入到睡眠状态，在以下两种情况下会执行 <code>stopm()</code> 函数进入到睡眠状态：</p>
 <ul>
-<li>1、当 M 绑定的 P 无可运行的 G 且无法从其它 P 窃取可运行的 G 时 M 会尝试先进入自旋状态 (<code>spinning</code>) ，只有部分 M 会进入自旋状态，处于自旋状态的 M 数量最多为非空闲状态的 P 数量的一半（<code>sched.nmspinning &lt; (procs- sched.npidle)/2</code>），自旋转态的 M 会从其他 P 窃取可执行的 G，如果 M 在自旋状态未窃取到 G 或者未进入到自旋状态则会直接进入到睡眠转态；</li>
+<li>1、当 M 绑定的 P 无可运行的 G 且无法从其它 P 窃取可运行的 G 时 M 会尝试先进入自旋状态 (<code>spinning</code>) ，只有部分 M 会进入自旋状态，处于自旋状态的 M 数量最多为非空闲状态的 P 数量的一半（<code>sched.nmspinning &lt; (procs- sched.npidle)/2</code>），自旋状态的 M 会从其他 P 窃取可执行的 G，如果 M 在自旋状态未窃取到 G 或者未进入到自旋状态则会直接进入到睡眠转态；</li>
 <li>2、当 M 关联的 G 进入系统调用时，M 会主动和关联的 P 解绑 ，当  M 关联的 G 执行 <code>exitsyscall()</code> 函数退出系统调用时，M 会找一个空闲的 P 进行绑定，如果找不到空闲的 P 此时 M 会调用 <code>stopm()</code> 进入到睡眠状态；</li>
 </ul>
 <p>在 <code>stopm()</code> 函数中会将睡眠的 M 放到全局空闲队列（<code>sched.midle</code>）中。</p>
