@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2022-06-30T12:38:07.584Z</updated>
+  <updated>2022-06-30T12:53:40.628Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -21,7 +21,7 @@
     <link href="https://blog.tianfeiyu.com/2022/06/30/kubernetes_descheduler/"/>
     <id>https://blog.tianfeiyu.com/2022/06/30/kubernetes_descheduler/</id>
     <published>2022-06-30T07:36:30.000Z</published>
-    <updated>2022-06-30T12:38:07.584Z</updated>
+    <updated>2022-06-30T12:53:40.628Z</updated>
     
     <summary type="html">
     
@@ -29,10 +29,7 @@
       
         
         
-          &lt;ul&gt;
-&lt;li&gt;&lt;a href=&quot;#descheduler-组件简介&quot;&gt;Descheduler 组件简介&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href=&quot;#descheduler-策略介绍&quot;&gt;Descheduler 策略介绍&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a
+          &lt;h3 id=&quot;Descheduler-组件简介&quot;&gt;&lt;a href=&quot;#Descheduler-组件简介&quot; class=&quot;headerlink&quot; title=&quot;Descheduler 组件简介&quot;&gt;&lt;/a&gt;Descheduler
         
       
     

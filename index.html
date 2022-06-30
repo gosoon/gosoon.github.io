@@ -380,19 +380,7 @@
       
         
           
-          
-Descheduler 组件简介
-Descheduler 策略介绍
-Descheduler 功能扩展
-LowNodeUtilization 策略扩展
-1、通过告警回调触发
-2、节点利用率预测
-
-
-HighNodeUtilization 策略扩展
-
-
-Descheduler Pod 迁移场景中的约束
+          Descheduler 组件简介实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们
           ...
           <!--noindex-->
           <div class="post-button text-center">

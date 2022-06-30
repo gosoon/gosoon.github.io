@@ -81,21 +81,21 @@
 
 
 
-<meta name="description" content="Descheduler 组件简介 Descheduler 策略介绍 Descheduler 功能扩展 LowNodeUtilization 策略扩展 1、通过告警回调触发 2、节点利用率预测   HighNodeUtilization 策略扩展   Descheduler Pod 迁移场景中的约束策略 Descheduler Pod 迁移的效果分析 总结  Descheduler 组件简介实例在">
+<meta name="description" content="Descheduler 组件简介实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们希望将节点上运行的实例迁移到其他节点：  节点上 pod 利用率的变化导致某些节点利用率过低或者过高">
 <meta name="keywords" content="kubernetes,descheduler">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Kubernetes 中 Descheduler 组件的使用与扩展">
 <meta property="og:url" content="https://blog.tianfeiyu.com/2022/06/30/kubernetes_descheduler/index.html">
 <meta property="og:site_name" content="田飞雨">
-<meta property="og:description" content="Descheduler 组件简介 Descheduler 策略介绍 Descheduler 功能扩展 LowNodeUtilization 策略扩展 1、通过告警回调触发 2、节点利用率预测   HighNodeUtilization 策略扩展   Descheduler Pod 迁移场景中的约束策略 Descheduler Pod 迁移的效果分析 总结  Descheduler 组件简介实例在">
+<meta property="og:description" content="Descheduler 组件简介实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们希望将节点上运行的实例迁移到其他节点：  节点上 pod 利用率的变化导致某些节点利用率过低或者过高">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/kubernetes%2Fdescheduler-1.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/kubernetes%2Fdescheduler-2.png">
 <meta property="og:image" content="https://cdn.tianfeiyu.com/kubernetes%2Fdescheduler-3.png">
-<meta property="og:updated_time" content="2022-06-30T12:38:07.584Z">
+<meta property="og:updated_time" content="2022-06-30T12:53:40.628Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Kubernetes 中 Descheduler 组件的使用与扩展">
-<meta name="twitter:description" content="Descheduler 组件简介 Descheduler 策略介绍 Descheduler 功能扩展 LowNodeUtilization 策略扩展 1、通过告警回调触发 2、节点利用率预测   HighNodeUtilization 策略扩展   Descheduler Pod 迁移场景中的约束策略 Descheduler Pod 迁移的效果分析 总结  Descheduler 组件简介实例在">
+<meta name="twitter:description" content="Descheduler 组件简介实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们希望将节点上运行的实例迁移到其他节点：  节点上 pod 利用率的变化导致某些节点利用率过低或者过高">
 <meta name="twitter:image" content="https://cdn.tianfeiyu.com/kubernetes%2Fdescheduler-1.png">
 
 
@@ -380,23 +380,7 @@
       
 
       
-        <ul>
-<li><a href="#descheduler-组件简介">Descheduler 组件简介</a></li>
-<li><a href="#descheduler-策略介绍">Descheduler 策略介绍</a></li>
-<li><a href="#descheduler-功能扩展">Descheduler 功能扩展</a><ul>
-<li><a href="#lownodeutilization-策略扩展">LowNodeUtilization 策略扩展</a><ul>
-<li><a href="#1通过告警回调触发">1、通过告警回调触发</a></li>
-<li><a href="#2节点利用率预测">2、节点利用率预测</a></li>
-</ul>
-</li>
-<li><a href="#highnodeutilization-策略扩展">HighNodeUtilization 策略扩展</a></li>
-</ul>
-</li>
-<li><a href="#descheduler-pod-迁移场景中的约束策略">Descheduler Pod 迁移场景中的约束策略</a></li>
-<li><a href="#descheduler-pod-迁移的效果分析">Descheduler Pod 迁移的效果分析</a></li>
-<li><a href="#总结">总结</a></li>
-</ul>
-<h3 id="Descheduler-组件简介"><a href="#Descheduler-组件简介" class="headerlink" title="Descheduler 组件简介"></a>Descheduler 组件简介</h3><p>实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们希望将节点上运行的实例迁移到其他节点：</p>
+        <h3 id="Descheduler-组件简介"><a href="#Descheduler-组件简介" class="headerlink" title="Descheduler 组件简介"></a>Descheduler 组件简介</h3><p>实例在新建时，调度器可以根据当时集群状态选择最优节点进行调度，但集群内资源使用状况是动态变化的，集群在一段时间内就会出现不均衡的状态，需要 Descheduler 将节点上已经运行的 pods 迁移到其他节点，使集群内资源分布达到一个比较均衡的状态。有以下几个原因我们希望将节点上运行的实例迁移到其他节点：</p>
 <ul>
 <li>节点上 pod 利用率的变化导致某些节点利用率过低或者过高；</li>
 <li>节点标签变化导致 pod 的亲和与反亲和策略不满足要求；</li>
