@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://blog.tianfeiyu.com/"/>
-  <updated>2021-12-14T03:14:59.167Z</updated>
+  <updated>2022-06-30T12:38:07.584Z</updated>
   <id>https://blog.tianfeiyu.com/</id>
   
   <author>
@@ -15,6 +15,36 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Kubernetes 中 Descheduler 组件的使用与扩展</title>
+    <link href="https://blog.tianfeiyu.com/2022/06/30/kubernetes_descheduler/"/>
+    <id>https://blog.tianfeiyu.com/2022/06/30/kubernetes_descheduler/</id>
+    <published>2022-06-30T07:36:30.000Z</published>
+    <updated>2022-06-30T12:38:07.584Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;#descheduler-组件简介&quot;&gt;Descheduler 组件简介&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;#descheduler-策略介绍&quot;&gt;Descheduler 策略介绍&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a
+        
+      
+    
+    </summary>
+    
+    
+    
+      <category term="kubernetes" scheme="https://blog.tianfeiyu.com/tags/kubernetes/"/>
+    
+      <category term="descheduler" scheme="https://blog.tianfeiyu.com/tags/descheduler/"/>
+    
+  </entry>
   
   <entry>
     <title>Golang GPM 模型剖析</title>
@@ -534,33 +564,6 @@
       <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
     
       <category term="daemonset controller" scheme="https://blog.tianfeiyu.com/tags/daemonset-controller/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>statefulset controller 源码分析</title>
-    <link href="https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/"/>
-    <id>https://blog.tianfeiyu.com/2019/12/11/statefulset_controller/</id>
-    <published>2019-12-11T12:40:30.000Z</published>
-    <updated>2020-01-13T02:43:20.000Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;h3 id=&quot;Statefulset-的基本功能&quot;&gt;&lt;a href=&quot;#Statefulset-的基本功能&quot; class=&quot;headerlink&quot; title=&quot;Statefulset 的基本功能&quot;&gt;&lt;/a&gt;Statefulset
-        
-      
-    
-    </summary>
-    
-    
-    
-      <category term="kube-controller-manager" scheme="https://blog.tianfeiyu.com/tags/kube-controller-manager/"/>
-    
-      <category term="statefulset controller" scheme="https://blog.tianfeiyu.com/tags/statefulset-controller/"/>
     
   </entry>
   
