@@ -1007,7 +1007,7 @@
       '    <div class="sidebar-brand">',
       '      <div class="brand-icon">阅</div>',
       '      <div>',
-      '        <div class="brand-name">专属信息茧房</div>',
+      '        <div class="brand-name">公众号分组管理</div>',
       '        <div class="brand-subtitle">WEB 管理端</div>',
       '      </div>',
       '    </div>',
@@ -1033,7 +1033,7 @@
       '    <header class="topbar">',
       '      <button id="toggleSidebarButton" class="toggle-button" type="button">◀</button>',
       '      <div>',
-      '        <div class="topbar-caption">专属信息茧房 · Web Workspace</div>',
+      '        <div class="topbar-caption">公众号分组管理 · Web Workspace</div>',
       `        <h1 class="topbar-title">${escapeHtml(getCurrentTitle())}</h1>`,
       `        <div class="topbar-subtitle">${escapeHtml(renderSectionIntro())}</div>`,
       '      </div>',
@@ -1052,7 +1052,7 @@
   }
 
   function render() {
-    document.title = `${getCurrentTitle()} - 公众号分组阅读 Web 管理端`;
+    document.title = `${getCurrentTitle()} - 公众号分组管理 Web 管理端`;
     document.getElementById('app').innerHTML = renderShell();
     bindEvents();
   }
