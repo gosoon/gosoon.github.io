@@ -9,15 +9,37 @@
     window.WEB_ADMIN_CONFIG || {}
   );
 
+  const NAV_ITEMS = [
+    { id: 'articles', label: '所有文章', icon: '📚' },
+    { id: 'follows', label: '关注的公众号', icon: '👥' },
+    { id: 'favorites', label: '收藏的文章', icon: '⭐' },
+    { id: 'groups', label: '分组管理', icon: '🏷' }
+  ];
+
   const state = {
     token: '',
     snapshot: null,
-    keyword: '',
-    group: 'all',
-    account: 'all',
-    readStatus: 'all',
+    section: 'articles',
+    viewMode: 'card',
+    page: 1,
     loadSource: '',
-    errorMessage: ''
+    errorMessage: '',
+    isLoading: true,
+    sidebarCollapsed: false,
+    filters: {
+      form: {
+        keyword: '',
+        date: '',
+        account: 'all',
+        group: 'all'
+      },
+      applied: {
+        keyword: '',
+        date: '',
+        account: 'all',
+        group: 'all'
+      }
+    }
   };
 
   function clone(value) {
@@ -60,6 +82,7 @@
   function ensureSnapshot(snapshot, token) {
     const next = clone(snapshot || {});
     next.token = next.token || token;
+    next.generatedAt = next.generatedAt || '';
     next.profile = next.profile || {
       nickname: '演示账号',
       userId: 'demo-user'
@@ -196,339 +219,533 @@
       .replace(/'/g, '&#39;');
   }
 
-  function renderPills(items) {
-    return items
-      .map(function (item) {
-        return `<span class="pill ${item.muted ? 'muted' : ''}">${escapeHtml(item.label)}</span>`;
-      })
-      .join('');
+  function getCurrentTitle() {
+    const current = NAV_ITEMS.find(function (item) {
+      return item.id === state.section;
+    });
+    return current ? current.label : '所有文章';
   }
 
-  function uniqueOptions(list, key) {
-    const values = [];
+  function getAccounts() {
+    if (!state.snapshot) {
+      return [];
+    }
 
-    list.forEach(function (item) {
-      const value = item[key];
-      if (value && values.indexOf(value) === -1) {
-        values.push(value);
+    const names = [];
+    (state.snapshot.follows || []).forEach(function (item) {
+      if (item.name && names.indexOf(item.name) === -1) {
+        names.push(item.name);
       }
     });
 
-    return values;
+    return names;
   }
 
-  function applyFilters(articles) {
-    return articles.filter(function (item) {
-      const keyword = state.keyword.trim().toLowerCase();
+  function getGroups() {
+    if (!state.snapshot) {
+      return [];
+    }
+
+    return (state.snapshot.groups || []).map(function (item) {
+      return item.name;
+    });
+  }
+
+  function filterArticles(articles) {
+    const applied = state.filters.applied;
+
+    return (articles || []).filter(function (item) {
+      const keyword = String(applied.keyword || '').trim().toLowerCase();
       const keywordPassed =
         !keyword ||
         item.title.toLowerCase().includes(keyword) ||
         item.accountName.toLowerCase().includes(keyword) ||
-        (item.summary || '').toLowerCase().includes(keyword);
-      const groupPassed = state.group === 'all' || (item.groupNames || []).indexOf(state.group) >= 0;
-      const accountPassed = state.account === 'all' || item.accountName === state.account;
-      const readPassed = state.readStatus === 'all' || (state.readStatus === 'read' ? item.read : !item.read);
-      return keywordPassed && groupPassed && accountPassed && readPassed;
+        String(item.summary || '').toLowerCase().includes(keyword);
+      const datePassed = !applied.date || String(item.publishedLabel || '').startsWith(applied.date);
+      const accountPassed = applied.account === 'all' || item.accountName === applied.account;
+      const groupPassed = applied.group === 'all' || (item.groupNames || []).indexOf(applied.group) >= 0;
+
+      return keywordPassed && datePassed && accountPassed && groupPassed;
     });
   }
 
-  function renderArticleCard(article) {
+  function getSectionItems() {
+    if (!state.snapshot) {
+      return [];
+    }
+
+    if (state.section === 'favorites') {
+      return filterArticles((state.snapshot.articles || []).filter(function (item) {
+        return !!item.favorite;
+      }));
+    }
+
+    if (state.section === 'follows') {
+      return state.snapshot.follows || [];
+    }
+
+    if (state.section === 'groups') {
+      return state.snapshot.groups || [];
+    }
+
+    return filterArticles(state.snapshot.articles || []);
+  }
+
+  function getPageSize() {
+    if (state.section === 'articles' || state.section === 'favorites') {
+      return state.viewMode === 'table' ? 8 : 6;
+    }
+
+    return 6;
+  }
+
+  function getPageState(items) {
+    const pageSize = getPageSize();
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(state.page, totalPages);
+    const start = (page - 1) * pageSize;
+    const currentItems = items.slice(start, start + pageSize);
+
+    state.page = page;
+
+    return {
+      items: currentItems,
+      total,
+      page,
+      totalPages
+    };
+  }
+
+  function renderStatCards() {
+    const overview = state.snapshot.overview;
+    const cards = [
+      ['未读文章', overview.unreadCount],
+      ['关注账号', overview.followCount],
+      ['收藏文章', overview.favoriteCount],
+      ['分组数量', overview.groupCount]
+    ];
+
+    return cards
+      .map(function (item) {
+        return [
+          '<div class="stat-card">',
+          `  <div class="stat-card-label">${escapeHtml(item[0])}</div>`,
+          `  <div class="stat-card-value">${escapeHtml(item[1])}</div>`,
+          '</div>'
+        ].join('');
+      })
+      .join('');
+  }
+
+  function renderFilters() {
+    const form = state.filters.form;
+    const accounts = getAccounts();
+    const groups = getGroups();
+
     return [
-      '<article class="article-card">',
-      '  <div class="article-top">',
-      '    <div>',
-      `      <div class="article-title">${escapeHtml(article.title)}</div>`,
-      '      <div class="article-meta">',
-      `        <span>${escapeHtml(article.accountName)}</span>`,
-      `        <span>${escapeHtml(article.publishedLabel)}</span>`,
-      `        <span>${article.read ? '已读' : '未读'}</span>`,
-      `        <span>${article.favorite ? '已收藏' : '未收藏'}</span>`,
+      '<section class="panel filter-panel">',
+      '  <div class="filter-grid">',
+      '    <label class="filter-item filter-item-wide">',
+      '      <span class="filter-label">标题筛选：</span>',
+      `      <input id="keywordInput" class="field-control" type="text" placeholder="输入文章标题关键词" value="${escapeHtml(form.keyword)}" />`,
+      '    </label>',
+      '    <label class="filter-item">',
+      '      <span class="filter-label">日期筛选：</span>',
+      `      <input id="dateInput" class="field-control" type="date" value="${escapeHtml(form.date)}" />`,
+      '    </label>',
+      '    <label class="filter-item">',
+      '      <span class="filter-label">公众号筛选：</span>',
+      '      <select id="accountSelect" class="field-control field-select">',
+      '        <option value="all">全部公众号</option>',
+      accounts
+        .map(function (item) {
+          return `<option value="${escapeHtml(item)}" ${form.account === item ? 'selected' : ''}>${escapeHtml(item)}</option>`;
+        })
+        .join(''),
+      '      </select>',
+      '    </label>',
+      '    <label class="filter-item">',
+      '      <span class="filter-label">分组筛选：</span>',
+      '      <select id="groupSelect" class="field-control field-select">',
+      '        <option value="all">全部分组</option>',
+      groups
+        .map(function (item) {
+          return `<option value="${escapeHtml(item)}" ${form.group === item ? 'selected' : ''}>${escapeHtml(item)}</option>`;
+        })
+        .join(''),
+      '      </select>',
+      '    </label>',
+      '    <div class="filter-action">',
+      '      <button id="searchButton" class="primary-button" type="button">搜索</button>',
+      '    </div>',
+      '  </div>',
+      '</section>'
+    ].join('');
+  }
+
+  function renderViewSwitch() {
+    if (state.section !== 'articles' && state.section !== 'favorites') {
+      return '';
+    }
+
+    return [
+      '<section class="panel panel-compact">',
+      '  <div class="view-switch">',
+      `    <button class="view-button ${state.viewMode === 'card' ? 'active' : ''}" data-view="card" type="button">卡片视图</button>`,
+      `    <button class="view-button ${state.viewMode === 'table' ? 'active' : ''}" data-view="table" type="button">表格视图</button>`,
+      '  </div>',
+      '</section>'
+    ].join('');
+  }
+
+  function renderLoadingCard(text) {
+    return [
+      '<section class="panel content-panel loading-panel">',
+      '  <div class="spinner"></div>',
+      `  <div class="loading-text">${escapeHtml(text || '加载中...')}</div>`,
+      '</section>'
+    ].join('');
+  }
+
+  function renderArticleCards(items) {
+    if (!items.length) {
+      return '<div class="empty-state">当前筛选条件下没有文章。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        return [
+          '<article class="content-card">',
+          '  <div class="content-card-head">',
+          '    <div>',
+          `      <div class="content-card-title">${escapeHtml(item.title)}</div>`,
+          `      <div class="content-card-meta">${escapeHtml(item.accountName)} · ${escapeHtml(item.publishedLabel)}</div>`,
+          '    </div>',
+          `    <div class="status-badge ${item.read ? 'muted' : ''}">${item.read ? '已读' : '未读'}</div>`,
+          '  </div>',
+          `  <div class="content-card-summary">${escapeHtml(item.summary || '')}</div>`,
+          `  <div class="content-card-tags">${(item.groupNames || [])
+            .map(function (tag) {
+              return `<span class="tag-chip">${escapeHtml(tag)}</span>`;
+            })
+            .join('')}</div>`,
+          '  <div class="content-card-foot">',
+          `    <span class="meta-flag">${item.favorite ? '已收藏' : '未收藏'}</span>`,
+          `    <a class="inline-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看原文</a>`,
+          '  </div>',
+          '</article>'
+        ].join('');
+      })
+      .join('');
+  }
+
+  function renderArticleTable(items) {
+    if (!items.length) {
+      return '<div class="empty-state">当前筛选条件下没有文章。</div>';
+    }
+
+    return [
+      '<div class="table-shell">',
+      '  <table class="data-table">',
+      '    <thead>',
+      '      <tr>',
+      '        <th>标题</th>',
+      '        <th>公众号</th>',
+      '        <th>日期</th>',
+      '        <th>分组</th>',
+      '        <th>状态</th>',
+      '        <th>操作</th>',
+      '      </tr>',
+      '    </thead>',
+      '    <tbody>',
+      items
+        .map(function (item) {
+          return [
+            '      <tr>',
+            `        <td class="table-title-cell">${escapeHtml(item.title)}</td>`,
+            `        <td>${escapeHtml(item.accountName)}</td>`,
+            `        <td>${escapeHtml(item.publishedLabel)}</td>`,
+            `        <td>${escapeHtml((item.groupNames || []).join(' / ') || '未分组')}</td>`,
+            `        <td>${item.read ? '已读' : '未读'}${item.favorite ? ' · 收藏' : ''}</td>`,
+            `        <td><a class="inline-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看</a></td>`,
+            '      </tr>'
+          ].join('');
+        })
+        .join(''),
+      '    </tbody>',
+      '  </table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderFollows(items) {
+    if (!items.length) {
+      return '<div class="empty-state">当前没有关注公众号。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        return [
+          '<article class="content-card content-card-simple">',
+          '  <div class="content-card-head">',
+          `    <div class="content-card-title">${escapeHtml(item.name)}</div>`,
+          `    <div class="status-badge ${item.monitoringLabel.indexOf('未监控') >= 0 ? 'muted' : ''}">${escapeHtml(item.monitoringLabel)}</div>`,
+          '  </div>',
+          `  <div class="content-card-summary">${escapeHtml(item.description || '')}</div>`,
+          `  <div class="content-card-tags">${(item.groupNames || [])
+            .map(function (tag) {
+              return `<span class="tag-chip">${escapeHtml(tag)}</span>`;
+            })
+            .join('')}</div>`,
+          `  <div class="content-card-meta solo">添加时间：${escapeHtml(item.createdLabel || '')}</div>`,
+          '</article>'
+        ].join('');
+      })
+      .join('');
+  }
+
+  function renderGroups(items) {
+    if (!items.length) {
+      return '<div class="empty-state">当前没有分组。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        return [
+          '<article class="content-card content-card-simple">',
+          '  <div class="content-card-head">',
+          `    <div class="content-card-title">${escapeHtml(item.name)}</div>`,
+          `    <div class="status-badge">${escapeHtml(item.articleCount)} 篇</div>`,
+          '  </div>',
+          `  <div class="content-card-summary">${escapeHtml(item.note || '')}</div>`,
+          '  <div class="group-rules">',
+          `    <div><strong>包含：</strong>${escapeHtml(item.includeKeywordsText || '无')}</div>`,
+          `    <div><strong>排除：</strong>${escapeHtml(item.excludeKeywordsText || '无')}</div>`,
+          '  </div>',
+          '</article>'
+        ].join('');
+      })
+      .join('');
+  }
+
+  function renderContentPanel() {
+    if (state.isLoading) {
+      return renderLoadingCard('加载中...');
+    }
+
+    const items = getSectionItems();
+    const pageState = getPageState(items);
+    let body = '';
+
+    if (state.section === 'articles' || state.section === 'favorites') {
+      body = state.viewMode === 'table' ? renderArticleTable(pageState.items) : renderArticleCards(pageState.items);
+    } else if (state.section === 'follows') {
+      body = renderFollows(pageState.items);
+    } else {
+      body = renderGroups(pageState.items);
+    }
+
+    return [
+      '<section class="panel content-panel">',
+      `  <div class="content-list ${state.viewMode === 'table' ? 'table-mode' : ''}">${body}</div>`,
+      '  <div class="pagination-bar">',
+      `    <button class="page-button" data-page-action="prev" type="button" ${pageState.page <= 1 ? 'disabled' : ''}>上一页</button>`,
+      `    <button class="page-button" data-page-action="next" type="button" ${pageState.page >= pageState.totalPages ? 'disabled' : ''}>下一页</button>`,
+      `    <span class="page-summary">共 ${pageState.total} 条记录，第 ${pageState.page} / ${pageState.totalPages} 页</span>`,
+      '  </div>',
+      '</section>'
+    ].join('');
+  }
+
+  function renderStatusNotice() {
+    const noticeText = state.errorMessage || `数据源：${state.loadSource}`;
+    const noticeClass = state.errorMessage ? 'status-notice error' : 'status-notice';
+    return `<div class="${noticeClass}">${escapeHtml(noticeText)}</div>`;
+  }
+
+  function renderSectionIntro() {
+    if (state.section === 'follows') {
+      return '集中查看当前已关注的公众号和监控状态。';
+    }
+
+    if (state.section === 'favorites') {
+      return '把值得回看的重点内容单独沉淀出来。';
+    }
+
+    if (state.section === 'groups') {
+      return '直接查看分组命中规则和当前文章规模。';
+    }
+
+    return '按标题、日期、公众号和分组多维筛选，快速找到你想看的文章。';
+  }
+
+  function renderShell() {
+    if (!state.snapshot) {
+      return renderLoadingCard('正在初始化页面，请稍候。');
+    }
+
+    return [
+      `<div class="dashboard ${state.sidebarCollapsed ? 'sidebar-collapsed' : ''}">`,
+      '  <aside class="sidebar">',
+      '    <div class="sidebar-brand">',
+      '      <div class="brand-icon">🌿</div>',
+      '      <div>',
+      '        <div class="brand-name">专属信息茧房</div>',
+      '        <div class="brand-subtitle">WEB 管理端</div>',
       '      </div>',
       '    </div>',
-      `    <span class="pill ${article.read ? 'muted' : ''}">${article.read ? '已读' : '未读'}</span>`,
-      '  </div>',
-      `  <div class="article-summary">${escapeHtml(article.summary)}</div>`,
-      `  <div class="tag-row">${(article.groupNames || [])
-        .map(function (name) {
-          return `<span class="tag">${escapeHtml(name)}</span>`;
-        })
-        .join('')}</div>`,
-      `  <a class="link" href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer">查看原文</a>`,
-      '</article>'
-    ].join('');
-  }
-
-  function renderListCard(title, meta, copy, tags) {
-    return [
-      '<article class="list-card">',
-      '  <div class="item-top">',
-      '    <div>',
-      `      <div class="article-title">${escapeHtml(title)}</div>`,
-      `      <div class="item-meta">${meta
+      '    <nav class="sidebar-nav">',
+      NAV_ITEMS
         .map(function (item) {
-          return `<span>${escapeHtml(item)}</span>`;
+          return [
+            `<button class="nav-item ${state.section === item.id ? 'active' : ''}" data-section="${item.id}" type="button">`,
+            `  <span class="nav-icon">${escapeHtml(item.icon)}</span>`,
+            `  <span class="nav-label">${escapeHtml(item.label)}</span>`,
+            '</button>'
+          ].join('');
         })
-        .join('')}</div>`,
+        .join(''),
+      '    </nav>',
+      '    <div class="sidebar-footer">',
+      `      <div class="sidebar-footer-line">会员：${escapeHtml(state.snapshot.membership.membershipLabel)}</div>`,
+      `      <div class="sidebar-footer-line">状态：${escapeHtml(state.snapshot.membership.expireAtLabel)}</div>`,
+      `      <div class="sidebar-footer-line">用户：${escapeHtml(state.snapshot.profile.nickname)}</div>`,
       '    </div>',
-      '  </div>',
-      `  <div class="item-copy">${escapeHtml(copy)}</div>`,
-      `  <div class="tag-row">${(tags || [])
-        .map(function (item) {
-          return `<span class="tag">${escapeHtml(item)}</span>`;
-        })
-        .join('')}</div>`,
-      '</article>'
-    ].join('');
-  }
-
-  function renderLoading() {
-    document.getElementById('app').innerHTML = [
-      '<div class="dashboard-shell">',
-      '  <aside class="sidebar">',
-      '    <div class="brand-mark">茧</div>',
-      '    <div class="brand-title">WEB 管理端</div>',
-      '    <div class="brand-copy">正在为你加载公众号管理数据...</div>',
       '  </aside>',
-      '  <main class="main-panel">',
-      '    <div class="empty">正在初始化页面，请稍候。</div>',
+      '  <main class="main-area">',
+      '    <header class="topbar">',
+      '      <button id="toggleSidebarButton" class="toggle-button" type="button">◀</button>',
+      '      <div>',
+      `        <h1 class="topbar-title">${escapeHtml(getCurrentTitle())}</h1>`,
+      `        <div class="topbar-subtitle">${escapeHtml(renderSectionIntro())}</div>`,
+      '      </div>',
+      renderStatusNotice(),
+      '    </header>',
+      '    <section class="overview-row">',
+      renderStatCards(),
+      '    </section>',
+      (state.section === 'articles' || state.section === 'favorites') ? renderFilters() : '',
+      renderViewSwitch(),
+      renderContentPanel(),
       '  </main>',
       '</div>'
     ].join('');
   }
 
   function render() {
-    const snapshot = state.snapshot;
-    const filteredArticles = applyFilters(snapshot.articles || []);
-    const groupOptions = uniqueOptions(snapshot.groups || [], 'name');
-    const accountOptions = uniqueOptions(snapshot.articles || [], 'accountName');
-
-    document.getElementById('app').innerHTML = [
-      '<div class="dashboard-shell">',
-      '  <aside class="sidebar">',
-      '    <div class="brand-mark">茧</div>',
-      '    <div class="brand-title">WEB 管理端</div>',
-      '    <div class="brand-copy">围绕公众号分组阅读、导出和会员状态整理出的桌面工作台。部署后可以作为用户专属的管理入口。</div>',
-      `    <div class="sidebar-pills">${renderPills([
-        { label: snapshot.membership.membershipLabel },
-        { label: snapshot.membership.statusLabel },
-        { label: `数据源 ${state.loadSource}` },
-        { label: `Token ${state.token.slice(0, 8)}...`, muted: true }
-      ])}</div>`,
-      '    <div class="sidebar-note">',
-      `      <div>用户 ID：${escapeHtml(snapshot.profile.userId)}</div>`,
-      `      <div>管理地址：${escapeHtml(snapshot.webAdmin.manageUrl)}</div>`,
-      `      <div>生成时间：${escapeHtml(snapshot.generatedAt)}</div>`,
-      `      <div style="margin-top:12px;">${escapeHtml(snapshot.webAdmin.webhookDescription)}</div>`,
-      state.errorMessage
-        ? `      <div style="margin-top:12px; color:#c25b3f;">${escapeHtml(state.errorMessage)}</div>`
-        : '',
-      '    </div>',
-      '  </aside>',
-      '  <main class="main-panel">',
-      '    <section class="hero">',
-      '      <div class="hero-card">',
-      '        <div class="hero-eyebrow">Official Account Organizer</div>',
-      `        <div class="hero-title">${escapeHtml(snapshot.profile.nickname)} 的公众号管理台</div>`,
-      '        <div class="hero-copy">把关注、分组、筛选、导出和会员状态统一收口到桌面端，让公众号阅读从翻列表变成按主题工作。</div>',
-      `        <div class="hero-meta">${renderPills([
-        { label: snapshot.membership.expireAtLabel },
-        { label: snapshot.preferences.showHomeCover ? '首页封面开启' : '首页封面关闭' },
-        { label: `字体 ${snapshot.preferences.readingFontLabel}` }
-      ])}</div>`,
-      '      </div>',
-      '      <div class="hero-panel card">',
-      '        <div class="hero-panel-title">当前会员状态</div>',
-      `        <div class="hero-panel-value">${escapeHtml(snapshot.membership.statusLabel)}</div>`,
-      `        <div class="hero-panel-copy">${escapeHtml(snapshot.membership.detail)}</div>`,
-      `        <div class="hero-panel-copy">Webhook：${escapeHtml(snapshot.webAdmin.webhookStatusLabel)}</div>`,
-      '      </div>',
-      '    </section>',
-      '    <section class="stats-grid">',
-      [
-        ['未读文章', snapshot.overview.unreadCount, '帮助用户优先处理真正还没看的更新。'],
-        ['已关注公众号', snapshot.overview.followCount, '和小程序中的关注池保持同一套口径。'],
-        ['分组数量', snapshot.overview.groupCount, '按主题、行业或关注目标做内容切片。'],
-        ['监控中的公众号', snapshot.overview.monitoringCount, '支持把重要账号单独放到高频追踪列表。'],
-        ['收藏文章', snapshot.overview.favoriteCount, '沉淀值得回看的重点内容。']
-      ]
-        .map(function (item) {
-          return [
-            '<article class="card">',
-            `  <div class="stat-label">${escapeHtml(item[0])}</div>`,
-            `  <div class="stat-value">${escapeHtml(item[1])}</div>`,
-            `  <div class="stat-copy">${escapeHtml(item[2])}</div>`,
-            '</article>'
-          ].join('');
-        })
-        .join(''),
-      '    </section>',
-      '    <section class="content-grid">',
-      '      <div class="card">',
-      '        <div class="section-head">',
-      '          <div>',
-      '            <div class="section-title">文章管理</div>',
-      '            <div class="section-copy">按标题、分组、公众号和已读状态快速筛选。</div>',
-      '          </div>',
-      '        </div>',
-      '        <div class="filters">',
-      `          <input id="keywordInput" class="input" placeholder="搜索标题、公众号或摘要" value="${escapeHtml(state.keyword)}" />`,
-      '          <select id="groupSelect" class="select">',
-      '            <option value="all">全部分组</option>',
-      groupOptions
-        .map(function (item) {
-          return `<option value="${escapeHtml(item)}" ${state.group === item ? 'selected' : ''}>${escapeHtml(item)}</option>`;
-        })
-        .join(''),
-      '          </select>',
-      '          <select id="accountSelect" class="select">',
-      '            <option value="all">全部公众号</option>',
-      accountOptions
-        .map(function (item) {
-          return `<option value="${escapeHtml(item)}" ${state.account === item ? 'selected' : ''}>${escapeHtml(item)}</option>`;
-        })
-        .join(''),
-      '          </select>',
-      '          <select id="readSelect" class="select">',
-      `            <option value="all" ${state.readStatus === 'all' ? 'selected' : ''}>全部状态</option>`,
-      `            <option value="unread" ${state.readStatus === 'unread' ? 'selected' : ''}>只看未读</option>`,
-      `            <option value="read" ${state.readStatus === 'read' ? 'selected' : ''}>只看已读</option>`,
-      '          </select>',
-      '        </div>',
-      `        <div class="article-list">${
-        filteredArticles.length ? filteredArticles.map(renderArticleCard).join('') : '<div class="empty">当前筛选条件下没有文章。</div>'
-      }</div>`,
-      '      </div>',
-      '      <div class="side-grid">',
-      '        <section class="card">',
-      '          <div class="section-head">',
-      '            <div>',
-      '              <div class="section-title">内容设置</div>',
-      '              <div class="section-copy">和小程序个人中心保持一致。</div>',
-      '            </div>',
-      '          </div>',
-      '          <div class="info-list">',
-      `            <div class="info-row"><span>首页封面显示</span><strong>${snapshot.preferences.showHomeCover ? '开启' : '关闭'}</strong></div>`,
-      `            <div class="info-row"><span>阅读字体</span><strong>${escapeHtml(snapshot.preferences.readingFontLabel)}</strong></div>`,
-      `            <div class="info-row"><span>Webhook 状态</span><strong>${escapeHtml(snapshot.webAdmin.webhookStatusLabel)}</strong></div>`,
-      '          </div>',
-      '        </section>',
-      '        <section class="card">',
-      '          <div class="section-head">',
-      '            <div>',
-      '              <div class="section-title">分组列表</div>',
-      '              <div class="section-copy">直接查看过滤规则和文章规模。</div>',
-      '            </div>',
-      '          </div>',
-      `          <div class="stack-list">${
-        (snapshot.groups || []).length
-          ? snapshot.groups
-              .map(function (group) {
-                return renderListCard(
-                  group.name,
-                  [`文章 ${group.articleCount} 篇`, `包含 ${group.includeKeywordsText}`, `排除 ${group.excludeKeywordsText}`],
-                  group.note,
-                  []
-                );
-              })
-              .join('')
-          : '<div class="empty">暂无分组。</div>'
-      }</div>`,
-      '        </section>',
-      '        <section class="card">',
-      '          <div class="section-head">',
-      '            <div>',
-      '              <div class="section-title">导出与解析</div>',
-      '              <div class="section-copy">最近输出与补录历史。</div>',
-      '            </div>',
-      '          </div>',
-      `          <div class="stack-list">${
-        (snapshot.exportRecords || [])
-          .map(function (item) {
-            return renderListCard(item.name, [item.createdLabel, `文章 ${item.articleCount} 篇`], '导出记录可用于复制、归档或再加工。', []);
-          })
-          .concat(
-            (snapshot.parseRecords || []).map(function (item) {
-              return renderListCard(item.title, [item.accountName, item.parsedLabel], '来自链接解析记录，可回看补录来源。', []);
-            })
-          )
-          .join('') || '<div class="empty">暂无记录。</div>'
-      }</div>`,
-      '        </section>',
-      '      </div>',
-      '    </section>',
-      '    <section class="card" style="margin-top:20px;">',
-      '      <div class="section-head">',
-      '        <div>',
-      '          <div class="section-title">公众号关注池</div>',
-      '          <div class="section-copy">管理每个账号属于哪个分组，以及当前监控频次。</div>',
-      '        </div>',
-      '      </div>',
-      `      <div class="stack-list">${
-        (snapshot.follows || []).length
-          ? snapshot.follows
-              .map(function (follow) {
-                return renderListCard(
-                  follow.name,
-                  [follow.createdLabel, follow.monitoringLabel],
-                  follow.description,
-                  follow.groupNames || []
-                );
-              })
-              .join('')
-          : '<div class="empty">暂无关注账号。</div>'
-      }</div>`,
-      '      <div class="footer-note">部署方式：优先把 web-admin 目录连同 data 目录一起发布成静态站点。如果你已经有后端接口，再把 config.js 里的 apiBaseUrl 指到返回 snapshot 的地址即可。</div>',
-      '    </section>',
-      '  </main>',
-      '</div>'
-    ].join('');
-
+    document.getElementById('app').innerHTML = renderShell();
     bindEvents();
   }
 
+  function updateFilterForm(field, value) {
+    state.filters.form[field] = value;
+  }
+
+  function applySearch() {
+    state.filters.applied = clone(state.filters.form);
+    state.page = 1;
+    state.isLoading = true;
+    render();
+    window.setTimeout(function () {
+      state.isLoading = false;
+      render();
+    }, 240);
+  }
+
+  function switchSection(section) {
+    state.section = section;
+    state.page = 1;
+    state.isLoading = true;
+    render();
+    window.setTimeout(function () {
+      state.isLoading = false;
+      render();
+    }, 180);
+  }
+
   function bindEvents() {
+    document.querySelectorAll('[data-section]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        switchSection(element.getAttribute('data-section'));
+      });
+    });
+
     const keywordInput = document.getElementById('keywordInput');
-    const groupSelect = document.getElementById('groupSelect');
+    const dateInput = document.getElementById('dateInput');
     const accountSelect = document.getElementById('accountSelect');
-    const readSelect = document.getElementById('readSelect');
+    const groupSelect = document.getElementById('groupSelect');
+    const searchButton = document.getElementById('searchButton');
+    const toggleSidebarButton = document.getElementById('toggleSidebarButton');
 
     if (keywordInput) {
       keywordInput.addEventListener('input', function (event) {
-        state.keyword = event.target.value;
-        render();
+        updateFilterForm('keyword', event.target.value);
+      });
+      keywordInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          applySearch();
+        }
       });
     }
 
-    if (groupSelect) {
-      groupSelect.addEventListener('change', function (event) {
-        state.group = event.target.value;
-        render();
+    if (dateInput) {
+      dateInput.addEventListener('change', function (event) {
+        updateFilterForm('date', event.target.value);
       });
     }
 
     if (accountSelect) {
       accountSelect.addEventListener('change', function (event) {
-        state.account = event.target.value;
+        updateFilterForm('account', event.target.value);
+      });
+    }
+
+    if (groupSelect) {
+      groupSelect.addEventListener('change', function (event) {
+        updateFilterForm('group', event.target.value);
+      });
+    }
+
+    if (searchButton) {
+      searchButton.addEventListener('click', function () {
+        applySearch();
+      });
+    }
+
+    if (toggleSidebarButton) {
+      toggleSidebarButton.addEventListener('click', function () {
+        state.sidebarCollapsed = !state.sidebarCollapsed;
         render();
       });
     }
 
-    if (readSelect) {
-      readSelect.addEventListener('change', function (event) {
-        state.readStatus = event.target.value;
+    document.querySelectorAll('[data-view]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        state.viewMode = element.getAttribute('data-view');
+        state.page = 1;
         render();
       });
-    }
+    });
+
+    document.querySelectorAll('[data-page-action]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const action = element.getAttribute('data-page-action');
+        state.page = action === 'prev' ? Math.max(1, state.page - 1) : state.page + 1;
+        render();
+      });
+    });
   }
 
   async function bootstrap() {
     state.token = resolveToken();
-    renderLoading();
+    render();
 
     const result = await loadSnapshot(state.token);
     state.snapshot = result.snapshot;
     state.loadSource = result.source;
     state.errorMessage = result.errorMessage || '';
+    state.isLoading = false;
     render();
   }
 
