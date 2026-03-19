@@ -3,6 +3,7 @@
   const config = Object.assign(
     {
       apiBaseUrl: '',
+      actionBaseUrl: '',
       dataBaseUrl: './data',
       requestTimeoutMs: 5000
     },
@@ -75,11 +76,73 @@
     return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
   }
 
+  function buildActionUrl() {
+    const explicit = String(config.actionBaseUrl || '').trim();
+
+    if (explicit) {
+      return explicit;
+    }
+
+    const apiBase = String(config.apiBaseUrl || '').trim();
+
+    if (!apiBase) {
+      return '';
+    }
+
+    const parts = apiBase.split('?');
+    const path = parts[0] || '';
+    const query = parts[1] ? `?${parts[1]}` : '';
+
+    if (path.endsWith('/snapshot')) {
+      return `${path.replace(/\/snapshot$/, '/action')}${query}`;
+    }
+
+    return apiBase;
+  }
+
   function buildManageUrl(token) {
     const origin = window.location.origin || '';
     const pathname = window.location.pathname || '/';
     const basePath = pathname.replace(/\/[^/]*$/, '/index.html');
     return `${origin}${basePath}?token=${encodeURIComponent(token)}`;
+  }
+
+  function extractMonitoringTimes(label) {
+    const match = String(label || '').match(/(\d+)\s*次\/天/);
+    return match ? Number(match[1] || 0) : 0;
+  }
+
+  function formatReadingFontLabel(value) {
+    if (value === 'large') {
+      return '大字体';
+    }
+
+    if (value === 'xlarge') {
+      return '特大字体';
+    }
+
+    return '默认';
+  }
+
+  function formatNowLabel() {
+    const now = new Date();
+    const pad = function (value) {
+      return value < 10 ? `0${value}` : `${value}`;
+    };
+
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  function isFollowMonitoringEnabled(item) {
+    if (!item) {
+      return false;
+    }
+
+    if (typeof item.monitoringEnabled === 'boolean') {
+      return item.monitoringEnabled;
+    }
+
+    return String(item.monitoringLabel || '').indexOf('已监控') === 0;
   }
 
   function ensureSnapshot(snapshot, token) {
@@ -126,14 +189,61 @@
       next.overview || {}
     );
     next.groups = Array.isArray(next.groups) ? next.groups : [];
-    next.follows = Array.isArray(next.follows) ? next.follows : [];
-    next.articles = Array.isArray(next.articles) ? next.articles : [];
+    next.follows = Array.isArray(next.follows)
+      ? next.follows.map(function (item) {
+          const follow = Object.assign({}, item || {});
+          follow.groupNames = Array.isArray(follow.groupNames) ? follow.groupNames : [];
+          follow.monitoringEnabled = isFollowMonitoringEnabled(follow);
+          follow.monitoringTimesPerDay = Number(follow.monitoringTimesPerDay || extractMonitoringTimes(follow.monitoringLabel)) || 0;
+          follow.monitoringLabel = follow.monitoringEnabled
+            ? `已监控 · ${follow.monitoringTimesPerDay || 24} 次/天`
+            : '未监控';
+          return follow;
+        })
+      : [];
+    next.articles = Array.isArray(next.articles)
+      ? next.articles.map(function (item) {
+          return Object.assign(
+            {
+              read: false,
+              favorite: false,
+              groupNames: []
+            },
+            item || {}
+          );
+        })
+      : [];
     next.exportRecords = Array.isArray(next.exportRecords) ? next.exportRecords : [];
     next.parseRecords = Array.isArray(next.parseRecords) ? next.parseRecords : [];
+    next.preferences.readingFontSize = next.preferences.readingFontSize || 'default';
+    next.preferences.readingFontLabel = formatReadingFontLabel(next.preferences.readingFontSize);
 
     if (!next.webAdmin.manageUrl) {
       next.webAdmin.manageUrl = buildManageUrl(next.token);
     }
+
+    return rebuildOverview(next);
+  }
+
+  function rebuildOverview(snapshot) {
+    const next = snapshot || {};
+    const articles = Array.isArray(next.articles) ? next.articles : [];
+    const follows = Array.isArray(next.follows) ? next.follows : [];
+    const groups = Array.isArray(next.groups) ? next.groups : [];
+
+    next.overview = Object.assign({}, next.overview || {}, {
+      unreadCount: articles.filter(function (item) {
+        return !item.read;
+      }).length,
+      followCount: follows.length,
+      groupCount: groups.length,
+      monitoringCount: follows.filter(function (item) {
+        return isFollowMonitoringEnabled(item);
+      }).length,
+      favoriteCount: articles.filter(function (item) {
+        return !!item.favorite;
+      }).length
+    });
 
     return next;
   }
@@ -152,6 +262,41 @@
 
     try {
       const response = await fetch(url, {
+        signal: controller ? controller.signal : undefined,
+        credentials: 'omit'
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  }
+
+  async function postJson(url, data) {
+    if (!url || typeof fetch !== 'function') {
+      throw new Error('fetch unavailable');
+    }
+
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller
+      ? setTimeout(function () {
+          controller.abort();
+        }, Number(config.requestTimeoutMs || 5000))
+      : 0;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data || {}),
         signal: controller ? controller.signal : undefined,
         credentials: 'omit'
       });
@@ -262,6 +407,18 @@
     return state.snapshot.articles[0].publishedLabel || '暂无文章';
   }
 
+  function getArticleById(articleId) {
+    return (state.snapshot && state.snapshot.articles || []).find(function (item) {
+      return item.id === articleId;
+    }) || null;
+  }
+
+  function getFollowById(followId) {
+    return (state.snapshot && state.snapshot.follows || []).find(function (item) {
+      return item.id === followId;
+    }) || null;
+  }
+
   function setRuntimeNotice(message, type) {
     state.runtimeNotice = message || '';
     state.runtimeNoticeType = type || 'info';
@@ -275,18 +432,103 @@
         state.runtimeNotice = '';
         state.runtimeNoticeType = 'info';
         render();
-      }, 2400);
+      }, 2600);
     }
   }
 
-  function hasAppliedFilters() {
-    const applied = state.filters.applied;
-    return !!(
-      applied.keyword ||
-      applied.date ||
-      (applied.account && applied.account !== 'all') ||
-      (applied.group && applied.group !== 'all')
-    );
+  function mutateLocalSnapshot(mutation, payload) {
+    if (!state.snapshot) {
+      return;
+    }
+
+    const next = ensureSnapshot(clone(state.snapshot), state.token);
+
+    if (mutation === 'updatePreferences') {
+      if (Object.prototype.hasOwnProperty.call(payload, 'showHomeCover')) {
+        next.preferences.showHomeCover = payload.showHomeCover !== false;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'readingFontSize')) {
+        next.preferences.readingFontSize = payload.readingFontSize || 'default';
+        next.preferences.readingFontLabel = formatReadingFontLabel(next.preferences.readingFontSize);
+      }
+    }
+
+    if (mutation === 'toggleArticleRead' || mutation === 'toggleArticleFavorite') {
+      next.articles = next.articles.map(function (item) {
+        if (item.id !== payload.articleId) {
+          return item;
+        }
+
+        const article = Object.assign({}, item);
+
+        if (mutation === 'toggleArticleRead') {
+          article.read = Object.prototype.hasOwnProperty.call(payload, 'read') ? !!payload.read : !article.read;
+        } else {
+          article.favorite = Object.prototype.hasOwnProperty.call(payload, 'favorite') ? !!payload.favorite : !article.favorite;
+        }
+
+        return article;
+      });
+    }
+
+    if (mutation === 'toggleFollowMonitoring') {
+      next.follows = next.follows.map(function (item) {
+        if (item.id !== payload.followId) {
+          return item;
+        }
+
+        const follow = Object.assign({}, item);
+        const nextEnabled = Object.prototype.hasOwnProperty.call(payload, 'enabled')
+          ? !!payload.enabled
+          : !isFollowMonitoringEnabled(follow);
+        const timesPerDay = Number(payload.timesPerDay || follow.monitoringTimesPerDay || 24) || 24;
+
+        follow.monitoringEnabled = nextEnabled;
+        follow.monitoringTimesPerDay = nextEnabled ? timesPerDay : 0;
+        follow.monitoringLabel = nextEnabled ? `已监控 · ${timesPerDay} 次/天` : '未监控';
+        return follow;
+      });
+    }
+
+    next.generatedAt = formatNowLabel();
+    state.snapshot = rebuildOverview(next);
+  }
+
+  async function runMutation(mutation, data, successMessage) {
+    const actionUrl = buildActionUrl();
+
+    try {
+      if (actionUrl) {
+        const response = await postJson(actionUrl, {
+          token: state.token,
+          mutation,
+          data: data || {}
+        });
+
+        if (!response || response.ok === false) {
+          throw new Error(response && response.message ? response.message : '更新失败');
+        }
+
+        const snapshot = response.snapshot || response.data || null;
+
+        if (snapshot && snapshot.profile) {
+          state.snapshot = ensureSnapshot(snapshot, state.token);
+        } else {
+          mutateLocalSnapshot(mutation, data || {});
+        }
+
+        state.errorMessage = '';
+        setRuntimeNotice(successMessage, 'success');
+      } else {
+        mutateLocalSnapshot(mutation, data || {});
+        setRuntimeNotice(`${successMessage} 当前为演示模式，已在页面内本地生效。`, 'success');
+      }
+    } catch (error) {
+      setRuntimeNotice(`操作失败：${error && error.message ? error.message : '请稍后重试'}`, 'error');
+    }
+
+    render();
   }
 
   function filterArticles(articles) {
@@ -493,6 +735,15 @@
     ].join('');
   }
 
+  function renderArticleActions(item) {
+    return [
+      '<div class="content-card-actions">',
+      `  <button class="mini-action ${item.read ? 'active' : ''}" data-article-read="${escapeHtml(item.id)}" type="button">${item.read ? '标记未读' : '标记已读'}</button>`,
+      `  <button class="mini-action ${item.favorite ? 'active' : ''}" data-article-favorite="${escapeHtml(item.id)}" type="button">${item.favorite ? '取消收藏' : '加入收藏'}</button>`,
+      '</div>'
+    ].join('');
+  }
+
   function renderArticleCards(items) {
     if (!items.length) {
       return '<div class="empty-state">当前筛选条件下没有文章，试试放宽关键词或切换分组。</div>';
@@ -515,6 +766,7 @@
               return `<span class="tag-chip">${escapeHtml(tag)}</span>`;
             })
             .join('')}</div>`,
+          renderArticleActions(item),
           '  <div class="content-card-foot">',
           `    <span class="meta-flag">${item.favorite ? '已收藏' : '未收藏'}</span>`,
           `    <a class="inline-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看原文</a>`,
@@ -553,7 +805,7 @@
             `        <td>${escapeHtml(item.publishedLabel)}</td>`,
             `        <td>${escapeHtml((item.groupNames || []).join(' / ') || '未分组')}</td>`,
             `        <td>${item.read ? '已读' : '未读'}${item.favorite ? ' · 收藏' : ''}</td>`,
-            `        <td><a class="inline-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看</a></td>`,
+            `        <td><div class="table-actions"><button class="table-action ${item.read ? 'active' : ''}" data-article-read="${escapeHtml(item.id)}" type="button">${item.read ? '未读' : '已读'}</button><button class="table-action ${item.favorite ? 'active' : ''}" data-article-favorite="${escapeHtml(item.id)}" type="button">${item.favorite ? '取消收藏' : '收藏'}</button><a class="inline-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看</a></div></td>`,
             '      </tr>'
           ].join('');
         })
@@ -571,11 +823,12 @@
 
     return items
       .map(function (item) {
+        const monitoringEnabled = isFollowMonitoringEnabled(item);
         return [
           '<article class="content-card content-card-simple">',
           '  <div class="content-card-head">',
           `    <div class="content-card-title">${escapeHtml(item.name)}</div>`,
-          `    <div class="status-badge ${item.monitoringLabel.indexOf('未监控') >= 0 ? 'muted' : ''}">${escapeHtml(item.monitoringLabel)}</div>`,
+          `    <div class="status-badge ${monitoringEnabled ? '' : 'muted'}">${escapeHtml(item.monitoringLabel)}</div>`,
           '  </div>',
           `  <div class="content-card-summary">${escapeHtml(item.description || '')}</div>`,
           `  <div class="content-card-tags">${(item.groupNames || [])
@@ -584,6 +837,10 @@
             })
             .join('')}</div>`,
           `  <div class="content-card-meta solo">添加时间：${escapeHtml(item.createdLabel || '')}</div>`,
+          '  <div class="content-card-foot">',
+          `    <span class="meta-flag">${item.groupNames && item.groupNames.length ? `已归类 ${item.groupNames.length} 个分组` : '暂未分组'}</span>`,
+          `    <button class="mini-action ${monitoringEnabled ? 'active' : ''}" data-follow-monitor="${escapeHtml(item.id)}" type="button">${monitoringEnabled ? '暂停监控' : '开启监控'}</button>`,
+          '  </div>',
           '</article>'
         ].join('');
       })
@@ -646,7 +903,7 @@
   function renderStatusNotice() {
     const snapshotTime = state.snapshot && state.snapshot.generatedAt ? state.snapshot.generatedAt : '未同步';
     const noticeText = state.errorMessage || state.runtimeNotice || `数据源：${state.loadSource || '未连接'} · 最近更新 ${snapshotTime}`;
-    const noticeClass = state.errorMessage
+    const noticeClass = state.errorMessage || state.runtimeNoticeType === 'error'
       ? 'status-notice error'
       : state.runtimeNoticeType === 'success'
         ? 'status-notice success'
@@ -671,6 +928,35 @@
     return '按标题、日期、公众号和分组多维筛选，快速定位真正值得阅读的文章。';
   }
 
+  function renderSettingsPanel() {
+    const preferences = state.snapshot.preferences || {};
+    const fontSize = preferences.readingFontSize || 'default';
+
+    return [
+      '<div class="settings-card">',
+      '  <div class="workspace-side-title">内容设置</div>',
+      '  <div class="setting-row">',
+      '    <div>',
+      '      <div class="setting-label">首页封面显示</div>',
+      '      <div class="setting-desc">控制小程序首页顶部信息卡是否展示</div>',
+      '    </div>',
+      `    <button class="switch-chip ${preferences.showHomeCover ? 'active' : ''}" data-toggle-cover="1" type="button">${preferences.showHomeCover ? '已开启' : '已关闭'}</button>`,
+      '  </div>',
+      '  <div class="setting-row setting-row-stack">',
+      '    <div>',
+      '      <div class="setting-label">阅读字体</div>',
+      '      <div class="setting-desc">同步到小程序的阅读字号偏好</div>',
+      '    </div>',
+      '    <div class="setting-chip-row">',
+      `      <button class="setting-chip ${fontSize === 'default' ? 'active' : ''}" data-font-size="default" type="button">默认</button>`,
+      `      <button class="setting-chip ${fontSize === 'large' ? 'active' : ''}" data-font-size="large" type="button">大字体</button>`,
+      `      <button class="setting-chip ${fontSize === 'xlarge' ? 'active' : ''}" data-font-size="xlarge" type="button">特大字体</button>`,
+      '    </div>',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
   function renderWorkspacePanel() {
     const profile = state.snapshot.profile || {};
     const membership = state.snapshot.membership || {};
@@ -693,6 +979,7 @@
       `        <span class="info-pill">最新文章 ${escapeHtml(getLatestPublishedLabel())}</span>`,
       `        <span class="info-pill">监控中 ${escapeHtml(overview.monitoringCount || 0)} 个账号</span>`,
       '      </div>',
+      renderSettingsPanel(),
       '    </div>',
       '    <div class="workspace-side">',
       '      <div class="workspace-side-title">WEB 管理链接</div>',
@@ -746,7 +1033,7 @@
       '    <header class="topbar">',
       '      <button id="toggleSidebarButton" class="toggle-button" type="button">◀</button>',
       '      <div>',
-      `        <div class="topbar-caption">专属信息茧房 · Web Workspace</div>`,
+      '        <div class="topbar-caption">专属信息茧房 · Web Workspace</div>',
       `        <h1 class="topbar-title">${escapeHtml(getCurrentTitle())}</h1>`,
       `        <div class="topbar-subtitle">${escapeHtml(renderSectionIntro())}</div>`,
       '      </div>',
@@ -937,6 +1224,74 @@
         const action = element.getAttribute('data-page-action');
         state.page = action === 'prev' ? Math.max(1, state.page - 1) : state.page + 1;
         render();
+      });
+    });
+
+    document.querySelectorAll('[data-toggle-cover]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const preferences = state.snapshot && state.snapshot.preferences ? state.snapshot.preferences : {};
+        runMutation('updatePreferences', {
+          showHomeCover: !(preferences.showHomeCover !== false)
+        }, '内容设置已更新。');
+      });
+    });
+
+    document.querySelectorAll('[data-font-size]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const nextSize = element.getAttribute('data-font-size') || 'default';
+        runMutation('updatePreferences', {
+          readingFontSize: nextSize
+        }, '阅读字体已更新。');
+      });
+    });
+
+    document.querySelectorAll('[data-article-read]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const articleId = element.getAttribute('data-article-read') || '';
+        const article = getArticleById(articleId);
+
+        if (!article) {
+          return;
+        }
+
+        runMutation('toggleArticleRead', {
+          articleId,
+          read: !article.read
+        }, article.read ? '已改回未读状态。' : '已标记为已读。');
+      });
+    });
+
+    document.querySelectorAll('[data-article-favorite]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const articleId = element.getAttribute('data-article-favorite') || '';
+        const article = getArticleById(articleId);
+
+        if (!article) {
+          return;
+        }
+
+        runMutation('toggleArticleFavorite', {
+          articleId,
+          favorite: !article.favorite
+        }, article.favorite ? '已取消收藏。' : '已加入收藏。');
+      });
+    });
+
+    document.querySelectorAll('[data-follow-monitor]').forEach(function (element) {
+      element.addEventListener('click', function () {
+        const followId = element.getAttribute('data-follow-monitor') || '';
+        const follow = getFollowById(followId);
+
+        if (!follow) {
+          return;
+        }
+
+        const enabled = isFollowMonitoringEnabled(follow);
+        runMutation('toggleFollowMonitoring', {
+          followId,
+          enabled: !enabled,
+          timesPerDay: follow.monitoringTimesPerDay || 24
+        }, enabled ? '公众号监控已暂停。' : '公众号监控已开启。');
       });
     });
   }

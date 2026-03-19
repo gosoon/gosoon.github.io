@@ -327,6 +327,107 @@ button {
   font-size: 14px;
 }
 
+
+.settings-card {
+  margin-top: 22px;
+  padding: 12px 18px 6px;
+  border-radius: 22px;
+  background: #f8fbff;
+  border: 1px solid rgba(127, 183, 218, 0.18);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 0;
+  border-top: 1px solid #eaf1f7;
+}
+
+.setting-row:first-of-type {
+  border-top: none;
+}
+
+.setting-row-stack {
+  align-items: flex-start;
+}
+
+.setting-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setting-desc {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.setting-chip-row,
+.content-card-actions,
+.table-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.content-card-actions {
+  margin-top: 18px;
+}
+
+.setting-chip,
+.switch-chip,
+.mini-action,
+.table-action {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 183, 218, 0.18);
+  background: #ffffff;
+  color: #5f768d;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.setting-chip:hover,
+.switch-chip:hover,
+.mini-action:hover,
+.table-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(104, 132, 158, 0.08);
+}
+
+.setting-chip.active,
+.switch-chip.active,
+.mini-action.active,
+.table-action.active {
+  background: var(--accent-soft);
+  border-color: rgba(127, 183, 218, 0.28);
+  color: var(--accent-strong);
+}
+
+.switch-chip {
+  min-width: 88px;
+  background: #f3f7fb;
+}
+
+.mini-action {
+  background: #f8fbfe;
+}
+
+.table-action {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
 .workspace-side {
   padding: 22px;
   border-radius: 22px;
@@ -858,6 +959,13 @@ button {
 }
 
 @media (max-width: 720px) {
+  .setting-row,
+
+  .setting-chip-row,
+  .table-actions {
+    width: 100%;
+  }
+
   .main-area {
     padding: 18px;
   }
