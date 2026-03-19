@@ -18,7 +18,7 @@ window.WEB_ADMIN_PRESETS = [
       readingFontLabel: '默认'
     },
     webAdmin: {
-      manageUrl: 'https://your-domain.example/manage/Prp5DUuwzbvl5yMhDUw9y0QtUJUq70ap',
+      manageUrl: 'https://blog.tianfeiyu.com/wechat-admin/index.html?token=Prp5DUuwzbvl5yMhDUw9y0QtUJUq70ap',
       webhookStatusLabel: '未开启',
       webhookDescription:
         'WebHooks功能暂未开放，此功能用来满足会员的特殊需求，可以设置数据推送接口地址，当用户的文章数据更新时会主动推送数据到设定的接口。'

@@ -24,8 +24,11 @@
     page: 1,
     loadSource: '',
     errorMessage: '',
+    runtimeNotice: '',
+    runtimeNoticeType: 'info',
     isLoading: true,
     sidebarCollapsed: false,
+    noticeTimer: 0,
     filters: {
       form: {
         keyword: '',
@@ -251,16 +254,50 @@
     });
   }
 
+  function getLatestPublishedLabel() {
+    if (!state.snapshot || !Array.isArray(state.snapshot.articles) || !state.snapshot.articles.length) {
+      return '暂无文章';
+    }
+
+    return state.snapshot.articles[0].publishedLabel || '暂无文章';
+  }
+
+  function setRuntimeNotice(message, type) {
+    state.runtimeNotice = message || '';
+    state.runtimeNoticeType = type || 'info';
+
+    if (state.noticeTimer) {
+      window.clearTimeout(state.noticeTimer);
+    }
+
+    if (message) {
+      state.noticeTimer = window.setTimeout(function () {
+        state.runtimeNotice = '';
+        state.runtimeNoticeType = 'info';
+        render();
+      }, 2400);
+    }
+  }
+
+  function hasAppliedFilters() {
+    const applied = state.filters.applied;
+    return !!(
+      applied.keyword ||
+      applied.date ||
+      (applied.account && applied.account !== 'all') ||
+      (applied.group && applied.group !== 'all')
+    );
+  }
+
   function filterArticles(articles) {
     const applied = state.filters.applied;
 
     return (articles || []).filter(function (item) {
+      const title = String(item.title || '').toLowerCase();
+      const accountName = String(item.accountName || '').toLowerCase();
+      const summary = String(item.summary || '').toLowerCase();
       const keyword = String(applied.keyword || '').trim().toLowerCase();
-      const keywordPassed =
-        !keyword ||
-        item.title.toLowerCase().includes(keyword) ||
-        item.accountName.toLowerCase().includes(keyword) ||
-        String(item.summary || '').toLowerCase().includes(keyword);
+      const keywordPassed = !keyword || title.includes(keyword) || accountName.includes(keyword) || summary.includes(keyword);
       const datePassed = !applied.date || String(item.publishedLabel || '').startsWith(applied.date);
       const accountPassed = applied.account === 'all' || item.accountName === applied.account;
       const groupPassed = applied.group === 'all' || (item.groupNames || []).indexOf(applied.group) >= 0;
@@ -320,10 +357,11 @@
   function renderStatCards() {
     const overview = state.snapshot.overview;
     const cards = [
-      ['未读文章', overview.unreadCount],
-      ['关注账号', overview.followCount],
-      ['收藏文章', overview.favoriteCount],
-      ['分组数量', overview.groupCount]
+      ['未读文章', overview.unreadCount, '优先处理的新内容'],
+      ['关注账号', overview.followCount, '当前同步的公众号'],
+      ['监控开启', overview.monitoringCount, '正在自动巡检更新'],
+      ['收藏文章', overview.favoriteCount, '沉淀下来的重点内容'],
+      ['分组数量', overview.groupCount, '当前使用中的阅读视角']
     ];
 
     return cards
@@ -332,10 +370,48 @@
           '<div class="stat-card">',
           `  <div class="stat-card-label">${escapeHtml(item[0])}</div>`,
           `  <div class="stat-card-value">${escapeHtml(item[1])}</div>`,
+          `  <div class="stat-card-note">${escapeHtml(item[2])}</div>`,
           '</div>'
         ].join('');
       })
       .join('');
+  }
+
+  function renderAppliedFilters() {
+    if (state.section !== 'articles' && state.section !== 'favorites') {
+      return '';
+    }
+
+    const applied = state.filters.applied;
+    const chips = [];
+
+    if (applied.keyword) {
+      chips.push(`标题包含 ${applied.keyword}`);
+    }
+    if (applied.date) {
+      chips.push(`日期 ${applied.date}`);
+    }
+    if (applied.account && applied.account !== 'all') {
+      chips.push(`公众号 ${applied.account}`);
+    }
+    if (applied.group && applied.group !== 'all') {
+      chips.push(`分组 ${applied.group}`);
+    }
+
+    return [
+      '<div class="filter-current">',
+      '  <span class="filter-current-label">当前筛选</span>',
+      '  <div class="filter-pill-row">',
+      chips.length
+        ? chips
+            .map(function (item) {
+              return `<span class="filter-pill">${escapeHtml(item)}</span>`;
+            })
+            .join('')
+        : '<span class="filter-pill filter-pill-muted">全部内容</span>',
+      '  </div>',
+      '</div>'
+    ].join('');
   }
 
   function renderFilters() {
@@ -347,15 +423,15 @@
       '<section class="panel filter-panel">',
       '  <div class="filter-grid">',
       '    <label class="filter-item filter-item-wide">',
-      '      <span class="filter-label">标题筛选：</span>',
-      `      <input id="keywordInput" class="field-control" type="text" placeholder="输入文章标题关键词" value="${escapeHtml(form.keyword)}" />`,
+      '      <span class="filter-label">标题关键词</span>',
+      `      <input id="keywordInput" class="field-control" type="text" placeholder="输入文章标题、公众号名或摘要关键词" value="${escapeHtml(form.keyword)}" />`,
       '    </label>',
       '    <label class="filter-item">',
-      '      <span class="filter-label">日期筛选：</span>',
+      '      <span class="filter-label">发布日期</span>',
       `      <input id="dateInput" class="field-control" type="date" value="${escapeHtml(form.date)}" />`,
       '    </label>',
       '    <label class="filter-item">',
-      '      <span class="filter-label">公众号筛选：</span>',
+      '      <span class="filter-label">公众号</span>',
       '      <select id="accountSelect" class="field-control field-select">',
       '        <option value="all">全部公众号</option>',
       accounts
@@ -366,7 +442,7 @@
       '      </select>',
       '    </label>',
       '    <label class="filter-item">',
-      '      <span class="filter-label">分组筛选：</span>',
+      '      <span class="filter-label">阅读分组</span>',
       '      <select id="groupSelect" class="field-control field-select">',
       '        <option value="all">全部分组</option>',
       groups
@@ -377,24 +453,33 @@
       '      </select>',
       '    </label>',
       '    <div class="filter-action">',
-      '      <button id="searchButton" class="primary-button" type="button">搜索</button>',
+      '      <button id="searchButton" class="primary-button" type="button">应用筛选</button>',
+      '      <button id="resetFilterButton" class="secondary-button" type="button">重置筛选</button>',
       '    </div>',
       '  </div>',
+      renderAppliedFilters(),
       '</section>'
     ].join('');
   }
 
-  function renderViewSwitch() {
-    if (state.section !== 'articles' && state.section !== 'favorites') {
-      return '';
-    }
+  function renderToolbar() {
+    const items = getSectionItems();
+    const countLabel = `当前共 ${items.length} 条${state.section === 'groups' ? '分组' : state.section === 'follows' ? '关注' : '内容'}`;
 
     return [
-      '<section class="panel panel-compact">',
-      '  <div class="view-switch">',
-      `    <button class="view-button ${state.viewMode === 'card' ? 'active' : ''}" data-view="card" type="button">卡片视图</button>`,
-      `    <button class="view-button ${state.viewMode === 'table' ? 'active' : ''}" data-view="table" type="button">表格视图</button>`,
+      '<section class="panel panel-compact toolbar-panel">',
+      '  <div class="toolbar-meta">',
+      `    <div class="toolbar-title">${escapeHtml(countLabel)}</div>`,
+      `    <div class="toolbar-note">${escapeHtml(renderSectionIntro())}</div>`,
       '  </div>',
+      (state.section === 'articles' || state.section === 'favorites')
+        ? [
+            '  <div class="view-switch">',
+            `    <button class="view-button ${state.viewMode === 'card' ? 'active' : ''}" data-view="card" type="button">卡片视图</button>`,
+            `    <button class="view-button ${state.viewMode === 'table' ? 'active' : ''}" data-view="table" type="button">表格视图</button>`,
+            '  </div>'
+          ].join('')
+        : '<div class="toolbar-badge">列表视图</div>',
       '</section>'
     ].join('');
   }
@@ -410,7 +495,7 @@
 
   function renderArticleCards(items) {
     if (!items.length) {
-      return '<div class="empty-state">当前筛选条件下没有文章。</div>';
+      return '<div class="empty-state">当前筛选条件下没有文章，试试放宽关键词或切换分组。</div>';
     }
 
     return items
@@ -442,7 +527,7 @@
 
   function renderArticleTable(items) {
     if (!items.length) {
-      return '<div class="empty-state">当前筛选条件下没有文章。</div>';
+      return '<div class="empty-state">当前筛选条件下没有文章，试试放宽关键词或切换分组。</div>';
     }
 
     return [
@@ -481,7 +566,7 @@
 
   function renderFollows(items) {
     if (!items.length) {
-      return '<div class="empty-state">当前没有关注公众号。</div>';
+      return '<div class="empty-state">当前没有关注公众号，可以先从小程序里导入后再到这里统一管理。</div>';
     }
 
     return items
@@ -507,7 +592,7 @@
 
   function renderGroups(items) {
     if (!items.length) {
-      return '<div class="empty-state">当前没有分组。</div>';
+      return '<div class="empty-state">当前没有分组，可以先在小程序里建立分组规则再回到这里查看。</div>';
     }
 
     return items
@@ -531,7 +616,7 @@
 
   function renderContentPanel() {
     if (state.isLoading) {
-      return renderLoadingCard('加载中...');
+      return renderLoadingCard('正在整理页面内容，请稍候...');
     }
 
     const items = getSectionItems();
@@ -559,25 +644,69 @@
   }
 
   function renderStatusNotice() {
-    const noticeText = state.errorMessage || `数据源：${state.loadSource}`;
-    const noticeClass = state.errorMessage ? 'status-notice error' : 'status-notice';
+    const snapshotTime = state.snapshot && state.snapshot.generatedAt ? state.snapshot.generatedAt : '未同步';
+    const noticeText = state.errorMessage || state.runtimeNotice || `数据源：${state.loadSource || '未连接'} · 最近更新 ${snapshotTime}`;
+    const noticeClass = state.errorMessage
+      ? 'status-notice error'
+      : state.runtimeNoticeType === 'success'
+        ? 'status-notice success'
+        : 'status-notice';
+
     return `<div class="${noticeClass}">${escapeHtml(noticeText)}</div>`;
   }
 
   function renderSectionIntro() {
     if (state.section === 'follows') {
-      return '集中查看当前已关注的公众号和监控状态。';
+      return '集中查看当前已关注的公众号、所属分组和监控状态。';
     }
 
     if (state.section === 'favorites') {
-      return '把值得回看的重点内容单独沉淀出来。';
+      return '把值得反复回看的重点内容单独沉淀出来，方便二次查找。';
     }
 
     if (state.section === 'groups') {
-      return '直接查看分组命中规则和当前文章规模。';
+      return '按分组检查命中规则、文章规模和阅读主题划分。';
     }
 
-    return '按标题、日期、公众号和分组多维筛选，快速找到你想看的文章。';
+    return '按标题、日期、公众号和分组多维筛选，快速定位真正值得阅读的文章。';
+  }
+
+  function renderWorkspacePanel() {
+    const profile = state.snapshot.profile || {};
+    const membership = state.snapshot.membership || {};
+    const preferences = state.snapshot.preferences || {};
+    const webAdmin = state.snapshot.webAdmin || {};
+    const overview = state.snapshot.overview || {};
+    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token);
+
+    return [
+      '<section class="panel workspace-panel">',
+      '  <div class="workspace-layout">',
+      '    <div class="workspace-main">',
+      '      <div class="workspace-eyebrow">当前工作台</div>',
+      `      <div class="workspace-user">${escapeHtml(profile.nickname || '演示账号')} <span class="workspace-id">ID: ${escapeHtml(profile.userId || 'demo-user')}</span></div>`,
+      `      <div class="workspace-membership">${escapeHtml(membership.membershipLabel || '基础会员')} · ${escapeHtml(membership.statusLabel || '演示模式')} · ${escapeHtml(membership.expireAtLabel || '未连接真实服务')}</div>`,
+      `      <div class="workspace-detail">${escapeHtml(membership.detail || '已为你整理关注、分组、筛选与收藏数据。')}</div>`,
+      '      <div class="workspace-pills">',
+      `        <span class="info-pill">首页封面 ${preferences.showHomeCover ? '开启' : '关闭'}</span>`,
+      `        <span class="info-pill">阅读字体 ${escapeHtml(preferences.readingFontLabel || '默认')}</span>`,
+      `        <span class="info-pill">最新文章 ${escapeHtml(getLatestPublishedLabel())}</span>`,
+      `        <span class="info-pill">监控中 ${escapeHtml(overview.monitoringCount || 0)} 个账号</span>`,
+      '      </div>',
+      '    </div>',
+      '    <div class="workspace-side">',
+      '      <div class="workspace-side-title">WEB 管理链接</div>',
+      `      <div class="workspace-link">${escapeHtml(manageUrl)}</div>`,
+      `      <div class="workspace-side-note">WebHook：${escapeHtml(webAdmin.webhookStatusLabel || '未开启')} · ${escapeHtml(webAdmin.webhookDescription || '')}</div>`,
+      '      <div class="workspace-actions">',
+      '        <button id="refreshSnapshotButton" class="secondary-button" type="button">刷新数据</button>',
+      '        <button id="copyManageLinkButton" class="primary-button" type="button">复制链接</button>',
+      `        <a class="ghost-button anchor-button" href="${escapeHtml(manageUrl)}" target="_blank" rel="noreferrer">打开页面</a>`,
+      '      </div>',
+      '    </div>',
+      '  </div>',
+      '</section>'
+    ].join('');
   }
 
   function renderShell() {
@@ -589,7 +718,7 @@
       `<div class="dashboard ${state.sidebarCollapsed ? 'sidebar-collapsed' : ''}">`,
       '  <aside class="sidebar">',
       '    <div class="sidebar-brand">',
-      '      <div class="brand-icon">🌿</div>',
+      '      <div class="brand-icon">阅</div>',
       '      <div>',
       '        <div class="brand-name">专属信息茧房</div>',
       '        <div class="brand-subtitle">WEB 管理端</div>',
@@ -617,16 +746,18 @@
       '    <header class="topbar">',
       '      <button id="toggleSidebarButton" class="toggle-button" type="button">◀</button>',
       '      <div>',
+      `        <div class="topbar-caption">专属信息茧房 · Web Workspace</div>`,
       `        <h1 class="topbar-title">${escapeHtml(getCurrentTitle())}</h1>`,
       `        <div class="topbar-subtitle">${escapeHtml(renderSectionIntro())}</div>`,
       '      </div>',
       renderStatusNotice(),
       '    </header>',
+      renderWorkspacePanel(),
       '    <section class="overview-row">',
       renderStatCards(),
       '    </section>',
       (state.section === 'articles' || state.section === 'favorites') ? renderFilters() : '',
-      renderViewSwitch(),
+      renderToolbar(),
       renderContentPanel(),
       '  </main>',
       '</div>'
@@ -634,6 +765,7 @@
   }
 
   function render() {
+    document.title = `${getCurrentTitle()} - 公众号分组阅读 Web 管理端`;
     document.getElementById('app').innerHTML = renderShell();
     bindEvents();
   }
@@ -650,7 +782,20 @@
     window.setTimeout(function () {
       state.isLoading = false;
       render();
-    }, 240);
+    }, 220);
+  }
+
+  function resetFilters() {
+    state.filters.form = {
+      keyword: '',
+      date: '',
+      account: 'all',
+      group: 'all'
+    };
+    state.filters.applied = clone(state.filters.form);
+    state.page = 1;
+    setRuntimeNotice('筛选条件已重置。', 'success');
+    render();
   }
 
   function switchSection(section) {
@@ -661,7 +806,45 @@
     window.setTimeout(function () {
       state.isLoading = false;
       render();
-    }, 180);
+    }, 160);
+  }
+
+  async function refreshSnapshot() {
+    state.isLoading = true;
+    state.errorMessage = '';
+    render();
+
+    const result = await loadSnapshot(state.token);
+    state.snapshot = result.snapshot;
+    state.loadSource = result.source;
+    state.errorMessage = result.errorMessage || '';
+    state.isLoading = false;
+
+    if (!state.errorMessage) {
+      setRuntimeNotice('数据快照已刷新。', 'success');
+    }
+
+    render();
+  }
+
+  async function copyManageLink() {
+    const webAdmin = state.snapshot && state.snapshot.webAdmin ? state.snapshot.webAdmin : {};
+    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token);
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(manageUrl);
+        setRuntimeNotice('管理链接已复制，可直接发送给用户。', 'success');
+        render();
+        return;
+      }
+    } catch (error) {
+      // Fallback below.
+    }
+
+    window.prompt('请复制下面的管理链接', manageUrl);
+    setRuntimeNotice('当前浏览器不支持自动复制，已切换为手动复制。', 'info');
+    render();
   }
 
   function bindEvents() {
@@ -676,7 +859,10 @@
     const accountSelect = document.getElementById('accountSelect');
     const groupSelect = document.getElementById('groupSelect');
     const searchButton = document.getElementById('searchButton');
+    const resetFilterButton = document.getElementById('resetFilterButton');
     const toggleSidebarButton = document.getElementById('toggleSidebarButton');
+    const refreshSnapshotButton = document.getElementById('refreshSnapshotButton');
+    const copyManageLinkButton = document.getElementById('copyManageLinkButton');
 
     if (keywordInput) {
       keywordInput.addEventListener('input', function (event) {
@@ -713,10 +899,28 @@
       });
     }
 
+    if (resetFilterButton) {
+      resetFilterButton.addEventListener('click', function () {
+        resetFilters();
+      });
+    }
+
     if (toggleSidebarButton) {
       toggleSidebarButton.addEventListener('click', function () {
         state.sidebarCollapsed = !state.sidebarCollapsed;
         render();
+      });
+    }
+
+    if (refreshSnapshotButton) {
+      refreshSnapshotButton.addEventListener('click', function () {
+        refreshSnapshot();
+      });
+    }
+
+    if (copyManageLinkButton) {
+      copyManageLinkButton.addEventListener('click', function () {
+        copyManageLink();
       });
     }
 
