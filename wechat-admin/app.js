@@ -1027,7 +1027,7 @@
     const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token, profile);
     const avatarMarkup = profile.avatarUrl
       ? '<img class="workspace-avatar-image" src="' + escapeHtml(profile.avatarUrl) + '" alt="' + escapeHtml(profile.nickname || '微信用户') + '" />'
-      : '<div class="workspace-avatar-fallback">' + escapeHtml(profile.avatarText || '微') + '</div>';;
+      : '<div class="workspace-avatar-fallback">' + escapeHtml(profile.avatarText || '微') + '</div>';
 
     return [
       '<section class="panel workspace-panel">',
