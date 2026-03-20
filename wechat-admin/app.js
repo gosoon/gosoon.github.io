@@ -61,6 +61,15 @@
     return queryToken || pathToken || presetToken;
   }
 
+  function resolveProfileOverrides() {
+    const params = new URLSearchParams(window.location.search);
+
+    return {
+      nickname: String(params.get('displayName') || '').trim(),
+      avatarUrl: String(params.get('avatarUrl') || '').trim()
+    };
+  }
+
   function buildStaticDataUrl(token) {
     const baseUrl = String(config.dataBaseUrl || './data').replace(/\/$/, '');
     return `${baseUrl}/${encodeURIComponent(token)}.json`;
@@ -100,11 +109,43 @@
     return apiBase;
   }
 
-  function buildManageUrl(token) {
+  function appendQueryParam(url, key, value) {
+    const nextValue = String(value || '').trim();
+
+    if (!url || !nextValue) {
+      return url;
+    }
+
+    const hashIndex = url.indexOf('#');
+    const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
+    const base = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+    const separator = base.includes('?') ? '&' : '?';
+    return base + separator + encodeURIComponent(key) + '=' + encodeURIComponent(nextValue) + hash;
+  }
+
+  function isRemoteAvatarUrl(url) {
+    return /^https?:\/\//i.test(String(url || '').trim());
+  }
+
+  function buildManageUrl(token, profile) {
     const origin = window.location.origin || '';
     const pathname = window.location.pathname || '/';
     const basePath = pathname.replace(/\/[^/]*$/, '/index.html');
-    return `${origin}${basePath}?token=${encodeURIComponent(token)}`;
+    let manageUrl = origin + basePath + '?token=' + encodeURIComponent(token);
+    const version = new URLSearchParams(window.location.search).get('v');
+    const currentProfile = profile || {};
+
+    if (version) {
+      manageUrl = appendQueryParam(manageUrl, 'v', version);
+    }
+
+    manageUrl = appendQueryParam(manageUrl, 'displayName', currentProfile.nickname || '');
+
+    if (currentProfile.avatarUrl && isRemoteAvatarUrl(currentProfile.avatarUrl)) {
+      manageUrl = appendQueryParam(manageUrl, 'avatarUrl', currentProfile.avatarUrl);
+    }
+
+    return manageUrl;
   }
 
   function extractMonitoringTimes(label) {
@@ -147,12 +188,31 @@
 
   function ensureSnapshot(snapshot, token) {
     const next = clone(snapshot || {});
+    const profileOverrides = resolveProfileOverrides();
     next.token = next.token || token;
     next.generatedAt = next.generatedAt || '';
-    next.profile = next.profile || {
-      nickname: '演示账号',
-      userId: 'demo-user'
-    };
+    next.profile = Object.assign(
+      {
+        nickname: '微信用户',
+        userId: 'demo-user',
+        avatarUrl: ''
+      },
+      next.profile || {}
+    );
+
+    if (profileOverrides.nickname) {
+      next.profile.nickname = profileOverrides.nickname;
+    }
+
+    if (profileOverrides.avatarUrl) {
+      next.profile.avatarUrl = profileOverrides.avatarUrl;
+    }
+
+    if (!profileOverrides.nickname && ['YUE.ddKxai', 'tianfeiyu', '演示账号'].indexOf(String(next.profile.nickname || '').trim()) >= 0) {
+      next.profile.nickname = '微信用户';
+    }
+
+    next.profile.avatarText = String(next.profile.nickname || '微').trim().slice(0, 1) || '微';
     next.membership = Object.assign(
       {
         membershipLabel: '基础会员',
@@ -196,7 +256,7 @@
           follow.monitoringEnabled = isFollowMonitoringEnabled(follow);
           follow.monitoringTimesPerDay = Number(follow.monitoringTimesPerDay || extractMonitoringTimes(follow.monitoringLabel)) || 0;
           follow.monitoringLabel = follow.monitoringEnabled
-            ? `已监控 · ${follow.monitoringTimesPerDay || 24} 次/天`
+            ? '已监控 · ' + (follow.monitoringTimesPerDay || 24) + ' 次/天'
             : '未监控';
           return follow;
         })
@@ -217,9 +277,10 @@
     next.parseRecords = Array.isArray(next.parseRecords) ? next.parseRecords : [];
     next.preferences.readingFontSize = next.preferences.readingFontSize || 'default';
     next.preferences.readingFontLabel = formatReadingFontLabel(next.preferences.readingFontSize);
+    next.webAdmin.manageUrl = next.webAdmin.manageUrl || buildManageUrl(next.token, next.profile);
 
-    if (!next.webAdmin.manageUrl) {
-      next.webAdmin.manageUrl = buildManageUrl(next.token);
+    if (profileOverrides.nickname || profileOverrides.avatarUrl) {
+      next.webAdmin.manageUrl = buildManageUrl(next.token, next.profile);
     }
 
     return rebuildOverview(next);
@@ -963,32 +1024,40 @@
     const preferences = state.snapshot.preferences || {};
     const webAdmin = state.snapshot.webAdmin || {};
     const overview = state.snapshot.overview || {};
-    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token);
+    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token, profile);
+    const avatarMarkup = profile.avatarUrl
+      ? '<img class="workspace-avatar-image" src="' + escapeHtml(profile.avatarUrl) + '" alt="' + escapeHtml(profile.nickname || '微信用户') + '" />'
+      : '<div class="workspace-avatar-fallback">' + escapeHtml(profile.avatarText || '微') + '</div>';;
 
     return [
       '<section class="panel workspace-panel">',
       '  <div class="workspace-layout">',
       '    <div class="workspace-main">',
       '      <div class="workspace-eyebrow">当前工作台</div>',
-      `      <div class="workspace-user">${escapeHtml(profile.nickname || '演示账号')} <span class="workspace-id">ID: ${escapeHtml(profile.userId || 'demo-user')}</span></div>`,
-      `      <div class="workspace-membership">${escapeHtml(membership.membershipLabel || '基础会员')} · ${escapeHtml(membership.statusLabel || '演示模式')} · ${escapeHtml(membership.expireAtLabel || '未连接真实服务')}</div>`,
-      `      <div class="workspace-detail">${escapeHtml(membership.detail || '已为你整理关注、分组、筛选与收藏数据。')}</div>`,
+      '      <div class="workspace-profile-head">',
+      '        <div class="workspace-avatar">' + avatarMarkup + '</div>',
+      '        <div class="workspace-profile-copy">',
+      '          <div class="workspace-user">' + escapeHtml(profile.nickname || '微信用户') + ' <span class="workspace-id">ID: ' + escapeHtml(profile.userId || 'demo-user') + '</span></div>',
+      '          <div class="workspace-membership">' + escapeHtml(membership.membershipLabel || '基础会员') + ' · ' + escapeHtml(membership.statusLabel || '演示模式') + ' · ' + escapeHtml(membership.expireAtLabel || '未连接真实服务') + '</div>',
+      '        </div>',
+      '      </div>',
+      '      <div class="workspace-detail">' + escapeHtml(membership.detail || '已为你整理关注、分组、筛选与收藏数据。') + '</div>',
       '      <div class="workspace-pills">',
-      `        <span class="info-pill">首页封面 ${preferences.showHomeCover ? '开启' : '关闭'}</span>`,
-      `        <span class="info-pill">阅读字体 ${escapeHtml(preferences.readingFontLabel || '默认')}</span>`,
-      `        <span class="info-pill">最新文章 ${escapeHtml(getLatestPublishedLabel())}</span>`,
-      `        <span class="info-pill">监控中 ${escapeHtml(overview.monitoringCount || 0)} 个账号</span>`,
+      '        <span class="info-pill">首页封面 ' + (preferences.showHomeCover ? '开启' : '关闭') + '</span>',
+      '        <span class="info-pill">阅读字体 ' + escapeHtml(preferences.readingFontLabel || '默认') + '</span>',
+      '        <span class="info-pill">最新文章 ' + escapeHtml(getLatestPublishedLabel()) + '</span>',
+      '        <span class="info-pill">监控中 ' + escapeHtml(overview.monitoringCount || 0) + ' 个账号</span>',
       '      </div>',
       renderSettingsPanel(),
       '    </div>',
       '    <div class="workspace-side">',
       '      <div class="workspace-side-title">WEB 管理链接</div>',
-      `      <div class="workspace-link">${escapeHtml(manageUrl)}</div>`,
-      `      <div class="workspace-side-note">WebHook：${escapeHtml(webAdmin.webhookStatusLabel || '未开启')} · ${escapeHtml(webAdmin.webhookDescription || '')}</div>`,
+      '      <div class="workspace-link">' + escapeHtml(manageUrl) + '</div>',
+      '      <div class="workspace-side-note">WebHook：' + escapeHtml(webAdmin.webhookStatusLabel || '未开启') + ' · ' + escapeHtml(webAdmin.webhookDescription || '') + '</div>',
       '      <div class="workspace-actions">',
       '        <button id="refreshSnapshotButton" class="secondary-button" type="button">刷新数据</button>',
       '        <button id="copyManageLinkButton" class="primary-button" type="button">复制链接</button>',
-      `        <a class="ghost-button anchor-button" href="${escapeHtml(manageUrl)}" target="_blank" rel="noreferrer">打开页面</a>`,
+      '        <a class="ghost-button anchor-button" href="' + escapeHtml(manageUrl) + '" target="_blank" rel="noreferrer">打开页面</a>',
       '      </div>',
       '    </div>',
       '  </div>',
@@ -1116,7 +1185,7 @@
 
   async function copyManageLink() {
     const webAdmin = state.snapshot && state.snapshot.webAdmin ? state.snapshot.webAdmin : {};
-    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token);
+    const manageUrl = webAdmin.manageUrl || buildManageUrl(state.token, state.snapshot && state.snapshot.profile ? state.snapshot.profile : {});
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
